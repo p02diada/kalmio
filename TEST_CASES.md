@@ -65,6 +65,7 @@
 - `/api/health` status.
 - `/api/ready` returns `503` without authorized charger data and `200` after importing authorized charger data.
 - Anonymous `/api/conversation/message` stores validated A2UI blocks in the Django session.
+- Conversation clarification follow-ups preserve the previous user intent, for example urgent charging plus a later city answer.
 - The PWA quick-start flow posts free-form intents to `/api/conversation/message`, not the typed route-planning endpoint.
 - A2UI registry and unknown-type validation.
 - Account registration, current-user lookup, logout, and CSRF rejection.

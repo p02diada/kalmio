@@ -93,33 +93,38 @@ def initial_blocks() -> list[dict]:
     ]
 
 
-def run_conversation_agent(message: str) -> list[dict]:
+def run_conversation_agent(message: str, history_blocks: list[dict] | None = None) -> list[dict]:
     mode = getattr(settings, "KALMIO_CONVERSATION_AGENT_MODE", "local")
     if mode == "codex":
-        blocks = validate_blocks(run_codex_agent(message))
+        blocks = validate_blocks(run_codex_agent(message, history_blocks=history_blocks))
         if not any(item.get("type") == "UserMessage" for item in blocks):
             blocks.insert(0, block(f"user-{uuid4().hex[:10]}", "UserMessage", {"text": message.strip()}))
         return blocks
     if mode != "local":
         raise AgentResponseError(f"Modo de agente no soportado: {mode}.")
-    return validate_blocks(run_local_agent(message))
+    return validate_blocks(run_local_agent(message, history_blocks=history_blocks))
 
 
-def run_local_agent(message: str) -> list[dict]:
-    intent = parse_intent(message)
+def run_local_agent(message: str, history_blocks: list[dict] | None = None) -> list[dict]:
+    intent = parse_intent(contextualized_message(message, history_blocks or []))
     blocks = [block(f"user-{uuid4().hex[:10]}", "UserMessage", {"text": message.strip()})]
+
+    if intent.is_urgent_request:
+        location = intent.origin or intent.destination_search or intent.destination
+        if not location:
+            blocks.append(
+                clarifying_block(
+                    "Para buscar cargadores cercanos necesito tu ubicación o unas coordenadas.",
+                    ["ubicación actual", "latitud", "longitud"],
+                )
+            )
+            return blocks
+
+        blocks.extend(urgent_charge_blocks(intent, location))
+        return blocks
 
     if intent.is_destination_charge_request and not intent.is_route_request:
         blocks.extend(destination_charge_blocks(intent))
-        return blocks
-
-    if intent.is_urgent_request and not intent.origin:
-        blocks.append(
-            clarifying_block(
-                "Para buscar cargadores cercanos necesito tu ubicación o unas coordenadas.",
-                ["ubicación actual", "latitud", "longitud"],
-            )
-        )
         return blocks
 
     if intent.is_route_request:
@@ -166,15 +171,16 @@ def run_local_agent(message: str) -> list[dict]:
     return blocks
 
 
-def run_codex_agent(message: str) -> list[dict]:
+def run_codex_agent(message: str, history_blocks: list[dict] | None = None) -> list[dict]:
+    decision_message = contextualized_message(message, history_blocks or [])
     tool_history: list[dict[str, Any]] = []
     seen_calls: set[str] = set()
     max_tool_calls = getattr(settings, "KALMIO_CODEX_MAX_TOOL_CALLS", 3)
 
     for _ in range(max_tool_calls + 1):
-        decision = run_codex_decision(message, tool_history=tool_history)
+        decision = run_codex_decision(decision_message, tool_history=tool_history)
         if decision["type"] == "final":
-            return validated_or_repaired_final_blocks(message, decision["blocks"], tool_history)
+            return validated_or_repaired_final_blocks(decision_message, decision["blocks"], tool_history)
 
         call_signature = json.dumps(
             {"tool": decision["tool"], "args": decision["args"]},
@@ -559,6 +565,115 @@ def route_a2ui_issues(blocks: list[dict]) -> list[str]:
 
 def blocks_of_type(blocks: list[dict], block_type: str) -> list[dict]:
     return [item for item in blocks if isinstance(item, dict) and item.get("type") == block_type]
+
+
+def contextualized_message(message: str, history_blocks: list[dict]) -> str:
+    current_message = message.strip()
+    if not current_message or not has_open_clarification(history_blocks):
+        return current_message
+
+    current_intent = parse_intent(current_message)
+    if current_intent.is_route_request or current_intent.is_destination_charge_request or current_intent.is_urgent_request:
+        return current_message
+
+    previous_messages = recent_user_message_texts(history_blocks)
+    if not previous_messages:
+        return current_message
+    return " ".join([*previous_messages, current_message])
+
+
+def has_open_clarification(history_blocks: list[dict]) -> bool:
+    for item in reversed(history_blocks):
+        if not isinstance(item, dict):
+            continue
+        block_type = item.get("type")
+        if block_type == "ClarifyingQuestionCard":
+            return True
+        if block_type == "UserMessage":
+            return False
+    return False
+
+
+def recent_user_message_texts(history_blocks: list[dict], limit: int = 3) -> list[str]:
+    messages: list[str] = []
+    for item in reversed(history_blocks):
+        if not isinstance(item, dict) or item.get("type") != "UserMessage":
+            continue
+        props = item.get("props") if isinstance(item.get("props"), dict) else {}
+        text = str(props.get("text") or "").strip()
+        if text:
+            messages.append(text)
+        if len(messages) >= limit:
+            break
+    return list(reversed(messages))
+
+
+def urgent_charge_blocks(intent: ParsedIntent, location: ParsedLocation) -> list[dict]:
+    stations = get_nearby_stations(
+        lat=location.lat,
+        lon=location.lon,
+        radius_km=80,
+        connector=intent.vehicle_fields.get("connector"),
+        available_only=False,
+    )
+    if not stations:
+        return [
+            block(
+                f"destination-{uuid4().hex[:10]}",
+                "DestinationChargingCard",
+                {"destination": location.label, "needsConfirmation": True},
+            ),
+            block(
+                f"risk-{uuid4().hex[:10]}",
+                "RiskExplanationCard",
+                {
+                    "level": "alto",
+                    "text": (
+                        f"No hay cargadores autorizados importados cerca de {location.label}. "
+                        "No voy a inventar estaciones; comparte otra ubicación o coordenadas más precisas."
+                    ),
+                },
+            ),
+        ]
+
+    nearest = stations[0]
+    top = stations[:3]
+    return [
+        block(
+            f"urgent-{uuid4().hex[:10]}",
+            "UrgentChargeCard",
+            {
+                "battery": intent.vehicle_fields.get("battery"),
+                "nearest": nearest.station.name,
+                "distanceKm": nearest.distance_km,
+            },
+        ),
+        block(
+            f"stops-{uuid4().hex[:10]}",
+            "AlternativeStopsList",
+            {
+                "stops": [
+                    {
+                        "name": item.station.name,
+                        "powerKw": item.max_power_kw,
+                        "distanceKm": item.distance_km,
+                    }
+                    for item in top
+                ]
+            },
+        ),
+        block(
+            f"risk-{uuid4().hex[:10]}",
+            "RiskExplanationCard",
+            {
+                "level": "medio",
+                "text": (
+                    "Muestro cargadores autorizados importados cerca de la ubicación indicada. "
+                    "Confirma acceso final, tarifa y disponibilidad antes de depender de ellos."
+                ),
+            },
+        ),
+    ]
 
 
 def destination_charge_blocks(intent: ParsedIntent) -> list[dict]:

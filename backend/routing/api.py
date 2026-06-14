@@ -63,12 +63,12 @@ def create_conversation_message(request, payload: ConversationMessageRequest):
         )
     record_conversation_attempt(request)
 
+    current_blocks = request.session.get(ACTIVE_CONVERSATION_BLOCKS_KEY) or initial_blocks()
     try:
-        new_blocks = run_conversation_agent(payload.text)
+        new_blocks = run_conversation_agent(payload.text, history_blocks=current_blocks)
     except AgentResponseError as exc:
         return Response({"detail": str(exc)}, status=502)
 
-    current_blocks = request.session.get(ACTIVE_CONVERSATION_BLOCKS_KEY) or initial_blocks()
     blocks = [*current_blocks, *new_blocks]
     request.session[ACTIVE_CONVERSATION_BLOCKS_KEY] = blocks[-80:]
     request.session.modified = True

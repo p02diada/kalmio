@@ -27,17 +27,6 @@ import { getCritiqueDir } from './lib/impeccable-paths.mjs';
 /** Is there code here at all, or just context files / an empty repo? */
 function hasCode(cwd) {
   if (fs.existsSync(path.join(cwd, 'package.json'))) return true;
-  for (const d of ['frontend', 'backend']) {
-    const dir = path.join(cwd, d);
-    if (
-      fs.existsSync(path.join(dir, 'package.json'))
-      || fs.existsSync(path.join(dir, 'pyproject.toml'))
-      || fs.existsSync(path.join(dir, 'manage.py'))
-      || fs.existsSync(path.join(dir, 'src'))
-    ) {
-      return true;
-    }
-  }
   for (const d of ['src', 'app', 'pages', 'site', 'public', 'components', 'lib']) {
     if (fs.existsSync(path.join(cwd, d))) return true;
   }
@@ -168,7 +157,7 @@ const SCANNABLE_EXT = new Set([
 ]);
 // Where UI source typically lives. The detector walks these and skips
 // node_modules / dist / build / .next / .nuxt automatically.
-const SOURCE_DIRS = ['src', 'app', 'components', 'pages', 'public', 'frontend/src', 'frontend/app', 'frontend/components', 'frontend/pages', 'frontend/public'];
+const SOURCE_DIRS = ['src', 'app', 'components', 'pages', 'public'];
 
 /**
  * Local paths the agent should point the bundled detector at — never a URL.

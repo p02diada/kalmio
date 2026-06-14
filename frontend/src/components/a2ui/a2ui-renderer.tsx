@@ -133,7 +133,7 @@ function A2UIBlockView({ block, onChipClick }: { block: A2UIBlock; onChipClick?:
           title="Carga urgente"
           tone="warning"
           rows={[
-            ['Batería', `${num(block.props.battery)}%`],
+            ['Batería', percentOrUnknown(block.props.battery)],
             ['Más cercano', text(block.props.nearest)],
             ['Distancia', `${num(block.props.distanceKm)} km`],
           ]}
@@ -425,6 +425,10 @@ function text(value: unknown) {
 
 function num(value: unknown) {
   return typeof value === 'number' ? value : 0
+}
+
+function percentOrUnknown(value: unknown) {
+  return typeof value === 'number' ? `${value}%` : 'No indicada'
 }
 
 function bool(value: unknown) {

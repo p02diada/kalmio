@@ -155,6 +155,56 @@ def test_conversation_message_handles_destination_charging_without_route_planner
 
 
 @pytest.mark.django_db
+def test_conversation_message_preserves_urgent_charge_intent_for_location_followup(client):
+    source = DataSource.objects.create(name="Authorized provider Córdoba", kind="ocpi", is_authorized=True)
+    operator = Operator.objects.create(name="Córdoba Operator")
+    station = Station.objects.create(
+        external_id="real-cordoba-001",
+        operator=operator,
+        data_source=source,
+        name="Córdoba Centro HPC",
+        address="Córdoba",
+        latitude=Decimal("37.890000"),
+        longitude=Decimal("-4.780000"),
+        amenities=["bathroom"],
+        is_sample_data=False,
+    )
+    evse = EVSE.objects.create(station=station, evse_uid="real-cordoba-001-1", max_power_kw=150, status="available")
+    Connector.objects.create(evse=evse, connector_type="CCS2", max_power_kw=150)
+    ReliabilityScore.objects.create(station=station, score=84, reasons=["provider_history"])
+
+    first_response = client.post(
+        "/api/conversation/message",
+        data={"text": "Necesito cargar ya"},
+        content_type="application/json",
+    )
+
+    assert first_response.status_code == 200
+    assert first_response.json()["blocks"][-1]["type"] == "ClarifyingQuestionCard"
+
+    second_response = client.post(
+        "/api/conversation/message",
+        data={"text": "En cordoba"},
+        content_type="application/json",
+    )
+
+    assert second_response.status_code == 200
+    blocks = second_response.json()["blocks"]
+    latest_user_index = max(
+        index
+        for index, item in enumerate(blocks)
+        if item["type"] == "UserMessage" and item["props"]["text"] == "En cordoba"
+    )
+    new_blocks = blocks[latest_user_index + 1 :]
+    new_block_types = [block["type"] for block in new_blocks]
+    assert "UrgentChargeCard" in new_block_types
+    assert "AlternativeStopsList" in new_block_types
+    assert "ClarifyingQuestionCard" not in new_block_types
+    urgent_block = next(block for block in new_blocks if block["type"] == "UrgentChargeCard")
+    assert urgent_block["props"]["nearest"] == station.name
+
+
+@pytest.mark.django_db
 def test_codex_conversation_agent_executes_allowlisted_tool(client, settings, monkeypatch, real_station):
     settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
 
