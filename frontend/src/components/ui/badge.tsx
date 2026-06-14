@@ -4,13 +4,13 @@ import type * as React from 'react'
 import { cn } from '@/lib/utils'
 
 const badgeVariants = cva(
-  'inline-flex w-fit items-center rounded-md border px-2 py-0.5 text-xs font-medium',
+  'inline-flex w-fit items-center rounded-full border px-2 py-0.5 text-xs font-medium',
   {
     variants: {
       variant: {
-        default: 'border-primary/25 bg-primary-soft text-foreground',
+        default: 'border-border bg-muted text-foreground',
         secondary: 'border-border bg-muted text-muted-foreground',
-        warning: 'border-warning/30 bg-warning/20 text-foreground',
+        warning: 'border-warning bg-warning-soft text-foreground',
       },
     },
     defaultVariants: {
@@ -26,4 +26,3 @@ export function Badge({
 }: React.ComponentProps<'span'> & VariantProps<typeof badgeVariants>) {
   return <span className={cn(badgeVariants({ variant, className }))} {...props} />
 }
-

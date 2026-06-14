@@ -24,7 +24,7 @@ import {
   UserRound,
   Zap,
 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { A2UIRenderer } from '@/components/a2ui/a2ui-renderer'
 import { Button } from '@/components/ui/button'
@@ -79,26 +79,26 @@ const quickPrompts = [
 
 function AppShell() {
   return (
-    <div className="min-h-svh bg-background px-0 text-foreground md:bg-muted md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-svh w-full max-w-[430px] flex-col bg-surface shadow-none md:min-h-[880px] md:overflow-hidden md:rounded-xl md:border md:border-border md:shadow-[0_12px_32px_oklch(20.5%_0_0_/_0.12)]">
-        <header className="sticky top-0 z-10 border-b border-border bg-surface px-6 pb-3 pt-5">
+    <div className="app-frame">
+      <div className="app-shell">
+        <header className="sticky top-0 z-10 border-b border-border bg-surface px-6 py-3">
           <div className="flex items-center justify-between gap-3">
             <Link to="/" className="flex items-baseline gap-1" aria-label="Kalmio home">
-              <span className="text-[1.05rem] font-semibold leading-none text-primary">Kalmio</span>
-              <span className="text-[1.05rem] font-semibold leading-none text-primary">EV</span>
+              <span className="text-sm font-semibold leading-none text-foreground">Kalmio</span>
+              <span className="font-mono text-xs leading-none text-muted-foreground">EV</span>
             </Link>
-            <span className="grid size-8 place-items-center rounded-full border border-border bg-surface text-foreground shadow-[0_2px_6px_oklch(20.5%_0_0_/_0.08)]">
+            <span className="grid size-8 place-items-center rounded-full border border-border bg-surface text-foreground">
               <UserRound className="size-4" aria-hidden="true" />
             </span>
           </div>
         </header>
 
-        <main className="flex-1 px-6 pb-24 pt-5">
+        <main className="app-main">
           <Outlet />
         </main>
 
         <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface px-3 py-2 md:sticky md:bottom-auto">
-          <div className="mx-auto grid max-w-[430px] grid-cols-4 gap-1">
+          <div className="mx-auto grid max-w-app-width grid-cols-4 gap-1">
             <NavItem to="/" icon={Home} label="Inicio" />
             <NavItem to="/chat" icon={MessageCircle} label="Chat" />
             <NavItem to="/activity" icon={Activity} label="Planes" />
@@ -123,7 +123,7 @@ function NavItem({
   return (
     <Link
       to={to}
-      className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-md px-1 text-[0.72rem] font-medium text-muted-foreground transition-colors hover:text-foreground [&.active]:font-semibold [&.active]:text-primary"
+      className="app-nav-item"
     >
       <Icon className="size-4" aria-hidden="true" />
       <span>{label}</span>
@@ -144,17 +144,17 @@ function HomePage() {
   }
 
   return (
-    <section className="space-y-5">
-      <div className="space-y-2 pt-2">
-        <p className="text-[0.82rem] font-semibold uppercase tracking-[0.08em] text-primary">Viaja sin ansiedad de carga</p>
-        <h1 className="text-[1.82rem] font-semibold leading-[1.04] text-foreground">¿Qué necesitas hacer ahora?</h1>
-        <p className="text-sm leading-6 text-muted-foreground">
+    <section className="space-y-6">
+      <div className="space-y-3 pt-2">
+        <p className="font-mono text-xs leading-4 text-muted-foreground">Viaja sin ansiedad de carga</p>
+        <h1 className="max-w-hero-width text-hero font-semibold leading-none tracking-display text-foreground">¿Qué necesitas hacer ahora?</h1>
+        <p className="text-base leading-7 text-body">
           Dime la intención. El agente decidirá si necesita aclarar datos, buscar cargadores o calcular una ruta.
         </p>
       </div>
 
       <form
-        className="rounded-[22px] border border-border bg-surface shadow-[0_6px_14px_oklch(20.5%_0_0_/_0.10)]"
+        className="rounded-sm border border-border bg-surface"
         onSubmit={(event) => {
           event.preventDefault()
           startChat(intent)
@@ -166,7 +166,7 @@ function HomePage() {
             value={intent}
             onChange={(event) => setIntent(event.target.value)}
             placeholder="Ruta, hotel, carga urgente..."
-            className="h-10 flex-1 rounded-none border-0 bg-transparent px-0 py-0 text-[0.95rem] shadow-none focus-visible:outline-none"
+            className="h-10 flex-1 rounded-none border-0 bg-transparent px-0 py-0 text-input shadow-none focus-visible:outline-none"
           />
           <Button type="submit" size="icon" aria-label="Abrir chat" className="size-11 shrink-0 rounded-full">
             <ArrowUp className="size-5" aria-hidden="true" />
@@ -175,8 +175,8 @@ function HomePage() {
       </form>
 
       <div className="space-y-2.5">
-        <p className="text-[0.82rem] font-semibold leading-5 text-foreground">Inicio rápido</p>
-        <div className="flex flex-col items-start gap-2">
+        <p className="text-compact font-semibold text-foreground">Inicio rápido</p>
+        <div className="flex flex-wrap items-start gap-2">
           {quickPrompts.map((prompt) => {
             const Icon = prompt.icon
             return (
@@ -185,10 +185,10 @@ function HomePage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-9 justify-start gap-3 rounded-md border-border bg-surface px-4 text-[0.86rem] font-medium shadow-[0_2px_6px_oklch(20.5%_0_0_/_0.08)] hover:bg-muted"
+                className="h-9 justify-start gap-2 border-border bg-surface px-3 text-compact font-medium hover:bg-muted"
                 onClick={() => startChat(prompt.value)}
               >
-                <Icon className="size-4 text-primary" aria-hidden="true" />
+                <Icon className="size-4 text-foreground" aria-hidden="true" />
                 {prompt.label}
               </Button>
             )
@@ -196,14 +196,14 @@ function HomePage() {
         </div>
       </div>
 
-      <Card className="border-primary/20 bg-primary-soft">
+      <Card className="bg-muted">
         <CardContent className="flex items-start gap-3 p-3">
-          <span className="grid size-9 shrink-0 place-items-center rounded-md bg-surface text-primary">
+          <span className="grid size-9 shrink-0 place-items-center rounded-md bg-surface text-foreground">
             <Sparkles className="size-5" aria-hidden="true" />
           </span>
           <div className="space-y-1">
-            <h2 className="font-bold text-primary">Chat primero, mapa después.</h2>
-            <p className="text-sm leading-6 text-foreground">
+            <h2 className="font-semibold text-foreground">Chat primero, mapa después.</h2>
+            <p className="text-sm leading-6 text-body">
               Las respuestas se pintan con componentes A2UI permitidos. Si falta una fuente fiable, Kalmio lo dirá.
             </p>
           </div>
@@ -238,7 +238,7 @@ function ChatPage() {
     },
   })
 
-  const sendText = (value: string) => {
+  const sendText = useCallback((value: string) => {
     const text = value.trim()
     if (!text || isSending) {
       return
@@ -253,7 +253,7 @@ function ChatPage() {
       .finally(() => {
         setIsSending(false)
       })
-  }
+  }, [isSending, sendMutation])
 
   useEffect(() => {
     if (sentInitialPrompt.current) {
@@ -265,11 +265,12 @@ function ChatPage() {
     }
     sentInitialPrompt.current = true
     sessionStorage.removeItem(pendingPromptKey)
-    sendText(pending)
-  }, [])
+    const timer = window.setTimeout(() => sendText(pending), 0)
+    return () => window.clearTimeout(timer)
+  }, [sendText])
 
   return (
-    <section className="flex min-h-[calc(100svh-9rem)] flex-col gap-4">
+    <section className="flex min-h-chat-panel flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-normal">Chat</h1>
@@ -295,7 +296,7 @@ function ChatPage() {
       </div>
 
       <form
-        className="sticky bottom-[4.8rem] rounded-lg border border-border bg-surface p-2 shadow-[0_8px_20px_oklch(20.5%_0_0_/_0.12)] md:bottom-3"
+        className="chat-composer"
         onSubmit={(event) => {
           event.preventDefault()
           sendText(draft)
@@ -339,7 +340,7 @@ function ActivityPage() {
       {plansQuery.data && plansQuery.data.length === 0 ? (
         <Card>
           <CardContent className="flex items-start gap-3 p-4">
-            <span className="grid size-9 shrink-0 place-items-center rounded-md bg-primary-soft text-primary">
+            <span className="grid size-9 shrink-0 place-items-center rounded-md bg-muted text-foreground">
               <ClipboardList className="size-5" aria-hidden="true" />
             </span>
             <div className="space-y-1">
@@ -379,7 +380,7 @@ function RoutePlanHistory({ plans }: { plans: RoutePlanResponse[] }) {
                   {plan.created_at ? new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(plan.created_at)) : 'Sin fecha'}
                 </p>
               </div>
-              <span className="rounded-md bg-primary-soft px-2 py-1 text-xs font-medium text-primary">
+              <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium text-foreground">
                 {plan.arrival_battery_percent !== null ? `${plan.arrival_battery_percent}%` : 'Exploración'}
               </span>
             </div>
@@ -431,11 +432,11 @@ function AccountPanel() {
 
   if (authQuery.data?.authenticated) {
     return (
-      <Card className="border-primary/25 bg-primary-soft">
+      <Card className="bg-muted">
         <CardContent className="space-y-4 p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-primary">Sesión activa</p>
+              <p className="text-sm font-semibold text-foreground">Sesión activa</p>
               <p className="text-sm leading-6 text-foreground">{authQuery.data.email}</p>
             </div>
             <Button type="button" variant="secondary" size="sm" onClick={() => logoutMutation.mutate()} disabled={logoutMutation.isPending}>
@@ -498,15 +499,15 @@ function AccountPanel() {
 
 function AccountRequiredCard({ text }: { text: string }) {
   return (
-    <Card className="border-primary/25 bg-primary-soft">
+    <Card className="bg-muted">
       <CardContent className="flex items-start gap-3 p-4">
-        <span className="grid size-9 shrink-0 place-items-center rounded-md bg-surface text-primary">
+        <span className="grid size-9 shrink-0 place-items-center rounded-md bg-surface text-foreground">
           <UserRound className="size-5" aria-hidden="true" />
         </span>
         <div className="space-y-2">
-          <h2 className="font-bold text-primary">Cuenta requerida</h2>
+          <h2 className="font-semibold text-foreground">Cuenta requerida</h2>
           <p className="text-sm leading-6 text-foreground">{text}</p>
-          <Link className="text-sm font-semibold text-primary underline-offset-4 hover:underline" to="/settings">
+          <Link className="text-sm font-semibold text-link underline-offset-4 hover:underline" to="/settings">
             Ir a Cuenta
           </Link>
         </div>
@@ -517,8 +518,8 @@ function AccountRequiredCard({ text }: { text: string }) {
 
 function InlineError({ message }: { message: string }) {
   return (
-    <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm leading-6">
-      <AlertTriangle className="mt-1 size-4 shrink-0 text-warning" aria-hidden="true" />
+    <div className="flex items-start gap-2 rounded-md border border-warning bg-warning-soft px-3 py-2 text-sm leading-6">
+      <AlertTriangle className="mt-1 size-4 shrink-0 text-foreground" aria-hidden="true" />
       <span>{message}</span>
     </div>
   )

@@ -45,6 +45,7 @@ Backend: Django, Django Ninja, Django ORM, GeoDjango, Postgres/PostGIS, provider
 - Use Impeccable before important UI screens.
 - Maintain consistent spacing, typography, color, states, and microcopy.
 - Avoid generic gradients and overloaded layouts.
+- Prefer design tokens and Tailwind utilities directly. Add semantic CSS classes only when they encapsulate reused patterns, complex CSS, or behavior that utilities express poorly; avoid creating a parallel design system with one-off semantic classes.
 
 ## Security Rules
 
@@ -54,4 +55,3 @@ Backend: Django, Django Ninja, Django ORM, GeoDjango, Postgres/PostGIS, provider
 - Do not store API keys in the repo.
 - Do not execute destructive commands without confirmation.
 - Do not allow arbitrary UI outside the A2UI catalog.
-

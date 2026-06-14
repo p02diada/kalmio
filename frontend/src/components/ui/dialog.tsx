@@ -11,12 +11,9 @@ export const DialogClose = DialogPrimitive.Close
 export function DialogContent({ className, children, ...props }: React.ComponentProps<typeof DialogPrimitive.Content>) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-foreground/35" />
+      <DialogPrimitive.Overlay className="ui-overlay" />
       <DialogPrimitive.Content
-        className={cn(
-          'fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-md border border-border bg-surface p-5 shadow-lg',
-          className,
-        )}
+        className={cn('ui-dialog-content', className)}
         {...props}
       >
         {children}
@@ -40,4 +37,3 @@ export function DialogTitle({ className, ...props }: React.ComponentProps<typeof
 export function DialogDescription({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Description>) {
   return <DialogPrimitive.Description className={cn('text-sm text-muted-foreground', className)} {...props} />
 }
-

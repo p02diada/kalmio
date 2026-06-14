@@ -104,14 +104,14 @@ function A2UIBlockView({ block, onChipClick }: { block: A2UIBlock; onChipClick?:
       return <ListCard title="Cargadores alternativos" items={list(block.props.stops)} />
     case 'RiskExplanationCard':
       return (
-        <Card className="border-warning/40 bg-warning/10">
+        <Card className="border-warning bg-warning-soft">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <AlertTriangle className="size-4 text-warning" aria-hidden="true" />
+              <AlertTriangle className="size-4 text-foreground" aria-hidden="true" />
               Riesgo {text(block.props.level)}
             </CardTitle>
           </CardHeader>
-          <CardContent className="text-sm leading-6 text-muted-foreground">{text(block.props.text)}</CardContent>
+          <CardContent className="text-sm leading-6 text-body">{text(block.props.text)}</CardContent>
         </Card>
       )
     case 'CostComparisonCard':
@@ -170,7 +170,7 @@ function A2UIBlockView({ block, onChipClick }: { block: A2UIBlock; onChipClick?:
       return <ActionButtons actions={list(block.props.actions)} />
     case 'ClarifyingQuestionCard':
       return (
-        <Card className="border-assistant/30 bg-assistant/10">
+        <Card className="border-border bg-muted">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <CircleHelp className="size-4 text-assistant" aria-hidden="true" />
@@ -193,7 +193,7 @@ function A2UIBlockView({ block, onChipClick }: { block: A2UIBlock; onChipClick?:
       return (
         <div className="flex flex-wrap gap-2">
               {strings(block.props.chips).map((chip) => (
-                <Button key={chip} type="button" variant="secondary" size="sm" onClick={() => onChipClick?.(chip)}>
+                <Button key={chip} type="button" variant="outline" size="sm" onClick={() => onChipClick?.(chip)}>
                   {chip}
                 </Button>
               ))}
@@ -229,11 +229,11 @@ function MessageCard({
       <div
         className={
           isUser
-            ? 'max-w-[82%] rounded-lg border border-primary/15 bg-primary-soft px-3 py-2 text-[0.86rem] leading-5 tracking-[-0.01em] shadow-[0_2px_8px_oklch(20.5%_0_0_/_0.08)]'
-            : 'max-w-[82%] rounded-lg border border-border bg-surface px-3 py-2 text-[0.86rem] leading-5 tracking-[-0.01em] shadow-[0_2px_8px_oklch(20.5%_0_0_/_0.08)]'
+            ? 'a2ui-message a2ui-message-user'
+            : 'a2ui-message a2ui-message-assistant'
         }
       >
-        <span className="mb-1 flex items-center gap-2 text-[0.72rem] font-medium text-muted-foreground">
+        <span className={isUser ? 'mb-1 flex items-center gap-2 text-caption font-medium text-primary-foreground/70' : 'mb-1 flex items-center gap-2 text-caption font-medium text-muted-foreground'}>
           {isUser ? <Icon className={`size-3.5 ${tone === 'assistant' ? 'text-assistant' : 'text-route'}`} aria-hidden="true" /> : null}
           {isUser ? 'Usuario' : 'Kalmio'}
         </span>
@@ -245,17 +245,17 @@ function MessageCard({
 
 function TripSummaryCard({ block }: { block: A2UIBlock }) {
   return (
-    <Card className="border-border bg-surface shadow-[0_2px_8px_oklch(20.5%_0_0_/_0.08)]">
+    <Card>
       <CardHeader className="pb-1">
-        <CardTitle className="flex items-center gap-2 text-[0.86rem] font-semibold tracking-[-0.02em] text-route">
+        <CardTitle className="flex items-center gap-2 text-compact font-semibold tracking-tight text-route">
           <Route className="size-4" aria-hidden="true" />
           Resumen de la ruta
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center gap-2 text-[1.05rem] font-semibold tracking-[-0.03em]">
+        <div className="flex items-center gap-2 text-lg font-semibold tracking-tight">
           <span>{text(block.props.origin)}</span>
-          <span className="text-primary" aria-hidden="true">→</span>
+          <span className="text-muted-foreground" aria-hidden="true">→</span>
           <span>{text(block.props.destination)}</span>
         </div>
         <MetricGrid
@@ -289,9 +289,9 @@ function MetricCard({
   }[tone]
 
   return (
-    <Card className="border-border bg-surface shadow-[0_2px_8px_oklch(20.5%_0_0_/_0.08)]">
+    <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-[0.96rem] font-semibold tracking-[-0.02em]">
+        <CardTitle className="flex items-center gap-2 text-sm font-semibold tracking-tight">
           <span className="grid size-7 place-items-center rounded-md bg-muted">
             <Icon className={`size-4 ${toneClass}`} aria-hidden="true" />
           </span>
@@ -310,8 +310,8 @@ function MetricGrid({ rows }: { rows: Array<[string, string]> }) {
     <div className="grid grid-cols-3 gap-2 text-sm">
       {rows.map(([label, value]) => (
         <div key={label} className="min-w-0">
-          <span className="block truncate text-[0.68rem] font-medium leading-4 text-muted-foreground">{label}</span>
-          <span className="block truncate text-[0.86rem] font-semibold leading-5 tracking-[-0.02em] text-foreground">{value}</span>
+          <span className="block truncate text-caption font-medium text-muted-foreground">{label}</span>
+          <span className="block truncate text-compact font-semibold tracking-tight text-foreground">{value}</span>
         </div>
       ))}
     </div>
@@ -320,9 +320,9 @@ function MetricGrid({ rows }: { rows: Array<[string, string]> }) {
 
 function ListCard({ title, items }: { title: string; items: RecordList }) {
   return (
-    <Card className="border-border bg-surface shadow-[0_2px_8px_oklch(20.5%_0_0_/_0.08)]">
+    <Card>
       <CardHeader>
-        <CardTitle className="text-[0.96rem] font-semibold tracking-[-0.02em]">{title}</CardTitle>
+        <CardTitle className="text-sm font-semibold tracking-tight">{title}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
         {items.map((item, index) => (
@@ -331,7 +331,7 @@ function ListCard({ title, items }: { title: string; items: RecordList }) {
               {index + 1}
             </span>
             <div className="min-w-0 flex-1">
-              <div className="truncate font-semibold tracking-[-0.01em]">{text(item.name)}</div>
+              <div className="truncate font-semibold tracking-tight">{text(item.name)}</div>
               <div className="text-muted-foreground">
                 {item.powerKw
                   ? `${num(item.powerKw)} kW${item.distanceKm ? ` · ${num(item.distanceKm)} km` : ''}`
@@ -347,7 +347,7 @@ function ListCard({ title, items }: { title: string; items: RecordList }) {
 
 function MapPreviewCard({ block }: { block: A2UIBlock }) {
   return (
-    <Card className="border-border bg-surface shadow-[0_2px_8px_oklch(20.5%_0_0_/_0.08)]">
+    <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <MapPinned className="size-4 text-route" aria-hidden="true" />
@@ -355,9 +355,9 @@ function MapPreviewCard({ block }: { block: A2UIBlock }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="relative h-40 overflow-hidden rounded-md border border-border bg-[oklch(95%_0.018_225)]">
-          <div className="absolute inset-0 opacity-55 [background-image:linear-gradient(30deg,transparent_45%,oklch(100%_0_0_/_0.75)_46%,transparent_48%),linear-gradient(120deg,transparent_42%,oklch(100%_0_0_/_0.75)_44%,transparent_46%)] [background-size:54px_54px,70px_70px]" />
-          <div className="absolute left-8 top-24 h-1 w-64 -rotate-12 rounded-md bg-primary" />
+        <div className="a2ui-map-canvas">
+          <div className="a2ui-map-grid" />
+          <div className="a2ui-route-line" />
           <div className="absolute left-7 top-24 size-4 rounded-full border-2 border-surface bg-primary" />
           <div className="absolute left-[48%] top-[47%] size-5 -translate-x-1/2 rounded-full border-2 border-surface bg-warning" />
           <div className="absolute right-9 top-14 size-4 rounded-full border-2 border-surface bg-primary" />

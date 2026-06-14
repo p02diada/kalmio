@@ -245,7 +245,6 @@ The home screen is a quick-start launcher and the chat screen uses `/api/convers
 - `ARCHITECTURE.md`
 - `ROUTING.md`
 - `DESIGN.md`
-- `docs/DESIGN-vercel.md`
 - `docs/CODEX_AI.md`
 - `docs/VEHICLE_DATA_SOURCES.md`
 - `A2UI_COMPONENTS.md`

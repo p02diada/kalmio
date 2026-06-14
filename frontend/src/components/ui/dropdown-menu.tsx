@@ -27,9 +27,8 @@ export function DropdownMenuItem({
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Item>) {
   return (
     <DropdownMenuPrimitive.Item
-      className={cn('relative flex cursor-default select-none items-center rounded-[0.35rem] px-2 py-1.5 text-sm outline-none hover:bg-muted', className)}
+      className={cn('relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-muted', className)}
       {...props}
     />
   )
 }
-

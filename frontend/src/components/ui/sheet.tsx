@@ -11,12 +11,9 @@ export const SheetClose = DialogPrimitive.Close
 export function SheetContent({ className, children, ...props }: React.ComponentProps<typeof DialogPrimitive.Content>) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-foreground/35" />
+      <DialogPrimitive.Overlay className="ui-overlay" />
       <DialogPrimitive.Content
-        className={cn(
-          'fixed inset-y-0 right-0 z-50 h-full w-80 max-w-[calc(100%-2rem)] border-l border-border bg-surface p-5 shadow-lg',
-          className,
-        )}
+        className={cn('ui-sheet-content', className)}
         {...props}
       >
         {children}
@@ -35,4 +32,3 @@ export function SheetHeader({ className, ...props }: React.ComponentProps<'div'>
 
 export const SheetTitle = DialogPrimitive.Title
 export const SheetDescription = DialogPrimitive.Description
-
