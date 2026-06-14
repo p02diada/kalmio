@@ -16,7 +16,7 @@ export async function getConversationMessages(): Promise<ConversationMessagesRes
   const body = await response.json().catch(() => null)
 
   if (!response.ok) {
-    throw new Error(errorDetail(body, `Conversation messages request failed with ${response.status}`))
+    throw new Error(conversationErrorMessage(body, response.status, 'load'))
   }
 
   return parseConversationMessagesResponse(body)
@@ -36,7 +36,7 @@ export async function sendConversationMessage(text: string): Promise<Conversatio
   const body = await response.json().catch(() => null)
 
   if (!response.ok) {
-    throw new Error(errorDetail(body, `Conversation message failed with ${response.status}`))
+    throw new Error(conversationErrorMessage(body, response.status, 'send'))
   }
 
   return parseConversationMessagesResponse(body)
@@ -52,8 +52,43 @@ export async function clearConversation(): Promise<void> {
 
   if (!response.ok) {
     const body = await response.json().catch(() => null)
-    throw new Error(errorDetail(body, `Conversation clear request failed with ${response.status}`))
+    throw new Error(conversationErrorMessage(body, response.status, 'clear'))
   }
+}
+
+function conversationErrorMessage(body: unknown, status: number, action: 'load' | 'send' | 'clear') {
+  const detail = errorDetail(body, '')
+  if (status === 429 && detail) {
+    return detail
+  }
+  if (status === 403) {
+    return 'No he podido verificar la sesión. Recarga la página y vuelve a intentarlo.'
+  }
+  if (hasTechnicalDetail(detail)) {
+    return 'No he podido completar la comprobación con fiabilidad. Reintenta con origen, destino, batería y conector, o corrige los datos del mensaje.'
+  }
+  if (detail) {
+    return detail
+  }
+  if (action === 'load') {
+    return 'No he podido cargar la conversación. Reintenta en unos segundos.'
+  }
+  if (action === 'clear') {
+    return 'No he podido reiniciar la conversación. Reintenta en unos segundos.'
+  }
+  return 'No he podido enviar el mensaje. Reintenta en unos segundos.'
+}
+
+function hasTechnicalDetail(value: string) {
+  const normalized = value.toLowerCase()
+  return (
+    normalized.includes('codex')
+    || normalized.includes('json')
+    || normalized.includes('backend')
+    || normalized.includes('a2ui')
+    || normalized.includes('conversation ')
+    || normalized.includes('request failed')
+  )
 }
 
 function parseConversationMessagesResponse(body: unknown): ConversationMessagesResponse {

@@ -42,6 +42,8 @@ The agent chooses the UI that best fits the user request and tool results. The b
 
 - A broken block cannot break the whole conversation.
 - Every block needs stable spacing and mobile-safe width.
+- Renderer text helpers must normalize object labels before display; raw props such as `{"label": "..."}` or Python dict strings must never be visible.
+- Unknown route, energy, arrival, price, or availability values must render as `No calculado`, `No disponible`, or equivalent explicit uncertainty, never as calculated-looking zeroes.
 - Missing or stale provider data must expose uncertainty in the relevant card.
 - Action buttons cannot claim unsupported actions such as booking or payment.
 - Preference chips may send a new user message back to the conversation agent.
@@ -51,6 +53,7 @@ The agent chooses the UI that best fits the user request and tool results. The b
 
 - After `search_destination_chargers`, final A2UI must include a destination context, charger alternatives sourced from the tool result, and an uncertainty/risk explanation.
 - After `plan_route`, final A2UI must include a route summary and recommended stop sourced from the tool result.
+- Urgent or immediate low-battery requests must render `UrgentChargeCard` when a nearby authorized charger can be proposed, or `LocationRequestCard` when location is missing or needs correction. They must not render `DestinationChargingCard`.
 - If final A2UI violates these rules, Django asks the agent for one repaired `final.blocks` response. If repair fails, Django returns deterministic fallback A2UI.
 
 ## Coverage

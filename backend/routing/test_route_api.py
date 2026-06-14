@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from charging.models import AvailabilitySnapshot, Connector, DataSource, EVSE, Operator, ReliabilityScore, Station, Tariff
 from routing.api import ACTIVE_CONVERSATION_BLOCKS_KEY
+from routing.agent import AgentResponseError
 from routing.models import RoutePlan
 from routing.production_planner import station_to_score_payload
 from routing.providers import Coordinate, ProviderRoute, RoutingProviderError
@@ -297,20 +298,33 @@ def test_codex_conversation_agent_interprets_vehicle_followup_from_available_tra
 
     def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
         captured_messages.append(message)
-        return {
-            "type": "final",
-            "blocks": [
+        blocks = [
+            {
+                "id": "urgent-with-battery",
+                "type": "UrgentChargeCard",
+                "version": 1,
+                "props": {
+                    "battery": 20,
+                    "nearest": "Eurostars Maimonides - 135",
+                    "distanceKm": 0.16,
+                },
+            }
+        ]
+        if repair_issues:
+            blocks.append(
                 {
-                    "id": "urgent-with-battery",
-                    "type": "UrgentChargeCard",
+                    "id": "urgent-risk",
+                    "type": "RiskExplanationCard",
                     "version": 1,
                     "props": {
-                        "battery": 20,
-                        "nearest": "Eurostars Maimonides - 135",
-                        "distanceKm": 0.16,
+                        "level": "medio",
+                        "text": "Confirma acceso final, tarifa y disponibilidad antes de depender del cargador.",
                     },
                 }
-            ],
+            )
+        return {
+            "type": "final",
+            "blocks": blocks,
         }
 
     monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
@@ -328,8 +342,7 @@ def test_codex_conversation_agent_interprets_vehicle_followup_from_available_tra
     assert "Resultado previo de carga urgente" in captured_messages[0]
     assert "Mensaje actual del usuario: Tengo un 20%" in captured_messages[0]
     body = response.json()
-    latest_urgent_block = body["blocks"][-1]
-    assert latest_urgent_block["type"] == "UrgentChargeCard"
+    latest_urgent_block = next(block for block in reversed(body["blocks"]) if block["type"] == "UrgentChargeCard")
     assert latest_urgent_block["props"]["battery"] == 20
 
 
@@ -411,7 +424,7 @@ def test_codex_conversation_agent_rejects_unknown_tool_with_a2ui_risk(client, se
     assert response.status_code == 200
     body = response.json()
     risk_block = next(block for block in body["blocks"] if block["type"] == "RiskExplanationCard")
-    assert "Herramienta no permitida" in risk_block["props"]["text"]
+    assert "No puedo hacer esa acción desde el chat" in risk_block["props"]["text"]
 
 
 @pytest.mark.django_db
@@ -628,7 +641,7 @@ def test_codex_conversation_agent_stops_repeated_tool_call(client, settings, mon
     assert response.status_code == 200
     body = response.json()
     risk_block = next(block for block in body["blocks"] if block["type"] == "RiskExplanationCard")
-    assert "repitió la herramienta" in risk_block["props"]["text"]
+    assert "No he podido completar esta respuesta con fiabilidad" in risk_block["props"]["text"]
 
 
 @pytest.mark.django_db
@@ -653,7 +666,87 @@ def test_codex_conversation_agent_stops_at_tool_budget(client, settings, monkeyp
     assert response.status_code == 200
     body = response.json()
     risk_block = next(block for block in body["blocks"] if block["type"] == "RiskExplanationCard")
-    assert "máximo de 1 llamadas" in risk_block["props"]["text"]
+    assert "No he podido completar esta respuesta con fiabilidad" in risk_block["props"]["text"]
+
+
+@pytest.mark.django_db
+def test_conversation_agent_failure_uses_local_semantic_fallback_without_technical_detail(client, monkeypatch):
+    def failing_agent(message, history_blocks=None):
+        raise AgentResponseError("Codex local no devolvió JSON válido.")
+
+    monkeypatch.setattr("routing.api.run_conversation_agent", failing_agent)
+
+    response = client.post(
+        "/api/conversation/message",
+        data={"text": "Necesito cargar ya"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    rendered_text = " ".join(str(block.get("props", {})) for block in body["blocks"])
+    assert "Codex" not in rendered_text
+    assert "JSON" not in rendered_text
+    block_types = [block["type"] for block in body["blocks"]]
+    assert "UserMessage" in block_types
+    assert "LocationRequestCard" in block_types
+    assert "RiskExplanationCard" not in block_types
+
+
+@pytest.mark.django_db
+def test_codex_urgent_response_repairs_destination_card_to_urgent_card(client, settings, monkeypatch):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+    repair_requests = []
+
+    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+        if repair_issues:
+            repair_requests.append(repair_issues)
+            return {
+                "type": "final",
+                "blocks": [
+                    {
+                        "id": "urgent-repaired",
+                        "type": "UrgentChargeCard",
+                        "version": 1,
+                        "props": {"battery": 18, "nearest": "Córdoba Centro HPC", "distanceKm": 1.4},
+                    },
+                    {
+                        "id": "risk-repaired",
+                        "type": "RiskExplanationCard",
+                        "version": 1,
+                        "props": {
+                            "level": "medio",
+                            "text": "Confirma acceso final, tarifa y disponibilidad antes de depender del cargador.",
+                        },
+                    },
+                ],
+            }
+        return {
+            "type": "final",
+            "blocks": [
+                {
+                    "id": "wrong-destination",
+                    "type": "DestinationChargingCard",
+                    "version": 1,
+                    "props": {"destination": "Córdoba", "needsConfirmation": True},
+                }
+            ],
+        }
+
+    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+
+    response = client.post(
+        "/api/conversation/message",
+        data={"text": "Necesito cargar ya en Córdoba con 18%"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    block_types = [block["type"] for block in body["blocks"]]
+    assert repair_requests
+    assert "UrgentChargeCard" in block_types
+    assert "DestinationChargingCard" not in block_types
 
 
 @pytest.mark.django_db

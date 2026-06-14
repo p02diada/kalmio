@@ -7,8 +7,69 @@ describe('A2UIRenderer', () => {
   it('renders a fallback for unknown blocks', () => {
     render(<A2UIRenderer blocks={[{ id: 'x', type: 'UnknownCard', version: 1, props: {} }]} />)
 
-    expect(screen.getByText('Bloque no disponible')).toBeInTheDocument()
+    expect(screen.getByText('No puedo mostrar una parte de la respuesta')).toBeInTheDocument()
     expect(screen.getByText('UnknownCard')).toBeInTheDocument()
+  })
+
+  it('normalizes object labels before rendering text', () => {
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'destination',
+            type: 'DestinationChargingCard',
+            version: 1,
+            props: { destination: { label: 'Alcobendas' }, needsConfirmation: true },
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('Alcobendas')).toBeInTheDocument()
+    expect(screen.queryByText(/label/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/\[object Object\]/i)).not.toBeInTheDocument()
+  })
+
+  it('renders unknown route numbers as not calculated', () => {
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'route',
+            type: 'RouteSummaryCard',
+            version: 1,
+            props: {
+              distanceKm: 520,
+              durationMin: 355,
+              energyKwh: 0,
+              arrivalBattery: 0,
+            },
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.queryByText('0 kWh')).not.toBeInTheDocument()
+    expect(screen.queryByText('0%')).not.toBeInTheDocument()
+    expect(screen.getAllByText('No calculado')).toHaveLength(2)
+  })
+
+  it('marks the recommended stop as the primary decision', () => {
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'recommended',
+            type: 'RecommendedStopCard',
+            version: 1,
+            props: { name: 'Almansa HPC', powerKw: 180, detourMin: 8, confidence: 'media' },
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('Recomendación principal')).toBeInTheDocument()
+    expect(screen.getByText('Almansa HPC')).toBeInTheDocument()
   })
 
   it('explains disabled actions', () => {

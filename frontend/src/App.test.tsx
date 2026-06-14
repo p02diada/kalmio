@@ -129,7 +129,60 @@ describe('App', () => {
     render(<App />)
     fireEvent.click((await screen.findAllByRole('link', { name: /Chat/i }))[0])
 
-    expect(await screen.findByText('Bloque no disponible')).toBeInTheDocument()
+    expect(await screen.findByText('No puedo mostrar una parte de la respuesta')).toBeInTheDocument()
     expect(screen.getByText('MadeUpComponent')).toBeInTheDocument()
+  })
+
+  it('translates technical conversation errors into recovery copy with retry', async () => {
+    document.cookie = 'csrftoken=test-token'
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = input.toString()
+      if (url.includes('/api/conversation/messages')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              blocks: [
+                {
+                  id: 'assistant-initial',
+                  type: 'AssistantMessage',
+                  version: 1,
+                  props: { text: 'Cuéntame qué necesitas.' },
+                },
+              ],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        )
+      }
+      if (url.includes('/api/auth/csrf')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ detail: 'csrf cookie set', csrf_token: 'test-token' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+      }
+      if (url.includes('/api/conversation/message')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ detail: 'Codex local no devolvió JSON válido.' }), {
+            status: 502,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+      }
+      return Promise.reject(new Error(`Unexpected request: ${url}`))
+    })
+
+    render(<App />)
+    fireEvent.click((await screen.findAllByRole('link', { name: /Chat/i }))[0])
+    fireEvent.change(await screen.findByLabelText('Mensaje para Kalmio'), {
+      target: { value: 'Madrid a Valencia con 20%' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+
+    expect(await screen.findByText(/No he podido completar la comprobación/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument()
+    expect(screen.queryByText(/Codex local/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/JSON válido/i)).not.toBeInTheDocument()
   })
 })

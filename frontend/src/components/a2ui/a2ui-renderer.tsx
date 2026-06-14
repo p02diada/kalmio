@@ -15,8 +15,9 @@ import { Component, type ReactNode, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import type { A2UIBlock } from '@/lib/a2ui/types'
+import { cn } from '@/lib/utils'
 
 type RecordList = Array<Record<string, unknown>>
 type A2UIRendererActions = {
@@ -36,7 +37,7 @@ export function A2UIRenderer({
   const actions = { onChipClick, onLocationSubmit, onManualLocationRequest }
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-3">
       {blocks.map((block) => (
         <A2UIBoundary key={block.id} block={block} actions={actions} />
       ))}
@@ -86,22 +87,21 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
           title="Ruta estimada"
           tone="route"
           rows={[
-            ['Distancia', `${num(block.props.distanceKm)} km`],
-            ['Duración', `${num(block.props.durationMin)} min`],
-            ['Energía', `${num(block.props.energyKwh)} kWh`],
-            ['Llegada', `${num(block.props.arrivalBattery)}%`],
+            ['Distancia', metric(block.props.distanceKm, 'km')],
+            ['Duración', metric(block.props.durationMin, 'min')],
+            ['Energía', metric(block.props.energyKwh, 'kWh', { zeroUnknown: true })],
+            ['Llegada', percent(block.props.arrivalBattery, { zeroUnknown: true })],
           ]}
         />
       )
     case 'RecommendedStopCard':
       return (
-        <MetricCard
+        <RecommendationCard
           icon={BatteryCharging}
           title={text(block.props.name)}
-          tone="primary"
           rows={[
-            ['Potencia', `${num(block.props.powerKw)} kW`],
-            ['Desvío', `${num(block.props.detourMin)} min`],
+            ['Potencia', metric(block.props.powerKw, 'kW')],
+            ['Desvío', metric(block.props.detourMin, 'min')],
             ['Confianza', text(block.props.confidence)],
           ]}
         />
@@ -111,17 +111,7 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
     case 'AlternativeStopsList':
       return <ListCard title="Cargadores alternativos" items={list(block.props.stops)} />
     case 'RiskExplanationCard':
-      return (
-        <Card className="border-warning bg-warning-soft">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <AlertTriangle className="size-4 text-foreground" aria-hidden="true" />
-              Riesgo {text(block.props.level)}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm leading-6 text-body">{text(block.props.text)}</CardContent>
-        </Card>
-      )
+      return <RiskBand level={text(block.props.level, 'medio')} body={text(block.props.text)} />
     case 'CostComparisonCard':
       return (
         <MetricCard
@@ -129,8 +119,8 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
           title={text(block.props.best)}
           tone="primary"
           rows={[
-            ['Coste estimado', `${num(block.props.estimatedCostEur)} EUR`],
-            ['Ahorro estimado', `${num(block.props.savingEur)} EUR`],
+            ['Coste estimado', metric(block.props.estimatedCostEur, 'EUR')],
+            ['Ahorro estimado', metric(block.props.savingEur, 'EUR')],
           ]}
         />
       )
@@ -143,7 +133,7 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
           rows={[
             ['Batería', percentOrUnknown(block.props.battery)],
             ['Más cercano', text(block.props.nearest)],
-            ['Distancia', `${num(block.props.distanceKm)} km`],
+            ['Distancia', metric(block.props.distanceKm, 'km')],
           ]}
         />
       )
@@ -166,7 +156,7 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
           title="Plan de estancia"
           tone="assistant"
           rows={[
-            ['Noches', String(num(block.props.nights))],
+            ['Noches', count(block.props.nights)],
             ['Ciudad', text(block.props.city)],
             ['Plan', text(block.props.recommendation)],
           ]}
@@ -363,8 +353,8 @@ function TripSummaryCard({ block }: { block: A2UIBlock }) {
         </div>
         <MetricGrid
           rows={[
-            ['Batería', `${num(block.props.battery)}%`],
-            ['Reserva', `${num(block.props.reserve)}%`],
+            ['Batería', percentOrUnknown(block.props.battery)],
+            ['Reserva', percent(block.props.reserve)],
             ['Tipo', 'Conservadora'],
           ]}
         />
@@ -408,13 +398,46 @@ function MetricCard({
   )
 }
 
+function RecommendationCard({
+  icon: Icon,
+  title,
+  rows,
+}: {
+  icon: typeof Route
+  title: string
+  rows: Array<[string, string]>
+}) {
+  return (
+    <Card className="border-primary bg-primary text-primary-foreground">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-start gap-3 text-base font-semibold tracking-tight">
+          <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-md bg-primary-foreground text-primary">
+            <Icon className="size-4" aria-hidden="true" />
+          </span>
+          <span className="flex min-w-0 flex-col gap-1">
+            <span className="text-caption font-medium text-primary-foreground/70">Recomendación principal</span>
+            <span className="truncate">{title || 'Cargador recomendado'}</span>
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <MetricGridRows rows={rows} inverted />
+      </CardContent>
+    </Card>
+  )
+}
+
 function MetricGrid({ rows }: { rows: Array<[string, string]> }) {
+  return <MetricGridRows rows={rows} />
+}
+
+function MetricGridRows({ rows, inverted = false }: { rows: Array<[string, string]>; inverted?: boolean }) {
   return (
     <div className="grid grid-cols-3 gap-2 text-sm">
       {rows.map(([label, value]) => (
         <div key={label} className="min-w-0">
-          <span className="block truncate text-caption font-medium text-muted-foreground">{label}</span>
-          <span className="block truncate text-compact font-semibold tracking-tight text-foreground">{value}</span>
+          <span className={cn('block truncate text-caption font-medium', inverted ? 'text-primary-foreground/70' : 'text-muted-foreground')}>{label}</span>
+          <span className={cn('block truncate text-compact font-semibold tracking-tight', inverted ? 'text-primary-foreground' : 'text-foreground')}>{value}</span>
         </div>
       ))}
     </div>
@@ -424,27 +447,45 @@ function MetricGrid({ rows }: { rows: Array<[string, string]> }) {
 function ListCard({ title, items }: { title: string; items: RecordList }) {
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-2">
         <CardTitle className="text-sm font-semibold tracking-tight">{title}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent>
+        <div className="flex flex-col divide-y divide-border">
         {items.map((item, index) => (
-          <div key={`${text(item.name)}-${index}`} className="flex items-center gap-3 rounded-md border border-border bg-surface p-3 text-sm">
+          <div key={`${text(item.name)}-${index}`} className="flex items-center gap-3 py-2.5 text-sm first:pt-0 last:pb-0">
             <span className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
               {index + 1}
             </span>
             <div className="min-w-0 flex-1">
               <div className="truncate font-semibold tracking-tight">{text(item.name)}</div>
               <div className="text-muted-foreground">
-                {item.powerKw
-                  ? `${num(item.powerKw)} kW${item.distanceKm ? ` · ${num(item.distanceKm)} km` : ''}`
-                  : `${num(item.deltaMin)} min de diferencia`}
+                {isKnownNumber(item.powerKw)
+                  ? `${metric(item.powerKw, 'kW')}${isKnownNumber(item.distanceKm) ? ` · ${metric(item.distanceKm, 'km')}` : ''}`
+                  : metric(item.deltaMin, 'min de diferencia')}
               </div>
             </div>
           </div>
         ))}
+        </div>
       </CardContent>
     </Card>
+  )
+}
+
+function RiskBand({ level, body }: { level: string; body: string }) {
+  const severity = level.toLowerCase()
+  const high = severity.includes('alto') || severity.includes('alta')
+  return (
+    <Alert className={cn('border-warning bg-warning-soft text-foreground', high && 'border-error bg-error-soft')}>
+      <AlertTriangle aria-hidden="true" />
+      <AlertTitle className="text-sm font-semibold">
+        {high ? 'Riesgo alto' : 'Riesgo a confirmar'}
+      </AlertTitle>
+      <AlertDescription className="text-sm leading-6 text-body">
+        {body || 'Hay incertidumbre que debes confirmar antes de depender de este resultado.'}
+      </AlertDescription>
+    </Alert>
   )
 }
 
@@ -481,18 +522,18 @@ function ActionButtons({ actions }: { actions: RecordList }) {
   return (
     <div className="grid gap-2 sm:grid-cols-2">
       {actions.map((action, index) => (
-        <div key={text(action.label)} className="space-y-1">
+        <div key={text(action.label)} className="flex flex-col gap-1">
           <Button
             type="button"
             disabled={bool(action.disabled)}
             variant={index === 0 && !bool(action.disabled) ? 'default' : 'outline'}
             className={index === 0 ? 'h-11 w-full font-bold' : 'h-11 w-full'}
-            onClick={() => openAction(text(action.href))}
+            onClick={() => openAction(text(action.href, ''))}
           >
             {text(action.label)}
           </Button>
-          {bool(action.disabled) && text(action.reason) ? (
-            <p className="max-w-48 text-xs leading-5 text-muted-foreground">{text(action.reason)}</p>
+          {bool(action.disabled) && text(action.reason, '') ? (
+            <p className="max-w-48 text-xs leading-5 text-muted-foreground">{text(action.reason, '')}</p>
           ) : null}
         </div>
       ))}
@@ -511,27 +552,43 @@ function ErrorFallbackCard({ type, message }: { type: string; message: string })
   return (
     <Card className="border-border bg-muted">
       <CardHeader>
-        <CardTitle className="text-base">Bloque no disponible</CardTitle>
+        <CardTitle className="text-base">No puedo mostrar una parte de la respuesta</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2 text-sm text-muted-foreground">
-        <p>{message}</p>
-        <Separator />
-        <code className="text-xs">{type}</code>
+      <CardContent className="flex flex-col gap-2 text-sm text-muted-foreground">
+        <p>{safeFallbackMessage(message)}</p>
+        <details className="text-xs">
+          <summary className="cursor-pointer font-medium text-body">Detalle para soporte</summary>
+          <code className="mt-1 block break-words">{type}</code>
+        </details>
       </CardContent>
     </Card>
   )
 }
 
-function text(value: unknown) {
-  return typeof value === 'string' ? value : ''
-}
-
-function num(value: unknown) {
-  return typeof value === 'number' ? value : 0
+function text(value: unknown, fallback = 'No disponible') {
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) {
+      return fallback
+    }
+    const labelMatch = trimmed.match(/['"]label['"]\s*:\s*['"]([^'"]+)/)
+    return labelMatch?.[1] ?? trimmed
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return formatNumber(value)
+  }
+  if (typeof value === 'boolean') {
+    return value ? 'Sí' : 'No'
+  }
+  if (isRecord(value)) {
+    return text(value.label ?? value.name ?? value.title ?? value.text ?? value.value, fallback)
+  }
+  return fallback
 }
 
 function percentOrUnknown(value: unknown) {
-  return typeof value === 'number' ? `${value}%` : 'No indicada'
+  const number = knownNumber(value)
+  return number === null ? 'No indicada' : `${formatNumber(number)}%`
 }
 
 function bool(value: unknown) {
@@ -543,5 +600,55 @@ function list(value: unknown): RecordList {
 }
 
 function strings(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+  return Array.isArray(value)
+    ? value.map((item) => text(item, '')).filter((item) => item.length > 0)
+    : []
+}
+
+function metric(value: unknown, unit: string, options: { zeroUnknown?: boolean } = {}) {
+  const number = knownNumber(value, options)
+  if (number === null) {
+    return 'No calculado'
+  }
+  return `${formatNumber(number)} ${unit}`
+}
+
+function percent(value: unknown, options: { zeroUnknown?: boolean } = {}) {
+  const number = knownNumber(value, options)
+  if (number === null) {
+    return 'No calculado'
+  }
+  return `${formatNumber(number)}%`
+}
+
+function count(value: unknown) {
+  const number = knownNumber(value)
+  return number === null ? 'No disponible' : formatNumber(number)
+}
+
+function isKnownNumber(value: unknown, options: { zeroUnknown?: boolean } = {}) {
+  return knownNumber(value, options) !== null
+}
+
+function knownNumber(value: unknown, options: { zeroUnknown?: boolean } = {}) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || (options.zeroUnknown && value === 0)) {
+    return null
+  }
+  return value
+}
+
+function formatNumber(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, '')
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function safeFallbackMessage(message: string) {
+  const normalized = message.toLowerCase()
+  if (normalized.includes('a2ui') || normalized.includes('codex') || normalized.includes('json')) {
+    return 'He ocultado un bloque que no venía en un formato seguro. Puedes continuar corrigiendo la petición o reintentarla.'
+  }
+  return message || 'He ocultado un bloque que no venía en un formato seguro.'
 }

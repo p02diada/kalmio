@@ -34,6 +34,7 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui
 import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { Label } from '@/components/ui/label'
+import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Sidebar,
@@ -110,6 +111,13 @@ const reassuranceSteps = [
   'Te pediré ubicación, batería y conector si faltan.',
   'Comprobaré ruta y cargadores con fuentes autorizadas.',
   'Si no hay datos fiables, no recomendaré una estación.',
+] as const
+
+const conversationPhases = [
+  'Interpretando tu petición',
+  'Comprobando ruta o ubicación',
+  'Buscando cargadores autorizados',
+  'Validando riesgo y próximos pasos',
 ] as const
 
 const navItems = [
@@ -365,11 +373,17 @@ function ChatPage() {
   const [draft, setDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isSending, setIsSending] = useState(false)
+  const [phaseIndex, setPhaseIndex] = useState(0)
+  const [retryText, setRetryText] = useState<string | null>(null)
   const sentInitialPrompt = useRef(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const latestRef = useRef<HTMLDivElement>(null)
+  const composerRef = useRef<HTMLTextAreaElement>(null)
   const messagesQuery = useQuery({
     queryKey: conversationMessagesQueryKey,
     queryFn: getConversationMessages,
   })
+  const blockCount = messagesQuery.data?.blocks.length ?? 0
   const sendMutation = useMutation({
     mutationFn: sendConversationMessage,
     onSuccess: (data) => {
@@ -393,10 +407,13 @@ function ChatPage() {
     }
     setDraft('')
     setError(null)
+    setRetryText(null)
     setIsSending(true)
+    setPhaseIndex(0)
     sendMutation.mutateAsync(text)
       .catch((mutationError) => {
         setError(mutationError instanceof Error ? mutationError.message : 'No se pudo enviar el mensaje.')
+        setRetryText(text)
       })
       .finally(() => {
         setIsSending(false)
@@ -417,30 +434,51 @@ function ChatPage() {
     return () => window.clearTimeout(timer)
   }, [sendText])
 
+  useEffect(() => {
+    if (!isSending) {
+      return
+    }
+    const timer = window.setInterval(() => {
+      setPhaseIndex((current) => Math.min(current + 1, conversationPhases.length - 1))
+    }, 1800)
+    return () => window.clearInterval(timer)
+  }, [isSending])
+
+  useEffect(() => {
+    if (!blockCount && !isSending && !error) {
+      return
+    }
+    const frame = window.requestAnimationFrame(() => {
+      if (typeof latestRef.current?.scrollIntoView === 'function') {
+        latestRef.current.scrollIntoView({ block: 'end', behavior: 'smooth' })
+      }
+      if (!isSending) {
+        composerRef.current?.focus({ preventScroll: true })
+      }
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [blockCount, isSending, error])
+
   return (
-    <section className="flex min-h-chat-panel flex-col gap-4">
+    <section className="chat-page">
       <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
+        <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-normal">Chat</h1>
-          <p className="text-sm leading-6 text-muted-foreground">El backend decide qué aclarar, qué herramienta usar y qué A2UI pintar.</p>
+          <p className="text-sm leading-6 text-muted-foreground">Dime ruta, batería o destino. Si falta algo crítico, te lo pediré antes de recomendar.</p>
         </div>
         <Button type="button" variant="ghost" size="icon" aria-label="Reiniciar chat" onClick={() => clearMutation.mutate()}>
           <RotateCcw className="size-4" aria-hidden="true" />
         </Button>
       </div>
 
-      <div className="flex-1 space-y-3">
+      <div ref={scrollRef} className="chat-scroll" aria-live="polite">
         {messagesQuery.isPending ? <ConversationSkeleton /> : null}
         {messagesQuery.data ? (
           <A2UIRenderer blocks={messagesQuery.data.blocks} onChipClick={sendText} />
         ) : null}
-        {isSending ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground" aria-live="polite">
-            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            Pensando...
-          </div>
-        ) : null}
-        {error ? <InlineError message={error} /> : null}
+        {isSending ? <ConversationProgress phaseIndex={phaseIndex} /> : null}
+        {error ? <InlineError message={error} onRetry={retryText ? () => sendText(retryText) : undefined} /> : null}
+        <div ref={latestRef} className="h-px" tabIndex={-1} aria-hidden="true" />
       </div>
 
       <form
@@ -451,6 +489,7 @@ function ChatPage() {
         }}
       >
         <Textarea
+          ref={composerRef}
           aria-label="Mensaje para Kalmio"
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
@@ -664,11 +703,42 @@ function AccountRequiredCard({ text }: { text: string }) {
   )
 }
 
-function InlineError({ message }: { message: string }) {
+function ConversationProgress({ phaseIndex }: { phaseIndex: number }) {
+  const progress = ((phaseIndex + 1) / conversationPhases.length) * 100
+
   return (
-    <div className="flex items-start gap-2 rounded-md border border-warning bg-warning-soft px-3 py-2 text-sm leading-6">
-      <AlertTriangle className="mt-1 size-4 shrink-0 text-foreground" aria-hidden="true" />
-      <span>{message}</span>
+    <Card aria-live="polite">
+      <CardContent className="flex flex-col gap-3 p-4">
+        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+          {conversationPhases[phaseIndex]}
+        </div>
+        <Progress value={progress} aria-label="Progreso de la comprobación" />
+        <ol className="grid gap-2 text-xs leading-5 text-muted-foreground">
+          {conversationPhases.map((phase, index) => (
+            <li key={phase} className={cn('flex items-center gap-2', index <= phaseIndex && 'text-foreground')}>
+              <span className={cn('size-1.5 rounded-full bg-border', index <= phaseIndex && 'bg-primary')} aria-hidden="true" />
+              {phase}
+            </li>
+          ))}
+        </ol>
+      </CardContent>
+    </Card>
+  )
+}
+
+function InlineError({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-warning bg-warning-soft px-3 py-2 text-sm leading-6">
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="mt-1 size-4 shrink-0 text-foreground" aria-hidden="true" />
+        <span>{message}</span>
+      </div>
+      {onRetry ? (
+        <Button type="button" variant="outline" size="sm" className="w-fit bg-surface" onClick={onRetry}>
+          Reintentar
+        </Button>
+      ) : null}
     </div>
   )
 }

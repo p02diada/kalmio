@@ -4,7 +4,7 @@ from ninja.responses import Response
 from ninja.security import SessionAuth
 from ninja.utils import check_csrf
 
-from routing.agent import AgentResponseError, initial_blocks, run_conversation_agent
+from routing.agent import AgentResponseError, conversation_failure_blocks, initial_blocks, run_conversation_agent, run_local_agent
 from routing.models import RoutePlan
 from routing.production_planner import PlanningDataError, ProductionPlanResult, plan_route_with_persisted_stations
 from routing.providers import Coordinate, RoutingProviderError, get_route_provider
@@ -66,8 +66,11 @@ def create_conversation_message(request, payload: ConversationMessageRequest):
     current_blocks = request.session.get(ACTIVE_CONVERSATION_BLOCKS_KEY) or initial_blocks()
     try:
         new_blocks = run_conversation_agent(payload.text, history_blocks=current_blocks)
-    except AgentResponseError as exc:
-        return Response({"detail": str(exc)}, status=502)
+    except AgentResponseError:
+        try:
+            new_blocks = run_local_agent(payload.text, history_blocks=current_blocks)
+        except (AgentResponseError, PlanningDataError, RoutingProviderError):
+            new_blocks = conversation_failure_blocks(payload.text)
 
     blocks = [*current_blocks, *new_blocks]
     request.session[ACTIVE_CONVERSATION_BLOCKS_KEY] = blocks[-80:]

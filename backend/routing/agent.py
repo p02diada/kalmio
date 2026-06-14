@@ -176,6 +176,39 @@ def run_local_agent(message: str, history_blocks: list[dict] | None = None) -> l
     return blocks
 
 
+def conversation_failure_blocks(message: str) -> list[dict]:
+    return [
+        block(f"user-{uuid4().hex[:10]}", "UserMessage", {"text": message.strip()}),
+        block(
+            f"risk-{uuid4().hex[:10]}",
+            "RiskExplanationCard",
+            {
+                "level": "alto",
+                "text": (
+                    "No he podido completar esta comprobación con fiabilidad. "
+                    "Puedo intentarlo de nuevo si me das origen, destino, batería actual y conector, "
+                    "o buscar primero cargadores cerca de una ciudad concreta."
+                ),
+            },
+        ),
+        clarifying_block(
+            "Para recuperar la consulta, envíame los datos que tengas y no asumiré los que falten.",
+            ["origen o ubicación", "destino si hay ruta", "batería actual", "conector"],
+        ),
+        block(
+            f"chips-{uuid4().hex[:10]}",
+            "PreferenceChips",
+            {
+                "chips": [
+                    "Reintentar con origen y destino",
+                    "Buscar cargadores cerca de mi ubicación",
+                    "Corregir batería o conector",
+                ]
+            },
+        ),
+    ]
+
+
 def run_codex_agent(message: str, history_blocks: list[dict] | None = None) -> list[dict]:
     decision_message = contextualized_prompt(message, history_blocks or [])
     tool_history: list[dict[str, Any]] = []
@@ -196,11 +229,13 @@ def run_codex_agent(message: str, history_blocks: list[dict] | None = None) -> l
             return fallback_from_tool_history(
                 tool_history,
                 f"Codex repitió la herramienta {decision['tool']} con los mismos argumentos.",
+                decision_message,
             )
         if len(tool_history) >= max_tool_calls:
             return fallback_from_tool_history(
                 tool_history,
                 f"Se alcanzó el máximo de {max_tool_calls} llamadas a herramientas para este turno.",
+                decision_message,
             )
         seen_calls.add(call_signature)
 
@@ -211,9 +246,13 @@ def run_codex_agent(message: str, history_blocks: list[dict] | None = None) -> l
         tool_history.append({"call": {"tool": decision["tool"], "args": decision["args"]}, "result": result})
 
         if not result.get("ok"):
-            return fallback_from_tool_history(tool_history, str(result.get("error") or "La herramienta falló."))
+            return fallback_from_tool_history(
+                tool_history,
+                str(result.get("error") or "La herramienta falló."),
+                decision_message,
+            )
 
-    return fallback_from_tool_history(tool_history, "Codex no devolvió una respuesta final.")
+    return fallback_from_tool_history(tool_history, "Codex no devolvió una respuesta final.", decision_message)
 
 
 def validated_or_repaired_final_blocks(
@@ -222,7 +261,7 @@ def validated_or_repaired_final_blocks(
     tool_history: list[dict[str, Any]],
 ) -> list[dict]:
     blocks = validate_blocks(candidate_blocks)
-    issues = semantic_a2ui_issues(blocks, tool_history)
+    issues = semantic_a2ui_issues(blocks, tool_history, message)
     if not issues:
         return blocks
 
@@ -236,14 +275,16 @@ def validated_or_repaired_final_blocks(
         return fallback_from_tool_history(
             tool_history,
             "Codex intentó pedir otra herramienta durante la reparación A2UI.",
+            message,
         )
 
     repaired_blocks = validate_blocks(repair_decision["blocks"])
-    remaining_issues = semantic_a2ui_issues(repaired_blocks, tool_history)
+    remaining_issues = semantic_a2ui_issues(repaired_blocks, tool_history, message)
     if remaining_issues:
         return fallback_from_tool_history(
             tool_history,
             "Codex no pudo reparar el contrato A2UI: " + "; ".join(remaining_issues),
+            message,
         )
     return repaired_blocks
 
@@ -312,7 +353,7 @@ def codex_prompt(
             "No pidas herramientas en esta reparación. Devuelve solo type=final con blocks A2UI válidos. "
             "Elige tú la UI que más valor aporte al usuario, pero debe cumplir estos problemas detectados:\n"
             f"{json.dumps(repair_issues, ensure_ascii=False)}\n"
-            f"{semantic_contract_prompt(tool_history)}\n"
+            f"{semantic_contract_prompt(tool_history, message)}\n"
             "Usa solo datos del historial de herramientas; no inventes estaciones, precios, disponibilidad, coordenadas ni estado del vehículo.\n"
             f"Usuario: {message}\n"
             f"Historial de herramientas: {json.dumps(tool_history, ensure_ascii=False)}\n"
@@ -330,10 +371,17 @@ def codex_prompt(
     return f"Eres el agente local de Kalmio.\n{tool_instructions}{output_instructions}\nUsuario: {message}"
 
 
-def semantic_contract_prompt(tool_history: list[dict[str, Any]]) -> str:
+def semantic_contract_prompt(tool_history: list[dict[str, Any]], message: str = "") -> str:
     tool_result = latest_successful_tool_result(tool_history)
     if not tool_result:
         return ""
+    if parse_intent(message).is_urgent_request and tool_result.get("tool") == "search_destination_chargers":
+        return (
+            "Contrato obligatorio para una petición urgente con search_destination_chargers ok=true:\n"
+            "- Usa UrgentChargeCard, AlternativeStopsList y RiskExplanationCard; no uses DestinationChargingCard.\n"
+            "- UrgentChargeCard debe mostrar el cargador cercano más plausible con nearest y distanceKm de la herramienta.\n"
+            "- RiskExplanationCard debe explicar que disponibilidad, tarifa y acceso se deben confirmar antes de depender del cargador."
+        )
     if tool_result.get("tool") == "search_destination_chargers":
         location = tool_result.get("location") if isinstance(tool_result.get("location"), dict) else {}
         return (
@@ -415,18 +463,53 @@ def parse_codex_decision(payload: dict[str, Any]) -> dict[str, Any]:
     raise AgentResponseError("Codex local devolvió una decisión no soportada.")
 
 
-def blocks_from_tool_result(tool_result: dict[str, Any]) -> list[dict]:
+def blocks_from_tool_result(tool_result: dict[str, Any], message: str = "") -> list[dict]:
     tool = tool_result.get("tool")
     if not tool_result.get("ok"):
         return [
             block(
                 f"risk-{uuid4().hex[:10]}",
                 "RiskExplanationCard",
-                {"level": "alto", "text": str(tool_result.get("error") or "La herramienta no pudo devolver datos reales.")},
+                {
+                    "level": "alto",
+                    "text": user_facing_failure_text(
+                        str(tool_result.get("error") or "La herramienta no pudo devolver datos reales.")
+                    ),
+                },
             )
         ]
     if tool == "search_destination_chargers":
         location = tool_result.get("location") if isinstance(tool_result.get("location"), dict) else {}
+        stops = tool_result.get("stops") if isinstance(tool_result.get("stops"), list) else []
+        if parse_intent(message).is_urgent_request:
+            nearest = stops[0] if stops and isinstance(stops[0], dict) else {}
+            return [
+                block(
+                    f"urgent-{uuid4().hex[:10]}",
+                    "UrgentChargeCard",
+                    {
+                        "battery": None,
+                        "nearest": str(nearest.get("name") or "Cargador cercano por confirmar"),
+                        "distanceKm": nearest.get("distanceKm"),
+                    },
+                ),
+                block(
+                    f"stops-{uuid4().hex[:10]}",
+                    "AlternativeStopsList",
+                    {"stops": stops},
+                ),
+                block(
+                    f"risk-{uuid4().hex[:10]}",
+                    "RiskExplanationCard",
+                    {
+                        "level": "medio",
+                        "text": (
+                            "Muestro cargadores autorizados importados cerca de la ubicación indicada. "
+                            "Confirma acceso final, tarifa y disponibilidad antes de depender de ellos."
+                        ),
+                    },
+                ),
+            ]
         return [
             block(
                 f"destination-{uuid4().hex[:10]}",
@@ -453,8 +536,8 @@ def blocks_from_tool_result(tool_result: dict[str, Any]) -> list[dict]:
                 {
                     "distanceKm": tool_result.get("distanceKm"),
                     "durationMin": tool_result.get("durationMin"),
-                    "energyKwh": tool_result.get("energyKwh") or 0,
-                    "arrivalBattery": tool_result.get("arrivalBattery") or 0,
+                    "energyKwh": tool_result.get("energyKwh"),
+                    "arrivalBattery": tool_result.get("arrivalBattery"),
                 },
             ),
             block(
@@ -471,17 +554,28 @@ def blocks_from_tool_result(tool_result: dict[str, Any]) -> list[dict]:
     return [block(f"assistant-{uuid4().hex[:10]}", "AssistantMessage", {"text": "Herramienta ejecutada."})]
 
 
-def fallback_from_tool_history(tool_history: list[dict[str, Any]], reason: str) -> list[dict]:
+def fallback_from_tool_history(tool_history: list[dict[str, Any]], reason: str, message: str = "") -> list[dict]:
     latest_result = latest_successful_tool_result(tool_history) or latest_tool_result(tool_history)
-    blocks = blocks_from_tool_result(latest_result) if latest_result else []
+    blocks = blocks_from_tool_result(latest_result, message) if latest_result else []
     blocks.append(
         block(
             f"risk-{uuid4().hex[:10]}",
             "RiskExplanationCard",
-            {"level": "medio", "text": reason},
+            {"level": "medio", "text": user_facing_failure_text(reason)},
         )
     )
     return blocks
+
+
+def user_facing_failure_text(reason: str) -> str:
+    normalized = normalize(reason)
+    if "herramienta no permitida" in normalized:
+        return "No puedo hacer esa acción desde el chat. Puedo ayudarte a calcular una ruta, buscar cargadores autorizados o pedir los datos que falten."
+    if "proveedor" in normalized or "ruta" in normalized:
+        return "No he podido validar la ruta ahora mismo. Reinténtalo con origen y destino concretos, o busca primero cargadores cerca de una ciudad."
+    if "datos" in normalized or "cargadores" in normalized:
+        return "No he podido validar cargadores suficientes con datos autorizados. Puedo intentarlo con otra ubicación o un radio más amplio."
+    return "No he podido completar esta respuesta con fiabilidad. Reintenta con menos datos ambiguos o corrige origen, destino, batería y conector."
 
 
 def latest_tool_result(tool_history: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -500,7 +594,9 @@ def latest_successful_tool_result(tool_history: list[dict[str, Any]]) -> dict[st
     return None
 
 
-def semantic_a2ui_issues(blocks: list[dict], tool_history: list[dict[str, Any]]) -> list[str]:
+def semantic_a2ui_issues(blocks: list[dict], tool_history: list[dict[str, Any]], message: str = "") -> list[str]:
+    if parse_intent(message).is_urgent_request:
+        return urgent_charge_a2ui_issues(blocks)
     tool_result = latest_successful_tool_result(tool_history)
     if not tool_result:
         return []
@@ -509,6 +605,17 @@ def semantic_a2ui_issues(blocks: list[dict], tool_history: list[dict[str, Any]])
     if tool_result.get("tool") == "plan_route":
         return route_a2ui_issues(blocks)
     return []
+
+
+def urgent_charge_a2ui_issues(blocks: list[dict]) -> list[str]:
+    issues = []
+    if blocks_of_type(blocks, "DestinationChargingCard"):
+        issues.append("Una petición urgente no debe renderizar DestinationChargingCard.")
+    if not blocks_of_type(blocks, "UrgentChargeCard") and not blocks_of_type(blocks, "LocationRequestCard"):
+        issues.append("Una petición urgente debe renderizar UrgentChargeCard o LocationRequestCard.")
+    if blocks_of_type(blocks, "UrgentChargeCard") and not blocks_of_type(blocks, "RiskExplanationCard"):
+        issues.append("Una petición urgente con recomendación debe incluir RiskExplanationCard.")
+    return issues
 
 
 def destination_charging_a2ui_issues(blocks: list[dict], tool_result: dict[str, Any]) -> list[str]:
@@ -680,11 +787,6 @@ def urgent_charge_blocks(intent: ParsedIntent, location: ParsedLocation) -> list
     if not stations:
         return [
             block(
-                f"destination-{uuid4().hex[:10]}",
-                "DestinationChargingCard",
-                {"destination": location.label, "needsConfirmation": True},
-            ),
-            block(
                 f"risk-{uuid4().hex[:10]}",
                 "RiskExplanationCard",
                 {
@@ -694,6 +796,14 @@ def urgent_charge_blocks(intent: ParsedIntent, location: ParsedLocation) -> list
                         "No voy a inventar estaciones; comparte otra ubicación o coordenadas más precisas."
                     ),
                 },
+            ),
+            location_request_block(
+                reason="urgent_charge",
+                title="Prueba con otra ubicación cercana",
+                body=(
+                    "No encuentro cargadores autorizados importados alrededor de esa ubicación. "
+                    "Comparte una ubicación más precisa o una ciudad cercana y volveré a comprobarlo."
+                ),
             ),
         ]
 
@@ -838,7 +948,7 @@ def route_planning_blocks(intent: ParsedIntent) -> list[dict]:
             {
                 "origin": intent.origin.label,
                 "destination": intent.destination.label,
-                "battery": intent.vehicle_fields.get("battery", 0),
+                "battery": intent.vehicle_fields.get("battery"),
                 "reserve": intent.preferences.reserve_min_percent,
             },
         ),
@@ -848,8 +958,8 @@ def route_planning_blocks(intent: ParsedIntent) -> list[dict]:
             {
                 "distanceKm": round(plan.route.distance_km, 1),
                 "durationMin": plan.route.duration_min,
-                "energyKwh": round(plan.energy_kwh or 0, 1),
-                "arrivalBattery": round(plan.arrival_battery_percent or 0, 1),
+                "energyKwh": round_optional(plan.energy_kwh),
+                "arrivalBattery": round_optional(plan.arrival_battery_percent),
             },
         ),
         block(
@@ -923,7 +1033,12 @@ def parse_intent(message: str) -> ParsedIntent:
     is_destination_charge_request = bool(
         re.search(r"\b(hotel|alojamiento|destino|cerca|cercanos|cargadores cerca)\b", normalized)
     )
-    is_urgent_request = bool(re.search(r"\b(cargar ya|urgente|bateria baja|batería baja|cerca de mi)\b", normalized))
+    is_near_me_request = bool(
+        re.search(r"\bcerca de mi\b(?!\s+(hotel|alojamiento|destino|ciudad|parking))", normalized)
+    )
+    is_urgent_request = bool(
+        re.search(r"\b(cargar ya|urgente|bateria baja|batería baja)\b", normalized) or is_near_me_request
+    )
     has_explicit_route_language = bool(
         re.search(r"\b(ruta|viaj|viaje|ir desde|voy desde)\b", normalized)
         or re.search(r"(?:de|desde)\s+[a-z0-9 .-]+?\s+(?:a|hasta|hacia)\s+[a-z0-9 .-]+", normalized)
@@ -1048,6 +1163,10 @@ def first_float(text: str, pattern: str) -> float | None:
     return float(match.group(1).replace(",", "."))
 
 
+def round_optional(value: float | None) -> float | None:
+    return round(value, 1) if isinstance(value, (int, float)) else None
+
+
 def clarifying_block(question: str, fields: list[str]) -> dict:
     return block(f"clarify-{uuid4().hex[:10]}", "ClarifyingQuestionCard", {"question": question, "fields": fields})
 
@@ -1127,7 +1246,7 @@ def normalize_block_props(block_type: str, props: dict) -> dict:
             or "Destino aproximado"
         )
         return {
-            "destination": str(destination),
+            "destination": display_text(destination, "Destino aproximado"),
             "needsConfirmation": bool(props.get("needsConfirmation", props.get("approximate", True))),
         }
     if block_type == "RiskExplanationCard":
@@ -1158,6 +1277,22 @@ def normalize_block_props(block_type: str, props: dict) -> dict:
             "manualFields": [str(item) for item in manual_fields if item],
         }
     return props
+
+
+def display_text(value: Any, fallback: str) -> str:
+    if isinstance(value, dict):
+        for key in ("label", "name", "title", "text", "value"):
+            nested = value.get(key)
+            if nested:
+                return display_text(nested, fallback)
+        return fallback
+    if value is None:
+        return fallback
+    text = str(value).strip()
+    if not text:
+        return fallback
+    match = re.search(r"['\"]label['\"]\s*:\s*['\"]([^'\"]+)", text)
+    return match.group(1) if match else text
 
 
 def extra_blocks_from_props(block_type: str, props: dict, index: int) -> list[dict]:

@@ -67,6 +67,13 @@ body {
   background: var(--color-background);
 }
 
+html:has(.chat-page),
+body:has(.chat-page),
+#root:has(.chat-page) {
+  height: 100%;
+  overflow: hidden;
+}
+
 button,
 input,
 textarea,
@@ -111,6 +118,12 @@ select {
     background: var(--color-surface);
   }
 
+  .app-frame:has(.chat-page),
+  .app-shell:has(.chat-page) {
+    height: 100svh;
+    overflow: hidden;
+  }
+
   .mobile-app-header {
     position: sticky;
     top: 0;
@@ -122,6 +135,12 @@ select {
   .app-main {
     flex: 1;
     padding: 1.25rem 1.5rem 6rem;
+  }
+
+  .app-main:has(.chat-page) {
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .mobile-bottom-nav {
@@ -160,9 +179,30 @@ select {
     font-weight: 600;
   }
 
+  .chat-page {
+    display: flex;
+    height: calc(100svh - 10.25rem);
+    min-height: 32rem;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .chat-scroll {
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scroll-padding-bottom: 1rem;
+    padding-right: 0.125rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .chat-scroll > * + * {
+    margin-top: 0.75rem;
+  }
+
   .chat-composer {
-    position: sticky;
-    bottom: 4.8rem;
+    flex-shrink: 0;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     background: var(--color-surface);
@@ -290,7 +330,12 @@ select {
     }
 
     .chat-composer {
-      bottom: 0.75rem;
+      margin-bottom: 0;
+    }
+
+    .chat-page {
+      height: calc(100svh - 6rem);
+      min-height: 36rem;
     }
   }
 }
