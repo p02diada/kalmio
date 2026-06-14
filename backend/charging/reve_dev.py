@@ -27,6 +27,7 @@ SPAIN_BBOX = {
     "zoom": 6,
 }
 REVE_PAGE_SIZE = 10
+REVE_MAX_PAGE_SIZE = 25
 
 
 class ReveDevScrapeError(ValueError):
@@ -50,6 +51,7 @@ def fetch_reve_locations(
     timeout_seconds: float = 30,
     max_retries: int = 8,
     retry_seconds: float = 60,
+    page_size: int = REVE_PAGE_SIZE,
     cache_dir: str | Path | None = None,
     offline: bool = False,
     user_agent: str = "Kalmio dev REVE data importer (local development; contact: dev@kalmio.local)",
@@ -59,13 +61,15 @@ def fetch_reve_locations(
     next_page: int | None = 1
     pages_fetched = 0
     payload = bbox or SPAIN_BBOX
+    if page_size < 1 or page_size > REVE_MAX_PAGE_SIZE:
+        raise ReveDevScrapeError(f"REVE page size must be between 1 and {REVE_MAX_PAGE_SIZE}.")
     cache_path = Path(cache_dir) if cache_dir else None
 
     while next_page is not None:
         if max_pages is not None and pages_fetched >= max_pages:
             break
 
-        page = read_cached_reve_page(cache_path, next_page) if cache_path else None
+        page = read_cached_reve_page(cache_path, next_page, page_size=page_size) if cache_path else None
         page_from_cache = page is not None
         if page is None:
             if offline:
@@ -76,6 +80,7 @@ def fetch_reve_locations(
                 timeout_seconds=timeout_seconds,
                 max_retries=max_retries,
                 retry_seconds=retry_seconds,
+                page_size=page_size,
                 user_agent=user_agent,
                 cache_dir=cache_path,
             )
@@ -98,12 +103,13 @@ def fetch_reve_page(
     timeout_seconds: float,
     max_retries: int,
     retry_seconds: float,
+    page_size: int,
     user_agent: str,
     cache_dir: Path | None = None,
 ) -> RevePage:
     body = json.dumps(bbox).encode("utf-8")
     request = Request(
-        f"{REVE_PUBLIC_API_BASE_URL}/locations?page={page}&per_page={REVE_PAGE_SIZE}",
+        f"{REVE_PUBLIC_API_BASE_URL}/locations?page={page}&per_page={page_size}",
         data=body,
         method="POST",
         headers={
@@ -139,7 +145,7 @@ def fetch_reve_page(
         raise ReveDevScrapeError(str(payload.get("status_message") or payload))
 
     page_payload = parse_reve_page_payload(payload, page)
-    write_cached_reve_page(cache_dir, page_payload.page, payload)
+    write_cached_reve_page(cache_dir, page_payload.page, payload, page_size=page_size)
     return page_payload
 
 
@@ -157,10 +163,15 @@ def parse_reve_page_payload(payload: Any, requested_page: int) -> RevePage:
     )
 
 
-def read_cached_reve_page(cache_dir: Path | None, page: int) -> RevePage | None:
+def read_cached_reve_page(
+    cache_dir: Path | None,
+    page: int,
+    *,
+    page_size: int = REVE_PAGE_SIZE,
+) -> RevePage | None:
     if cache_dir is None:
         return None
-    cache_file = reve_page_cache_file(cache_dir, page)
+    cache_file = reve_page_cache_file(cache_dir, page, page_size=page_size)
     if not cache_file.exists():
         return None
     try:
@@ -170,17 +181,25 @@ def read_cached_reve_page(cache_dir: Path | None, page: int) -> RevePage | None:
     return parse_reve_page_payload(payload, page)
 
 
-def write_cached_reve_page(cache_dir: Path | None, page: int, payload: dict[str, Any]) -> None:
+def write_cached_reve_page(
+    cache_dir: Path | None,
+    page: int,
+    payload: dict[str, Any],
+    *,
+    page_size: int = REVE_PAGE_SIZE,
+) -> None:
     if cache_dir is None:
         return
     cache_dir.mkdir(parents=True, exist_ok=True)
-    reve_page_cache_file(cache_dir, page).write_text(
+    reve_page_cache_file(cache_dir, page, page_size=page_size).write_text(
         json.dumps(payload, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
 
-def reve_page_cache_file(cache_dir: Path, page: int) -> Path:
+def reve_page_cache_file(cache_dir: Path, page: int, *, page_size: int = REVE_PAGE_SIZE) -> Path:
+    if page_size != REVE_PAGE_SIZE:
+        return cache_dir / f"locations-per-page-{page_size:05d}-page-{page:05d}.json"
     return cache_dir / f"locations-page-{page:05d}.json"
 
 

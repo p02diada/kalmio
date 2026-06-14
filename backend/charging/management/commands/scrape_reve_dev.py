@@ -9,6 +9,8 @@ from django.core.management.base import BaseCommand, CommandError
 
 from charging.importers import ChargerImportError, import_chargers, validate_records
 from charging.reve_dev import (
+    REVE_MAX_PAGE_SIZE,
+    REVE_PAGE_SIZE,
     REVE_SOURCE_NAME,
     SPAIN_BBOX,
     ReveDevScrapeError,
@@ -67,6 +69,12 @@ class Command(BaseCommand):
             help="Base wait before retrying after a transient REVE HTTP/network failure.",
         )
         parser.add_argument(
+            "--page-size",
+            type=int,
+            default=REVE_PAGE_SIZE,
+            help=f"REVE locations per page. Maximum accepted by REVE is {REVE_MAX_PAGE_SIZE}.",
+        )
+        parser.add_argument(
             "--bbox",
             nargs=4,
             type=float,
@@ -97,6 +105,7 @@ class Command(BaseCommand):
                 timeout_seconds=options["timeout_seconds"],
                 max_retries=options["max_retries"],
                 retry_seconds=options["retry_seconds"],
+                page_size=options["page_size"],
                 cache_dir=options["cache_dir"],
                 offline=options["offline"],
                 progress_callback=self.progress_callback(options["verbosity"]),
