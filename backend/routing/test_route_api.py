@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from charging.models import AvailabilitySnapshot, Connector, DataSource, EVSE, Operator, ReliabilityScore, Station, Tariff
 from routing.api import ACTIVE_CONVERSATION_BLOCKS_KEY
-from routing.agent import AgentResponseError
+from routing.agent import AgentResponseError, blocks_from_tool_result, validate_blocks
 from routing.models import RoutePlan
 from routing.production_planner import station_to_score_payload
 from routing.providers import Coordinate, ProviderRoute, RoutingProviderError
@@ -152,8 +152,71 @@ def test_conversation_message_handles_destination_charging_without_route_planner
     block_types = [block["type"] for block in body["blocks"]]
     assert "UserMessage" in block_types
     assert "DestinationChargingCard" in block_types
+    assert "LocationDetailCard" in block_types
     assert "RouteSummaryCard" not in block_types
     assert RoutePlan.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_location_detail_card_normalizes_embedded_location_text():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "location-detail",
+                "type": "LocationDetailCard",
+                "version": 1,
+                "props": {
+                    "location": "{'label': 'Córdoba', 'lat': 37.8882, 'lon': -4.7794}",
+                    "lat": 37.8882,
+                    "lon": -4.7794,
+                },
+            }
+        ]
+    )
+
+    assert blocks[0]["props"]["label"] == "Córdoba"
+    assert blocks[0]["props"]["precision"] == "approximate"
+    assert blocks[0]["props"]["needsConfirmation"] is True
+
+
+def test_urgent_charge_card_normalizes_nested_recommended_stop():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "urgent",
+                "type": "UrgentChargeCard",
+                "version": 1,
+                "props": {
+                    "batteryPercent": 18,
+                    "recommendedStop": {
+                        "name": "BALLENOIL-ES336090-COLON",
+                        "distanceKm": 0.3,
+                    },
+                },
+            }
+        ]
+    )
+
+    assert blocks[0]["props"] == {
+        "battery": 18,
+        "nearest": "BALLENOIL-ES336090-COLON",
+        "distanceKm": 0.3,
+    }
+
+
+def test_urgent_tool_fallback_preserves_user_battery():
+    blocks = blocks_from_tool_result(
+        {
+            "ok": True,
+            "tool": "search_destination_chargers",
+            "location": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794},
+            "stops": [{"name": "Córdoba Centro HPC", "distanceKm": 1.4, "powerKw": 150}],
+        },
+        message="Necesito cargar ya. Estoy en Córdoba con un 18%",
+    )
+
+    urgent_block = next(block for block in blocks if block["type"] == "UrgentChargeCard")
+    assert urgent_block["props"]["battery"] == 18
 
 
 @pytest.mark.django_db
@@ -347,6 +410,58 @@ def test_codex_conversation_agent_interprets_vehicle_followup_from_available_tra
 
 
 @pytest.mark.django_db
+def test_codex_conversation_agent_does_not_repair_component_choice_from_urgent_history(client, settings, monkeypatch):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+    repair_requests = []
+    session = client.session
+    session[ACTIVE_CONVERSATION_BLOCKS_KEY] = [
+        {"id": "user-urgent", "type": "UserMessage", "version": 1, "props": {"text": "Necesito cargar ya"}},
+        {
+            "id": "location-request",
+            "type": "LocationRequestCard",
+            "version": 1,
+            "props": {
+                "reason": "urgent_charge",
+                "title": "Necesito tu ubicación",
+                "body": "Comparte ubicación para buscar cargadores.",
+            },
+        },
+    ]
+    session.save()
+
+    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+        if repair_issues:
+            repair_requests.append(repair_issues)
+        return {
+            "type": "final",
+            "blocks": [
+                {
+                    "id": "wrong-destination",
+                    "type": "DestinationChargingCard",
+                    "version": 1,
+                    "props": {"destination": "Córdoba", "needsConfirmation": True},
+                }
+            ],
+        }
+
+    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+
+    response = client.post(
+        "/api/conversation/message",
+        data={"text": "Estoy en Córdoba con un 18%"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    new_blocks = body["blocks"][len(session[ACTIVE_CONVERSATION_BLOCKS_KEY]) :]
+    block_types = [block["type"] for block in new_blocks]
+    assert repair_requests == []
+    assert "DestinationChargingCard" in block_types
+    assert "UrgentChargeCard" not in block_types
+
+
+@pytest.mark.django_db
 def test_codex_conversation_agent_executes_allowlisted_tool(client, settings, monkeypatch, real_station):
     settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
 
@@ -428,10 +543,26 @@ def test_codex_conversation_agent_rejects_unknown_tool_with_a2ui_risk(client, se
 
 
 @pytest.mark.django_db
-def test_codex_destination_card_with_embedded_stops_is_normalized(client, settings, monkeypatch):
+def test_codex_destination_card_with_embedded_stops_requires_traced_station_data(client, settings, monkeypatch):
     settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+    repair_requests = []
 
-    def fake_codex_decision(message, tool_history=None):
+    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+        if repair_issues:
+            repair_requests.append(repair_issues)
+            return {
+                "type": "final",
+                "blocks": [
+                    {
+                        "id": "safe-text-only",
+                        "type": "AssistantMessage",
+                        "version": 1,
+                        "props": {
+                            "text": "Necesito validar cargadores autorizados antes de listar estaciones concretas."
+                        },
+                    }
+                ],
+            }
         return {
             "type": "final",
             "blocks": [
@@ -458,10 +589,11 @@ def test_codex_destination_card_with_embedded_stops_is_normalized(client, settin
 
     assert response.status_code == 200
     body = response.json()
-    destination_block = next(block for block in body["blocks"] if block["type"] == "DestinationChargingCard")
-    stops_block = next(block for block in body["blocks"] if block["type"] == "AlternativeStopsList")
-    assert destination_block["props"] == {"destination": "Valencia", "needsConfirmation": True}
-    assert stops_block["props"]["stops"][0]["name"] == "Cargador real"
+    rendered_text = " ".join(str(block.get("props", {})) for block in body["blocks"])
+    assert repair_requests
+    assert "sin resultado de herramienta trazable" in repair_requests[0][0]
+    assert "Cargador real" not in rendered_text
+    assert any(block["type"] == "AssistantMessage" for block in body["blocks"])
 
 
 @pytest.mark.django_db
@@ -543,7 +675,7 @@ def test_codex_conversation_agent_allows_bounded_tool_chain(client, settings, mo
 
 
 @pytest.mark.django_db
-def test_codex_conversation_agent_repairs_semantic_a2ui_contract(client, settings, monkeypatch, real_station):
+def test_codex_conversation_agent_allows_agent_chosen_text_final_after_tool(client, settings, monkeypatch, real_station):
     settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
     repair_requests = []
 
@@ -561,36 +693,7 @@ def test_codex_conversation_agent_repairs_semantic_a2ui_contract(client, setting
             }
         if repair_issues:
             repair_requests.append(repair_issues)
-            tool_result = tool_history[-1]["result"]
-            return {
-                "type": "final",
-                "blocks": [
-                    {
-                        "id": "destination-repaired",
-                        "type": "DestinationChargingCard",
-                        "version": 1,
-                        "props": {"destination": "Almansa", "needsConfirmation": True},
-                    },
-                    {
-                        "id": "stops-repaired",
-                        "type": "AlternativeStopsList",
-                        "version": 1,
-                        "props": {"stops": tool_result["stops"]},
-                    },
-                    {
-                        "id": "risk-repaired",
-                        "type": "RiskExplanationCard",
-                        "version": 1,
-                        "props": {
-                            "title": "Aviso importante",
-                            "items": [
-                                "Confirma disponibilidad antes de depender de estos cargadores.",
-                                "Confirma acceso y tarifa antes de depender de estos cargadores.",
-                            ],
-                        },
-                    },
-                ],
-            }
+            return {"type": "final", "blocks": []}
         return {
             "type": "final",
             "blocks": [
@@ -614,13 +717,115 @@ def test_codex_conversation_agent_repairs_semantic_a2ui_contract(client, setting
     assert response.status_code == 200
     body = response.json()
     block_types = [block["type"] for block in body["blocks"]]
+    assert repair_requests == []
+    assert "AssistantMessage" in block_types
+    assert real_station.name in " ".join(str(block.get("props", {})) for block in body["blocks"])
+
+
+@pytest.mark.django_db
+def test_codex_conversation_agent_repairs_untraced_structured_station_data(client, settings, monkeypatch, real_station):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+    repair_requests = []
+
+    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+        tool_history = tool_history or []
+        if not tool_history:
+            return {
+                "type": "tool_call",
+                "tool": "search_destination_chargers",
+                "args": {
+                    "location": {"label": "Almansa", "lat": 38.87, "lon": -1.09},
+                    "radius_km": 5,
+                    "limit": 2,
+                },
+            }
+        tool_result = tool_history[-1]["result"]
+        if repair_issues:
+            repair_requests.append(repair_issues)
+            return {
+                "type": "final",
+                "blocks": [
+                    {
+                        "id": "stops-repaired",
+                        "type": "AlternativeStopsList",
+                        "version": 1,
+                        "props": {"stops": tool_result["stops"]},
+                    }
+                ],
+            }
+        return {
+            "type": "final",
+            "blocks": [
+                {
+                    "id": "invented-stop",
+                    "type": "AlternativeStopsList",
+                    "version": 1,
+                    "props": {"stops": [{"name": "Fake HPC", "powerKw": 350, "distanceKm": 0.1}]},
+                }
+            ],
+        }
+
+    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+
+    response = client.post(
+        "/api/conversation/message",
+        data={"text": "Busca cargadores cerca de mi hotel en Almansa"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    rendered_text = " ".join(str(block.get("props", {})) for block in body["blocks"])
     assert repair_requests
-    assert "DestinationChargingCard" in block_types
-    assert "AlternativeStopsList" in block_types
-    assert "RiskExplanationCard" in block_types
-    risk_block = next(block for block in body["blocks"] if block["type"] == "RiskExplanationCard")
-    assert risk_block["props"]["level"] == "medio"
-    assert "Confirma disponibilidad" in risk_block["props"]["text"]
+    assert "Fake HPC" not in rendered_text
+    assert real_station.name in rendered_text
+
+
+@pytest.mark.django_db
+def test_codex_conversation_agent_repairs_unsupported_action_buttons(client, settings, monkeypatch):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+    repair_requests = []
+
+    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+        if repair_issues:
+            repair_requests.append(repair_issues)
+            return {
+                "type": "final",
+                "blocks": [
+                    {
+                        "id": "safe-action-text",
+                        "type": "AssistantMessage",
+                        "version": 1,
+                        "props": {"text": "Puedo ayudarte a ajustar la búsqueda desde el chat."},
+                    }
+                ],
+            }
+        return {
+            "type": "final",
+            "blocks": [
+                {
+                    "id": "unsupported-actions",
+                    "type": "ActionButtons",
+                    "version": 1,
+                    "props": {"actions": [{"label": "Ver alternativas", "action": "show_alternatives"}]},
+                }
+            ],
+        }
+
+    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+
+    response = client.post(
+        "/api/conversation/message",
+        data={"text": "Quiero revisar alternativas"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert repair_requests
+    assert any("href soportado" in issue for issue in repair_requests[0])
+    block_types = [block["type"] for block in response.json()["blocks"]]
+    assert "ActionButtons" not in block_types
+    assert "AssistantMessage" in block_types
 
 
 @pytest.mark.django_db
@@ -670,7 +875,7 @@ def test_codex_conversation_agent_stops_at_tool_budget(client, settings, monkeyp
 
 
 @pytest.mark.django_db
-def test_conversation_agent_failure_uses_local_semantic_fallback_without_technical_detail(client, monkeypatch):
+def test_local_conversation_agent_failure_uses_dev_fallback_without_technical_detail(client, monkeypatch):
     def failing_agent(message, history_blocks=None):
         raise AgentResponseError("Codex local no devolvió JSON válido.")
 
@@ -694,33 +899,42 @@ def test_conversation_agent_failure_uses_local_semantic_fallback_without_technic
 
 
 @pytest.mark.django_db
-def test_codex_urgent_response_repairs_destination_card_to_urgent_card(client, settings, monkeypatch):
+def test_codex_conversation_agent_failure_uses_minimal_safe_fallback(client, settings, monkeypatch):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+
+    def failing_agent(message, history_blocks=None):
+        raise AgentResponseError("Codex local no devolvió JSON válido.")
+
+    monkeypatch.setattr("routing.api.run_conversation_agent", failing_agent)
+
+    response = client.post(
+        "/api/conversation/message",
+        data={"text": "Necesito cargar ya"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    rendered_text = " ".join(str(block.get("props", {})) for block in body["blocks"])
+    assert "Codex" not in rendered_text
+    assert "JSON" not in rendered_text
+    block_types = [block["type"] for block in body["blocks"]]
+    assert "UserMessage" in block_types
+    assert "AssistantMessage" in block_types
+    assert "ClarifyingQuestionCard" in block_types
+    assert "LocationRequestCard" not in block_types
+    assert "UrgentChargeCard" not in block_types
+
+
+@pytest.mark.django_db
+def test_codex_urgent_response_does_not_repair_component_choice_by_intent(client, settings, monkeypatch):
     settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
     repair_requests = []
 
     def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
         if repair_issues:
             repair_requests.append(repair_issues)
-            return {
-                "type": "final",
-                "blocks": [
-                    {
-                        "id": "urgent-repaired",
-                        "type": "UrgentChargeCard",
-                        "version": 1,
-                        "props": {"battery": 18, "nearest": "Córdoba Centro HPC", "distanceKm": 1.4},
-                    },
-                    {
-                        "id": "risk-repaired",
-                        "type": "RiskExplanationCard",
-                        "version": 1,
-                        "props": {
-                            "level": "medio",
-                            "text": "Confirma acceso final, tarifa y disponibilidad antes de depender del cargador.",
-                        },
-                    },
-                ],
-            }
+            return {"type": "final", "blocks": []}
         return {
             "type": "final",
             "blocks": [
@@ -744,9 +958,9 @@ def test_codex_urgent_response_repairs_destination_card_to_urgent_card(client, s
     assert response.status_code == 200
     body = response.json()
     block_types = [block["type"] for block in body["blocks"]]
-    assert repair_requests
-    assert "UrgentChargeCard" in block_types
-    assert "DestinationChargingCard" not in block_types
+    assert repair_requests == []
+    assert "DestinationChargingCard" in block_types
+    assert "UrgentChargeCard" not in block_types
 
 
 @pytest.mark.django_db

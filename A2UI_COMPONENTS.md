@@ -15,7 +15,7 @@ Only registered types are valid. `/api/conversation/message` validates backend-g
 
 This is Kalmio's local A2UI adapter for the current vertical slice. It is intentionally compatible with a later migration to official A2UI surface messages such as `createSurface`, `updateComponents`, and `updateDataModel`.
 
-The agent chooses the UI that best fits the user request and tool results. The backend does not silently convert a text answer into a richer UI in the normal path; it validates semantic obligations and asks the agent for one repair when the final A2UI is incomplete.
+The agent chooses the UI that best fits the full conversation, user request, and tool results. The backend does not silently convert a text answer into richer UI and does not choose components from conversational intent. It asks the agent for one repair only when the final A2UI violates the catalog, data-traceability, or action-safety contract.
 
 ## Required Components
 
@@ -35,6 +35,7 @@ The agent chooses the UI that best fits the user request and tool results. The b
 - `ActionButtons`: next actions such as open navigation, save, adjust.
 - `ClarifyingQuestionCard`: missing critical data.
 - `LocationRequestCard`: request browser location or manual city/coordinates when location is critical.
+- `LocationDetailCard`: resolved city/coordinate context used for a search, including precision and whether the user should confirm the final place.
 - `PreferenceChips`: quick preference controls.
 - `ErrorFallbackCard`: unknown or broken component.
 
@@ -49,12 +50,17 @@ The agent chooses the UI that best fits the user request and tool results. The b
 - Preference chips may send a new user message back to the conversation agent.
 - Location requests may trigger browser geolocation only through the frontend renderer and must offer manual city/coordinate entry.
 
-## Semantic Rules
+## Agent And Backend Boundary
 
-- After `search_destination_chargers`, final A2UI must include a destination context, charger alternatives sourced from the tool result, and an uncertainty/risk explanation.
-- After `plan_route`, final A2UI must include a route summary and recommended stop sourced from the tool result.
-- Urgent or immediate low-battery requests must render `UrgentChargeCard` when a nearby authorized charger can be proposed, or `LocationRequestCard` when location is missing or needs correction. They must not render `DestinationChargingCard`.
-- If final A2UI violates these rules, Django asks the agent for one repaired `final.blocks` response. If repair fails, Django returns deterministic fallback A2UI.
+- The agent infers intent from the useful conversation context and decides whether to call a tool, ask a question, or return final A2UI.
+- Components are described to the agent by purpose, not as hardcoded intent mappings. Similar user messages may produce different blocks when context justifies it.
+- Django validates allowlisted component types, normalizes known prop variants, and renders unsupported component requests as `ErrorFallbackCard`.
+- Structured charger/station facts in blocks such as `AlternativeStopsList`, `RecommendedStopCard`, and `UrgentChargeCard` must trace to current tool results or previously validated session blocks.
+- Route metrics in `RouteSummaryCard` must trace to `plan_route`. Coordinates in `LocationDetailCard` must come from a tool or explicit user coordinates.
+- Prices, availability, station details, route metrics, and vehicle state must not be invented. If current tools do not provide prices, `CostComparisonCard` cannot show prices.
+- `ActionButtons` can expose only safe supported actions such as opening navigation/map links, refining the search, or disabled save actions. Booking, payment, and arbitrary script actions are not supported.
+- Repair is for contract and data-safety violations only. Django must not repair by intent rules such as "urgent implies `UrgentChargeCard`" or "destination search implies `DestinationChargingCard`".
+- `local` conversation mode may keep deterministic behavior for development and automated tests, but it does not define the primary agentic product behavior.
 
 ## Coverage
 

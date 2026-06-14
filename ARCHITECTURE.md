@@ -2,7 +2,7 @@
 
 ## System Shape
 
-Kalmio uses a React/Vite PWA frontend and a Django/Ninja backend. The backend owns provider integration, charger data access, planning logic, and conversation decisions. The frontend owns the host app, native rendering of allowlisted A2UI blocks, and local UI state.
+Kalmio uses a React/Vite PWA frontend and a Django/Ninja backend. The agent owns conversational reasoning: intent, tool choice, and A2UI component choice. The backend owns provider integration, charger data access, planning logic, tool execution, validation, and safety boundaries. The frontend owns the host app, native rendering of allowlisted A2UI blocks, and local UI state.
 
 ## Frontend
 
@@ -42,12 +42,12 @@ This is a local A2UI adapter shape for the current vertical slice. It is intenti
 3. Invoke the configured conversation agent mode:
    - `local`: deterministic local agent adapter for development and tests.
    - `codex`: local Codex CLI adapter using `KALMIO_CODEX_MODEL`, with an internal Django tool loop.
-4. In Codex mode, the model may return either final A2UI blocks or an allowlisted tool call. Django validates and executes each tool, appends the validated result to the turn history, and asks Codex again until it returns final A2UI or reaches `KALMIO_CODEX_MAX_TOOL_CALLS` (default 3). Codex chooses the UI blocks; Django validates component allowlist, factual constraints, and semantic A2UI obligations. Incomplete final A2UI gets one repair request back to Codex with concrete issues. Unknown tools, repeated identical calls, exhausted budgets, failed repairs, or missing final A2UI return fallback A2UI to avoid loops.
+4. In Codex mode, the model receives the useful conversation transcript, the allowed internal tools, and the A2UI catalog described by purpose. The model may return either final A2UI blocks or an allowlisted tool call. Django validates and executes each tool, appends the validated result to the turn history, and asks Codex again until it returns final A2UI or reaches `KALMIO_CODEX_MAX_TOOL_CALLS` (default 3). Codex chooses intent, tool calls, and UI blocks. Django validates component allowlist, structural props, data traceability, and supported actions; it does not choose components from regex or intent rules. Contract violations get one repair request back to Codex with concrete safety/data issues. Unknown tools, repeated identical calls, exhausted budgets, failed repairs, or missing final A2UI return minimal fallback A2UI to avoid loops.
 5. Current internal tools are `resolve_location`, `search_destination_chargers`, and `plan_route`. They are Python functions inside Django, not MCP tools, so they keep session, data-source, provider, and authorization boundaries inside the backend.
 6. Domain facts come only from authorized charger data, route provider responses, internal tool outputs, or explicit user input.
-7. Validate generated A2UI block types against the allowlist and normalize known Codex prop variants before rendering.
+7. Validate generated A2UI block types against the allowlist and normalize known Codex prop variants before rendering. Structured station data, route metrics, coordinates, costs, availability, and actions are checked against tool results or previously validated session blocks.
 8. Store the latest A2UI blocks in the Django session and return `{blocks}` to the frontend.
-9. If provider-backed routing or authorized charger data is unavailable, return explicit A2UI risk/error blocks or a structured backend error. Do not fabricate stations, coordinates, vehicle state, price, or availability.
+9. If provider-backed routing or authorized charger data is unavailable, return explicit A2UI risk/error blocks or a structured backend error. Do not fabricate stations, coordinates, vehicle state, price, or availability. A Codex failure does not fall through to the deterministic local parser in normal Codex mode; the fallback is minimal and honest.
 
 `GET /api/conversation/messages` returns the active A2UI block list for the current session, initializing it with an assistant prompt and preference chips when empty. `DELETE /api/conversation` clears both the route-plan session result and the A2UI chat blocks.
 

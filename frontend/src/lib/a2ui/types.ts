@@ -15,6 +15,7 @@ export type A2UIType =
   | 'ActionButtons'
   | 'ClarifyingQuestionCard'
   | 'LocationRequestCard'
+  | 'LocationDetailCard'
   | 'PreferenceChips'
   | 'ErrorFallbackCard'
 

@@ -66,6 +66,7 @@ import {
   getConversationMessages,
   sendConversationMessage,
 } from '@/lib/api/conversation'
+import type { A2UIBlock } from '@/lib/a2ui/types'
 import { listRoutePlans, type RoutePlanResponse } from '@/lib/api/route-plan'
 import { cn } from '@/lib/utils'
 
@@ -375,6 +376,7 @@ function ChatPage() {
   const [isSending, setIsSending] = useState(false)
   const [phaseIndex, setPhaseIndex] = useState(0)
   const [retryText, setRetryText] = useState<string | null>(null)
+  const [pendingUserBlock, setPendingUserBlock] = useState<A2UIBlock | null>(null)
   const sentInitialPrompt = useRef(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const latestRef = useRef<HTMLDivElement>(null)
@@ -383,16 +385,25 @@ function ChatPage() {
     queryKey: conversationMessagesQueryKey,
     queryFn: getConversationMessages,
   })
-  const blockCount = messagesQuery.data?.blocks.length ?? 0
+  const renderedBlocks = messagesQuery.data
+    ? pendingUserBlock
+      ? [...messagesQuery.data.blocks, pendingUserBlock]
+      : messagesQuery.data.blocks
+    : pendingUserBlock
+      ? [pendingUserBlock]
+      : []
+  const blockCount = renderedBlocks.length
   const sendMutation = useMutation({
     mutationFn: sendConversationMessage,
     onSuccess: (data) => {
       queryClient.setQueryData(conversationMessagesQueryKey, data)
+      setPendingUserBlock(null)
     },
   })
   const clearMutation = useMutation({
     mutationFn: clearConversation,
     onSuccess: () => {
+      setPendingUserBlock(null)
       queryClient.invalidateQueries({ queryKey: conversationMessagesQueryKey })
     },
     onError: (mutationError) => {
@@ -408,6 +419,12 @@ function ChatPage() {
     setDraft('')
     setError(null)
     setRetryText(null)
+    setPendingUserBlock({
+      id: `pending-user-${Date.now()}`,
+      type: 'UserMessage',
+      version: 1,
+      props: { text },
+    })
     setIsSending(true)
     setPhaseIndex(0)
     sendMutation.mutateAsync(text)
@@ -473,8 +490,8 @@ function ChatPage() {
 
       <div ref={scrollRef} className="chat-scroll" aria-live="polite">
         {messagesQuery.isPending ? <ConversationSkeleton /> : null}
-        {messagesQuery.data ? (
-          <A2UIRenderer blocks={messagesQuery.data.blocks} onChipClick={sendText} />
+        {renderedBlocks.length > 0 ? (
+          <A2UIRenderer blocks={renderedBlocks} onChipClick={sendText} />
         ) : null}
         {isSending ? <ConversationProgress phaseIndex={phaseIndex} /> : null}
         {error ? <InlineError message={error} onRetry={retryText ? () => sendText(retryText) : undefined} /> : null}

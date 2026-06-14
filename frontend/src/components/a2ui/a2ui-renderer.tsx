@@ -101,6 +101,7 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
           title={text(block.props.name)}
           rows={[
             ['Potencia', metric(block.props.powerKw, 'kW')],
+            ['Distancia', metric(block.props.distanceKm, 'km')],
             ['Desvío', metric(block.props.detourMin, 'min')],
             ['Confianza', text(block.props.confidence)],
           ]}
@@ -195,6 +196,8 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
           onManualLocationRequest={actions.onManualLocationRequest}
         />
       )
+    case 'LocationDetailCard':
+      return <LocationDetailCard block={block} />
     case 'PreferenceChips':
       return (
         <div className="flex flex-wrap gap-2">
@@ -294,6 +297,46 @@ function LocationRequestCard({
           </Button>
         </div>
         {statusMessage ? <p className="text-xs leading-5 text-muted-foreground">{statusMessage}</p> : null}
+      </CardContent>
+    </Card>
+  )
+}
+
+function LocationDetailCard({ block }: { block: A2UIBlock }) {
+  const needsConfirmation = bool(block.props.needsConfirmation)
+  const precision = text(block.props.precision, 'approximate') === 'exact' ? 'Precisa' : 'Aproximada'
+  const coordinates = coordinatePair(block.props.lat, block.props.lon)
+
+  return (
+    <Card className="border-route-soft bg-muted">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-sm font-semibold tracking-tight">
+          <span className="grid size-7 place-items-center rounded-md bg-surface">
+            <MapPinned className="size-4 text-route" aria-hidden="true" />
+          </span>
+          Detalle de ubicación
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1">
+          <span className="text-base font-semibold tracking-tight">{text(block.props.label, 'Ubicación indicada')}</span>
+          <span className="text-sm leading-6 text-body">{text(block.props.context, 'Ubicación usada para la búsqueda.')}</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <div>
+            <span className="block text-caption font-medium text-muted-foreground">Precisión</span>
+            <span className="block text-compact font-semibold tracking-tight">{precision}</span>
+          </div>
+          <div>
+            <span className="block text-caption font-medium text-muted-foreground">Coordenadas</span>
+            <span className="block truncate text-compact font-semibold tracking-tight">{coordinates}</span>
+          </div>
+        </div>
+        {needsConfirmation ? (
+          <Badge variant="secondary" className="w-fit">
+            Confirma acceso y ubicación final
+          </Badge>
+        ) : null}
       </CardContent>
     </Card>
   )
@@ -476,11 +519,12 @@ function ListCard({ title, items }: { title: string; items: RecordList }) {
 function RiskBand({ level, body }: { level: string; body: string }) {
   const severity = level.toLowerCase()
   const high = severity.includes('alto') || severity.includes('alta')
+  const low = severity.includes('bajo') || severity.includes('baja') || severity.includes('info')
   return (
     <Alert className={cn('border-warning bg-warning-soft text-foreground', high && 'border-error bg-error-soft')}>
       <AlertTriangle aria-hidden="true" />
       <AlertTitle className="text-sm font-semibold">
-        {high ? 'Riesgo alto' : 'Riesgo a confirmar'}
+        {high ? 'Riesgo alto' : low ? 'Aviso de datos' : 'Datos a confirmar'}
       </AlertTitle>
       <AlertDescription className="text-sm leading-6 text-body">
         {body || 'Hay incertidumbre que debes confirmar antes de depender de este resultado.'}
@@ -619,6 +663,15 @@ function percent(value: unknown, options: { zeroUnknown?: boolean } = {}) {
     return 'No calculado'
   }
   return `${formatNumber(number)}%`
+}
+
+function coordinatePair(lat: unknown, lon: unknown) {
+  const latitude = knownNumber(lat)
+  const longitude = knownNumber(lon)
+  if (latitude === null || longitude === null) {
+    return 'No disponible'
+  }
+  return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
 }
 
 function count(value: unknown) {

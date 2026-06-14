@@ -3,6 +3,7 @@ from ninja import Query
 from ninja.responses import Response
 from ninja.security import SessionAuth
 from ninja.utils import check_csrf
+from django.conf import settings
 
 from routing.agent import AgentResponseError, conversation_failure_blocks, initial_blocks, run_conversation_agent, run_local_agent
 from routing.models import RoutePlan
@@ -67,9 +68,12 @@ def create_conversation_message(request, payload: ConversationMessageRequest):
     try:
         new_blocks = run_conversation_agent(payload.text, history_blocks=current_blocks)
     except AgentResponseError:
-        try:
-            new_blocks = run_local_agent(payload.text, history_blocks=current_blocks)
-        except (AgentResponseError, PlanningDataError, RoutingProviderError):
+        if getattr(settings, "KALMIO_CONVERSATION_AGENT_MODE", "local") == "local":
+            try:
+                new_blocks = run_local_agent(payload.text, history_blocks=current_blocks)
+            except (AgentResponseError, PlanningDataError, RoutingProviderError):
+                new_blocks = conversation_failure_blocks(payload.text)
+        else:
             new_blocks = conversation_failure_blocks(payload.text)
 
     blocks = [*current_blocks, *new_blocks]

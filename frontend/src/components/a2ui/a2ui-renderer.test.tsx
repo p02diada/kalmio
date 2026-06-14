@@ -30,6 +30,33 @@ describe('A2UIRenderer', () => {
     expect(screen.queryByText(/\[object Object\]/i)).not.toBeInTheDocument()
   })
 
+  it('renders resolved location details without raw object labels', () => {
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'location-detail',
+            type: 'LocationDetailCard',
+            version: 1,
+            props: {
+              label: { label: 'Córdoba' },
+              lat: 37.8882,
+              lon: -4.7794,
+              precision: 'approximate',
+              context: 'Ubicación usada para buscar cargadores urgentes',
+              needsConfirmation: true,
+            },
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('Detalle de ubicación')).toBeInTheDocument()
+    expect(screen.getByText('Córdoba')).toBeInTheDocument()
+    expect(screen.getByText('37.88820, -4.77940')).toBeInTheDocument()
+    expect(screen.queryByText(/\[object Object\]/i)).not.toBeInTheDocument()
+  })
+
   it('renders unknown route numbers as not calculated', () => {
     render(
       <A2UIRenderer
@@ -62,7 +89,7 @@ describe('A2UIRenderer', () => {
             id: 'recommended',
             type: 'RecommendedStopCard',
             version: 1,
-            props: { name: 'Almansa HPC', powerKw: 180, detourMin: 8, confidence: 'media' },
+            props: { name: 'Almansa HPC', powerKw: 180, distanceKm: 1.2, detourMin: 8, confidence: 'media' },
           },
         ]}
       />,
@@ -70,6 +97,28 @@ describe('A2UIRenderer', () => {
 
     expect(screen.getByText('Recomendación principal')).toBeInTheDocument()
     expect(screen.getByText('Almansa HPC')).toBeInTheDocument()
+    expect(screen.getByText('1.2 km')).toBeInTheDocument()
+  })
+
+  it('labels medium uncertainty as data to confirm', () => {
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'risk',
+            type: 'RiskExplanationCard',
+            version: 1,
+            props: {
+              level: 'medio',
+              text: 'Confirma acceso final, tarifa y disponibilidad antes de depender de ellos.',
+            },
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('Datos a confirmar')).toBeInTheDocument()
+    expect(screen.queryByText('Riesgo a confirmar')).not.toBeInTheDocument()
   })
 
   it('explains disabled actions', () => {
