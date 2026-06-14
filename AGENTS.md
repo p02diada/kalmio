@@ -16,6 +16,12 @@ Backend: Django, Django Ninja, Django ORM, GeoDjango, Postgres/PostGIS, provider
 - Backend: `cd backend && python -m venv .venv && source .venv/bin/activate && pip install -r requirements-dev.txt && python manage.py migrate && python manage.py runserver`.
 - Docker: `docker compose up --build`.
 
+## Agent Runtime Rules
+
+- Use local mode only for automated unit tests and e2e test runs.
+- When developing, inspecting the app manually, or starting a dev server to review behavior or UI, run through Codex mode.
+- Prefer the smallest, lowest-cost Codex model that can handle the task, and minimize token usage by reading, generating, and retaining only relevant context. For routine local coding tasks, use `gpt-5.4-mini` unless the task clearly requires a stronger model.
+
 ## Phase Rules
 
 - Complete Phase 0, Phase 0.5, and Phase 1 before Phase 2.
