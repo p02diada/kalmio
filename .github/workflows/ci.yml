@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  backend:
+    name: Backend production gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run backend checks in PostGIS container
+        run: |
+          docker compose -f docker-compose.ci.yml build backend-ci
+          docker compose -f docker-compose.ci.yml run --rm backend-ci
+      - name: Stop services
+        if: always()
+        run: docker compose -f docker-compose.ci.yml down -v --remove-orphans
+
+  frontend:
+    name: Frontend gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run frontend checks
+        run: docker compose -f docker-compose.ci.yml run --rm frontend-ci
+      - name: Stop services
+        if: always()
+        run: docker compose -f docker-compose.ci.yml down -v --remove-orphans

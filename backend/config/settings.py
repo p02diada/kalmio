@@ -1,0 +1,332 @@
+"""Django settings for Kalmio."""
+
+import os
+from pathlib import Path
+from urllib.parse import urlparse
+
+from django.core.exceptions import ImproperlyConfigured
+from django.core.management.utils import get_random_secret_key
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def env_list(name: str, default: str = "") -> list[str]:
+    return [item.strip() for item in os.getenv(name, default).split(",") if item.strip()]
+
+
+def require_https_origins(name: str, origins: list[str]) -> None:
+    for origin in origins:
+        parsed = urlparse(origin)
+        if parsed.scheme != "https" or not parsed.netloc:
+            raise ImproperlyConfigured(f"{name} must contain only HTTPS origins in production.")
+
+
+def require_http_url(name: str, value: str) -> None:
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ImproperlyConfigured(f"{name} must be an absolute HTTP(S) URL.")
+
+
+def _ensure_value(values: list[str], candidate: str) -> list[str]:
+    if candidate and candidate not in values:
+        values.append(candidate)
+    return values
+
+
+KALMIO_ENV = os.getenv("KALMIO_ENV", "development").strip().lower()
+IS_PRODUCTION = KALMIO_ENV == "production"
+
+DEBUG = env_bool("DJANGO_DEBUG", default=not IS_PRODUCTION)
+if IS_PRODUCTION and DEBUG:
+    raise ImproperlyConfigured("DJANGO_DEBUG must be false when KALMIO_ENV=production.")
+
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+if not SECRET_KEY:
+    if IS_PRODUCTION:
+        raise ImproperlyConfigured("DJANGO_SECRET_KEY is required when KALMIO_ENV=production.")
+    SECRET_KEY = get_random_secret_key()
+if IS_PRODUCTION and any(marker in SECRET_KEY.lower() for marker in {"replace-with", "change-me", "dev-only"}):
+    raise ImproperlyConfigured("DJANGO_SECRET_KEY must be a real production secret.")
+
+ALLOWED_HOSTS = env_list(
+    "DJANGO_ALLOWED_HOSTS",
+    default="" if IS_PRODUCTION else "localhost,127.0.0.1,0.0.0.0,testserver",
+)
+if IS_PRODUCTION and (not ALLOWED_HOSTS or "*" in ALLOWED_HOSTS):
+    raise ImproperlyConfigured("DJANGO_ALLOWED_HOSTS must contain explicit production hosts.")
+if not IS_PRODUCTION:
+    ALLOWED_HOSTS = _ensure_value(ALLOWED_HOSTS, ".trycloudflare.com")
+
+INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "corsheaders",
+    "accounts",
+    "api",
+    "charging",
+    "routing",
+    "feedback",
+]
+
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "config.middleware.RequestIDMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
+
+ROOT_URLCONF = "config.urls"
+
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ],
+        },
+    },
+]
+
+WSGI_APPLICATION = "config.wsgi.application"
+
+DB_ENGINE = os.getenv("KALMIO_DB_ENGINE", "sqlite")
+if IS_PRODUCTION and DB_ENGINE != "postgis":
+    raise ImproperlyConfigured("KALMIO_DB_ENGINE=postgis is required when KALMIO_ENV=production.")
+
+if DB_ENGINE == "postgis":
+    postgres_password = os.getenv("POSTGRES_PASSWORD", "kalmio")
+    unsafe_postgres_passwords = {"", "kalmio", "postgres", "password"}
+    if IS_PRODUCTION and (
+        postgres_password.lower() in unsafe_postgres_passwords
+        or any(marker in postgres_password.lower() for marker in {"replace-with", "change-me", "dev-only"})
+    ):
+        raise ImproperlyConfigured("POSTGRES_PASSWORD must be a real production secret.")
+    database_options = {}
+    postgres_sslmode = os.getenv("POSTGRES_SSLMODE", "require" if IS_PRODUCTION else "")
+    if postgres_sslmode:
+        database_options["sslmode"] = postgres_sslmode
+
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.contrib.gis.db.backends.postgis",
+            "NAME": os.getenv("POSTGRES_DB", "kalmio"),
+            "USER": os.getenv("POSTGRES_USER", "kalmio"),
+            "PASSWORD": postgres_password,
+            "HOST": os.getenv("POSTGRES_HOST", "localhost"),
+            "PORT": os.getenv("POSTGRES_PORT", "5432"),
+            "CONN_MAX_AGE": int(os.getenv("POSTGRES_CONN_MAX_AGE", "600" if IS_PRODUCTION else "0")),
+            "OPTIONS": database_options,
+        }
+    }
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
+
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+
+LANGUAGE_CODE = "es-es"
+TIME_ZONE = "Europe/Madrid"
+USE_I18N = True
+USE_TZ = True
+
+STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+KALMIO_ENABLE_ADMIN = env_bool("KALMIO_ENABLE_ADMIN", default=not IS_PRODUCTION)
+KALMIO_ADMIN_PATH = os.getenv("KALMIO_ADMIN_PATH", "admin/").strip().lstrip("/")
+if KALMIO_ENABLE_ADMIN and not KALMIO_ADMIN_PATH:
+    raise ImproperlyConfigured("KALMIO_ADMIN_PATH is required when KALMIO_ENABLE_ADMIN=true.")
+if KALMIO_ENABLE_ADMIN and not KALMIO_ADMIN_PATH.endswith("/"):
+    raise ImproperlyConfigured("KALMIO_ADMIN_PATH must end with '/'.")
+
+CORS_ALLOWED_ORIGINS = env_list(
+    "CORS_ALLOWED_ORIGINS",
+    default="" if IS_PRODUCTION else "http://localhost:5173,http://127.0.0.1:5173",
+)
+if IS_PRODUCTION and not CORS_ALLOWED_ORIGINS:
+    raise ImproperlyConfigured("CORS_ALLOWED_ORIGINS is required when KALMIO_ENV=production.")
+if IS_PRODUCTION:
+    require_https_origins("CORS_ALLOWED_ORIGINS", CORS_ALLOWED_ORIGINS)
+if not IS_PRODUCTION:
+    CORS_ALLOWED_ORIGINS = _ensure_value(CORS_ALLOWED_ORIGINS, "https://*.trycloudflare.com")
+CORS_ALLOWED_ORIGIN_REGEXES = env_list("CORS_ALLOWED_ORIGIN_REGEXES")
+if not IS_PRODUCTION:
+    CORS_ALLOWED_ORIGIN_REGEXES = _ensure_value(
+        CORS_ALLOWED_ORIGIN_REGEXES,
+        r"^https://[A-Za-z0-9-]+\.trycloudflare\.com$",
+    )
+
+CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = env_list(
+    "CSRF_TRUSTED_ORIGINS",
+    default="" if IS_PRODUCTION else "http://localhost:5173,http://127.0.0.1:5173",
+)
+if IS_PRODUCTION and not CSRF_TRUSTED_ORIGINS:
+    raise ImproperlyConfigured("CSRF_TRUSTED_ORIGINS is required when KALMIO_ENV=production.")
+if IS_PRODUCTION:
+    require_https_origins("CSRF_TRUSTED_ORIGINS", CSRF_TRUSTED_ORIGINS)
+if not IS_PRODUCTION:
+    CSRF_TRUSTED_ORIGINS = _ensure_value(CSRF_TRUSTED_ORIGINS, "https://*.trycloudflare.com")
+
+SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", default=IS_PRODUCTION)
+SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_SECURE_HSTS_SECONDS", "31536000" if IS_PRODUCTION else "0"))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", default=IS_PRODUCTION)
+SECURE_HSTS_PRELOAD = env_bool("DJANGO_SECURE_HSTS_PRELOAD", default=IS_PRODUCTION)
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = os.getenv("DJANGO_SECURE_REFERRER_POLICY", "same-origin")
+if env_bool("DJANGO_TRUST_X_FORWARDED_PROTO", default=IS_PRODUCTION):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = env_bool("SESSION_COOKIE_SECURE", default=IS_PRODUCTION)
+SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
+CSRF_COOKIE_SECURE = env_bool("CSRF_COOKIE_SECURE", default=IS_PRODUCTION)
+CSRF_COOKIE_HTTPONLY = env_bool("CSRF_COOKIE_HTTPONLY", default=IS_PRODUCTION)
+CSRF_COOKIE_SAMESITE = os.getenv("CSRF_COOKIE_SAMESITE", "Lax")
+
+KALMIO_AUTH_THROTTLE_LIMIT = int(os.getenv("KALMIO_AUTH_THROTTLE_LIMIT", "5"))
+KALMIO_AUTH_THROTTLE_WINDOW_SECONDS = int(os.getenv("KALMIO_AUTH_THROTTLE_WINDOW_SECONDS", "900"))
+if KALMIO_AUTH_THROTTLE_LIMIT <= 0:
+    raise ImproperlyConfigured("KALMIO_AUTH_THROTTLE_LIMIT must be greater than zero.")
+if KALMIO_AUTH_THROTTLE_WINDOW_SECONDS <= 0:
+    raise ImproperlyConfigured("KALMIO_AUTH_THROTTLE_WINDOW_SECONDS must be greater than zero.")
+
+KALMIO_ENABLE_API_DOCS = env_bool("KALMIO_ENABLE_API_DOCS", default=not IS_PRODUCTION)
+KALMIO_ROUTING_PROVIDER = os.getenv("KALMIO_ROUTING_PROVIDER", "osrm").strip().lower()
+
+KALMIO_ROUTE_CONVERSATION_THROTTLE_LIMIT = int(os.getenv("KALMIO_ROUTE_CONVERSATION_THROTTLE_LIMIT", "30"))
+KALMIO_ROUTE_CONVERSATION_THROTTLE_WINDOW_SECONDS = int(
+    os.getenv("KALMIO_ROUTE_CONVERSATION_THROTTLE_WINDOW_SECONDS", "120")
+)
+if KALMIO_ROUTE_CONVERSATION_THROTTLE_LIMIT <= 0:
+    raise ImproperlyConfigured("KALMIO_ROUTE_CONVERSATION_THROTTLE_LIMIT must be greater than zero.")
+if KALMIO_ROUTE_CONVERSATION_THROTTLE_WINDOW_SECONDS <= 0:
+    raise ImproperlyConfigured(
+        "KALMIO_ROUTE_CONVERSATION_THROTTLE_WINDOW_SECONDS must be greater than zero.",
+    )
+
+KALMIO_CONVERSATION_AGENT_MODE = os.getenv("KALMIO_CONVERSATION_AGENT_MODE", "local").strip().lower()
+if KALMIO_CONVERSATION_AGENT_MODE not in {"local", "codex"}:
+    raise ImproperlyConfigured("KALMIO_CONVERSATION_AGENT_MODE must be local or codex.")
+KALMIO_CODEX_COMMAND = os.getenv("KALMIO_CODEX_COMMAND", "codex").strip() or "codex"
+KALMIO_CODEX_MODEL = os.getenv("KALMIO_CODEX_MODEL", "gpt-5-nano").strip() or "gpt-5-nano"
+try:
+    KALMIO_CODEX_TIMEOUT_SECONDS = float(os.getenv("KALMIO_CODEX_TIMEOUT_SECONDS", "20"))
+except ValueError as exc:
+    raise ImproperlyConfigured("KALMIO_CODEX_TIMEOUT_SECONDS must be a number.") from exc
+if KALMIO_CODEX_TIMEOUT_SECONDS <= 0:
+    raise ImproperlyConfigured("KALMIO_CODEX_TIMEOUT_SECONDS must be greater than zero.")
+try:
+    KALMIO_CODEX_MAX_TOOL_CALLS = int(os.getenv("KALMIO_CODEX_MAX_TOOL_CALLS", "3"))
+except ValueError as exc:
+    raise ImproperlyConfigured("KALMIO_CODEX_MAX_TOOL_CALLS must be an integer.") from exc
+if KALMIO_CODEX_MAX_TOOL_CALLS < 0 or KALMIO_CODEX_MAX_TOOL_CALLS > 8:
+    raise ImproperlyConfigured("KALMIO_CODEX_MAX_TOOL_CALLS must be between 0 and 8.")
+
+PUBLIC_OSRM_DEVELOPMENT_URL = "https://router.project-osrm.org"
+KALMIO_OSRM_BASE_URL = os.getenv(
+    "KALMIO_OSRM_BASE_URL",
+    "" if IS_PRODUCTION else PUBLIC_OSRM_DEVELOPMENT_URL,
+).strip()
+if KALMIO_ROUTING_PROVIDER == "osrm":
+    if not KALMIO_OSRM_BASE_URL:
+        if IS_PRODUCTION:
+            raise ImproperlyConfigured("KALMIO_OSRM_BASE_URL is required when KALMIO_ENV=production.")
+    else:
+        require_http_url("KALMIO_OSRM_BASE_URL", KALMIO_OSRM_BASE_URL)
+        if IS_PRODUCTION and KALMIO_OSRM_BASE_URL.rstrip("/") == PUBLIC_OSRM_DEVELOPMENT_URL:
+            raise ImproperlyConfigured("KALMIO_OSRM_BASE_URL must point to an explicit production routing provider.")
+
+try:
+    KALMIO_OSRM_TIMEOUT_SECONDS = float(os.getenv("KALMIO_OSRM_TIMEOUT_SECONDS", "5"))
+except ValueError as exc:
+    raise ImproperlyConfigured("KALMIO_OSRM_TIMEOUT_SECONDS must be a number.") from exc
+if KALMIO_OSRM_TIMEOUT_SECONDS <= 0:
+    raise ImproperlyConfigured("KALMIO_OSRM_TIMEOUT_SECONDS must be greater than zero.")
+
+KALMIO_ROUTING_REQUEST_RETRIES = int(os.getenv("KALMIO_ROUTING_REQUEST_RETRIES", "1"))
+if KALMIO_ROUTING_REQUEST_RETRIES < 0:
+    raise ImproperlyConfigured("KALMIO_ROUTING_REQUEST_RETRIES must be greater than or equal to zero.")
+
+KALMIO_ROUTING_READINESS_CHECK = env_bool(
+    "KALMIO_ROUTING_READINESS_CHECK", default=IS_PRODUCTION
+)
+
+KALMIO_LOG_LEVEL = os.getenv("KALMIO_LOG_LEVEL", "INFO").strip().upper()
+if KALMIO_LOG_LEVEL not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
+    raise ImproperlyConfigured("KALMIO_LOG_LEVEL must be one of DEBUG, INFO, WARNING, ERROR, or CRITICAL.")
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {
+        "request_id": {
+            "()": "config.middleware.RequestIDLogFilter",
+        },
+    },
+    "formatters": {
+        "kalmio": {
+            "format": "{levelname} {asctime} request_id={request_id} logger={name} message={message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "kalmio",
+            "filters": ["request_id"],
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": KALMIO_LOG_LEVEL,
+    },
+    "loggers": {
+        "django.server": {
+            "handlers": ["console"],
+            "level": KALMIO_LOG_LEVEL,
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "django.security": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+    },
+}

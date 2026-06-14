@@ -1,0 +1,3 @@
+# Project-scoped Codex defaults for Kalmio experiments.
+# Keep this lightweight: the product must remain demoable with deterministic local providers.
+model = "gpt-5.5"

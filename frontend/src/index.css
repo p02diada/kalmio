@@ -1,0 +1,61 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+
+@theme {
+  --font-sans: "Geist", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --color-background: oklch(100% 0 0);
+  --color-surface: oklch(100% 0 0);
+  --color-foreground: oklch(20.5% 0 0);
+  --color-muted: oklch(98.5% 0 0);
+  --color-muted-foreground: oklch(39.8% 0 0);
+  --color-border: oklch(92.2% 0 0);
+  --color-primary: oklch(42.8% 0.139 154);
+  --color-primary-foreground: oklch(100% 0 0);
+  --color-primary-soft: oklch(95.4% 0.052 151);
+  --color-warning: oklch(71% 0.151 69);
+  --color-route: oklch(54.7% 0.195 258);
+  --color-assistant: oklch(52.3% 0.165 294);
+  --radius-md: 0.5rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font-sans);
+  background: var(--color-background);
+  color: var(--color-foreground);
+  text-rendering: geometricPrecision;
+}
+
+body {
+  min-width: 320px;
+  margin: 0;
+  background: var(--color-background);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-route);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
