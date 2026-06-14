@@ -21,7 +21,6 @@ import {
   Navigation,
   RotateCcw,
   Settings,
-  ShieldCheck,
   UserRound,
   Zap,
   type LucideIcon,
@@ -29,7 +28,6 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { A2UIRenderer } from '@/components/a2ui/a2ui-renderer'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
@@ -82,24 +80,37 @@ const defaultAuthForm: AuthCredentials = {
 const quickPrompts = [
   {
     title: 'Carga urgente',
-    description: 'Ubicación, batería y conector primero.',
-    value: 'Necesito cargar ya. Pregúntame ubicación, batería y conector si hace falta.',
+    description: 'Para cuando necesitas decidir ahora.',
+    value: 'Necesito cargar ya. Te daré ubicación, batería actual y conector. Si falta algún dato crítico, pregúntame antes de recomendar.',
     icon: Zap,
-    priority: true,
   },
   {
     title: 'Planificar ruta larga',
-    description: 'Origen, destino, batería y conector.',
-    value: 'Quiero planificar una ruta de Córdoba a Valencia con 58%, batería útil 64 kWh, consumo 17.8 kWh/100km, CCS2 y potencia 150 kW.',
+    description: 'Ruta, autonomía y paradas cómodas.',
+    value: 'Quiero planificar una ruta larga. Te daré origen, destino, batería actual, batería útil, consumo, conector y preferencias de parada.',
     icon: Navigation,
   },
   {
     title: 'Cargar al llegar',
     description: 'Hotel, destino o parada de noche.',
-    value: 'Quiero buscar carga al llegar a mi hotel o destino en Valencia. Si falta la ubicación exacta, pregúntame.',
+    value: 'Quiero cargar al llegar a mi hotel o destino. Si falta la ubicación exacta, pregúntame antes de buscar opciones.',
     icon: MapPinned,
   },
 ]
+
+const intakeItems = [
+  'Ubicación',
+  'Batería',
+  'Conector',
+  'Destino',
+  'Urgencia',
+] as const
+
+const reassuranceSteps = [
+  'Te pediré ubicación, batería y conector si faltan.',
+  'Comprobaré ruta y cargadores con fuentes autorizadas.',
+  'Si no hay datos fiables, no recomendaré una estación.',
+] as const
 
 const navItems = [
   { to: '/', icon: Home, label: 'Inicio' },
@@ -236,6 +247,7 @@ function isActivePath(pathname: string, to: string) {
 
 function HomePage() {
   const navigate = useNavigate()
+  const inputRef = useRef<HTMLInputElement>(null)
   const [intent, setIntent] = useState('')
   const trimmedIntent = intent.trim()
 
@@ -248,13 +260,18 @@ function HomePage() {
     navigate({ to: '/chat' })
   }
 
+  const selectPrompt = (value: string) => {
+    setIntent(value)
+    window.requestAnimationFrame(() => inputRef.current?.focus())
+  }
+
   return (
-    <section className="flex flex-col gap-6">
+    <section className="flex flex-col gap-5">
       <div className="flex flex-col gap-3 pt-2">
         <p className="font-mono text-xs leading-4 text-muted-foreground">Viaja sin ansiedad de carga</p>
-        <h1 className="max-w-hero-width text-balance text-hero font-semibold leading-none tracking-display text-foreground">Dime tu ruta o urgencia de carga</h1>
+        <h1 className="max-w-hero-width text-balance text-hero font-semibold leading-none tracking-display text-foreground">Cuenta tu ruta o urgencia</h1>
         <p className="text-pretty text-base leading-7 text-body">
-          Kalmio preguntará lo que falte antes de recomendar. No asumimos disponibilidad, precios ni estaciones.
+          Kalmio preguntará lo que falte antes de recomendar. No inventa disponibilidad, precios ni estaciones.
         </p>
       </div>
 
@@ -267,29 +284,43 @@ function HomePage() {
         <FieldGroup>
           <Field>
             <FieldLabel htmlFor="home-intent" className="sr-only">Describe lo que necesitas</FieldLabel>
-            <InputGroup className="h-14 rounded-sm bg-surface">
+            <InputGroup className="h-16 rounded-md bg-surface">
               <InputGroupInput
+                ref={inputRef}
                 id="home-intent"
                 value={intent}
                 onChange={(event) => setIntent(event.target.value)}
-                placeholder="Ruta, hotel, carga urgente..."
-                className="h-12 text-input"
+                placeholder="Estoy en..., 18%, CCS2..."
+                className="h-14 text-input"
               />
               <InputGroupAddon align="inline-end">
-                <InputGroupButton type="submit" size="icon-sm" aria-label="Abrir chat" disabled={!trimmedIntent}>
+                <InputGroupButton type="submit" size="icon-sm" className="size-11 rounded-full" aria-label="Abrir chat" disabled={!trimmedIntent}>
                   <ArrowUp aria-hidden="true" />
                 </InputGroupButton>
               </InputGroupAddon>
             </InputGroup>
             <FieldDescription>
-              Si falta una fuente fiable o algún dato crítico, te lo diré antes de seguir.
+              {trimmedIntent
+                ? 'Revisa el mensaje. Al enviarlo, Kalmio abrirá el chat y pedirá lo que falte.'
+                : 'No hace falta tenerlo todo. Empieza con lo que sepas.'}
             </FieldDescription>
           </Field>
         </FieldGroup>
       </form>
 
+      <div className="flex flex-wrap gap-2" aria-label="Datos útiles para Kalmio">
+        {intakeItems.map((item) => (
+          <span key={item} className="rounded-full bg-muted px-2.5 py-1 text-caption font-medium leading-4 text-body">
+            {item}
+          </span>
+        ))}
+      </div>
+
       <div className="flex flex-col gap-2.5">
-        <p className="text-compact font-semibold text-foreground">Inicio rápido</p>
+        <div className="flex flex-col gap-1">
+          <p className="text-compact font-semibold text-foreground">Inicio guiado</p>
+          <p className="text-sm leading-5 text-muted-foreground">Elige una guía, revisa el texto y envíalo cuando esté listo.</p>
+        </div>
         <div className="grid gap-2 sm:grid-cols-3">
           {quickPrompts.map((prompt) => {
             const Icon = prompt.icon
@@ -297,14 +328,14 @@ function HomePage() {
               <Button
                 key={prompt.title}
                 type="button"
-                variant={prompt.priority ? 'default' : 'outline'}
+                variant="outline"
                 className="h-auto w-full justify-start gap-3 whitespace-normal rounded-md px-3 py-3 text-left"
-                onClick={() => startChat(prompt.value)}
+                onClick={() => selectPrompt(prompt.value)}
               >
                 <Icon data-icon="inline-start" aria-hidden="true" />
                 <span className="flex min-w-0 flex-col gap-0.5">
                   <span className="text-compact font-semibold">{prompt.title}</span>
-                  <span className={cn('text-xs font-normal leading-4', prompt.priority ? 'text-primary-foreground/80' : 'text-muted-foreground')}>{prompt.description}</span>
+                  <span className="text-xs font-normal leading-4 text-muted-foreground">{prompt.description}</span>
                 </span>
               </Button>
             )
@@ -312,13 +343,20 @@ function HomePage() {
         </div>
       </div>
 
-      <Alert>
-        <ShieldCheck aria-hidden="true" />
-        <AlertTitle>Sin recomendaciones a ciegas.</AlertTitle>
-        <AlertDescription>
-          Te pediré los datos mínimos para entender la situación. Si no hay una fuente fiable, te lo diré en vez de rellenar huecos.
-        </AlertDescription>
-      </Alert>
+      <div className="rounded-md bg-muted p-3">
+        <p className="text-compact font-semibold text-foreground">Antes de recomendar</p>
+        <ol className="mt-2 flex flex-col gap-2">
+          {reassuranceSteps.map((step, index) => (
+            <li key={step} className="flex gap-2 text-sm leading-5 text-body">
+              <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-surface font-mono text-[0.7rem] font-semibold text-foreground">
+                {index + 1}
+              </span>
+              <span>{step}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+
     </section>
   )
 }

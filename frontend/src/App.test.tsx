@@ -23,12 +23,13 @@ describe('App', () => {
     render(<App />)
 
     expect((await screen.findAllByText('Kalmio'))[0]).toBeInTheDocument()
-    expect(screen.getByText('Dime tu ruta o urgencia de carga')).toBeInTheDocument()
+    expect(screen.getByText('Cuenta tu ruta o urgencia')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Abrir chat/i })).toBeInTheDocument()
+    expect(screen.getByText('Antes de recomendar')).toBeInTheDocument()
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it('starts a chat and sends the initial intent to the backend agent', async () => {
+  it('lets users review a guided prompt before sending it to the backend agent', async () => {
     document.cookie = 'csrftoken=test-token'
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = input.toString()
@@ -66,7 +67,7 @@ describe('App', () => {
                   id: 'user-1',
                   type: 'UserMessage',
                   version: 1,
-                  props: { text: 'Quiero buscar carga al llegar a mi hotel o destino en Valencia. Si falta la ubicación exacta, pregúntame.' },
+                  props: { text: 'Quiero cargar al llegar a mi hotel o destino. Si falta la ubicación exacta, pregúntame antes de buscar opciones.' },
                 },
                 {
                   id: 'destination-1',
@@ -86,6 +87,9 @@ describe('App', () => {
 
     render(<App />)
     fireEvent.click(await screen.findByRole('button', { name: /Cargar al llegar/i }))
+    expect(screen.getByDisplayValue('Quiero cargar al llegar a mi hotel o destino. Si falta la ubicación exacta, pregúntame antes de buscar opciones.')).toBeInTheDocument()
+    expect(fetchSpy.mock.calls.some(([input]) => input.toString().includes('/api/conversation/message'))).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: /Abrir chat/i }))
 
     await waitFor(() =>
       expect(fetchSpy.mock.calls.some(([input]) => input.toString().includes('/api/conversation/message'))).toBe(true),
@@ -93,7 +97,7 @@ describe('App', () => {
     expect(fetchSpy.mock.calls.some(([input]) => input.toString().includes('/api/conversation/route'))).toBe(false)
     const messageCall = fetchSpy.mock.calls.find(([input]) => input.toString().endsWith('/api/conversation/message'))
     expect(JSON.parse(messageCall?.[1]?.body?.toString() ?? '{}')).toEqual({
-      text: 'Quiero buscar carga al llegar a mi hotel o destino en Valencia. Si falta la ubicación exacta, pregúntame.',
+      text: 'Quiero cargar al llegar a mi hotel o destino. Si falta la ubicación exacta, pregúntame antes de buscar opciones.',
     })
     expect(await screen.findByText('Carga en destino')).toBeInTheDocument()
     expect(screen.getByText('Valencia')).toBeInTheDocument()
