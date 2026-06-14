@@ -10,7 +10,7 @@ import {
   Route,
   Utensils,
 } from 'lucide-react'
-import { Component, type ReactNode } from 'react'
+import { Component, type ReactNode, useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -19,27 +19,35 @@ import { Separator } from '@/components/ui/separator'
 import type { A2UIBlock } from '@/lib/a2ui/types'
 
 type RecordList = Array<Record<string, unknown>>
+type A2UIRendererActions = {
+  onChipClick?: (value: string) => void
+  onLocationSubmit?: (value: string) => void
+  onManualLocationRequest?: () => void
+}
 
 export function A2UIRenderer({
   blocks,
   onChipClick,
+  onLocationSubmit,
+  onManualLocationRequest,
 }: {
   blocks: A2UIBlock[]
-  onChipClick?: (value: string) => void
-}) {
+} & A2UIRendererActions) {
+  const actions = { onChipClick, onLocationSubmit, onManualLocationRequest }
+
   return (
     <div className="space-y-3">
       {blocks.map((block) => (
-        <A2UIBoundary key={block.id} block={block} onChipClick={onChipClick} />
+        <A2UIBoundary key={block.id} block={block} actions={actions} />
       ))}
     </div>
   )
 }
 
-function A2UIBoundary({ block, onChipClick }: { block: A2UIBlock; onChipClick?: (value: string) => void }) {
+function A2UIBoundary({ block, actions }: { block: A2UIBlock; actions: A2UIRendererActions }) {
   return (
     <BlockErrorBoundary type={block.type}>
-      <A2UIBlockView block={block} onChipClick={onChipClick} />
+      <A2UIBlockView block={block} actions={actions} />
     </BlockErrorBoundary>
   )
 }
@@ -63,7 +71,7 @@ class BlockErrorBoundary extends Component<
   }
 }
 
-function A2UIBlockView({ block, onChipClick }: { block: A2UIBlock; onChipClick?: (value: string) => void }) {
+function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRendererActions }) {
   switch (block.type) {
     case 'AssistantMessage':
       return <MessageCard icon={Bot} tone="assistant" text={text(block.props.text)} />
@@ -189,11 +197,19 @@ function A2UIBlockView({ block, onChipClick }: { block: A2UIBlock; onChipClick?:
           </CardContent>
         </Card>
       )
+    case 'LocationRequestCard':
+      return (
+        <LocationRequestCard
+          block={block}
+          onLocationSubmit={actions.onLocationSubmit ?? actions.onChipClick}
+          onManualLocationRequest={actions.onManualLocationRequest}
+        />
+      )
     case 'PreferenceChips':
       return (
         <div className="flex flex-wrap gap-2">
               {strings(block.props.chips).map((chip) => (
-                <Button key={chip} type="button" variant="outline" size="sm" onClick={() => onChipClick?.(chip)}>
+                <Button key={chip} type="button" variant="outline" size="sm" onClick={() => actions.onChipClick?.(chip)}>
                   {chip}
                 </Button>
               ))}
@@ -204,6 +220,93 @@ function A2UIBlockView({ block, onChipClick }: { block: A2UIBlock; onChipClick?:
     default:
       return <ErrorFallbackCard type={block.type} message="Componente A2UI desconocido." />
   }
+}
+
+function LocationRequestCard({
+  block,
+  onLocationSubmit,
+  onManualLocationRequest,
+}: {
+  block: A2UIBlock
+  onLocationSubmit?: (value: string) => void
+  onManualLocationRequest?: () => void
+}) {
+  const [status, setStatus] = useState<'idle' | 'pending' | 'unsupported' | 'failed' | 'manual'>('idle')
+  const manualFields = strings(block.props.manualFields)
+
+  const requestLocation = () => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setStatus('unsupported')
+      return
+    }
+
+    setStatus('pending')
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setStatus('idle')
+        onLocationSubmit?.(
+          `Estoy en ${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}`,
+        )
+      },
+      () => {
+        setStatus('failed')
+      },
+      {
+        enableHighAccuracy: false,
+        maximumAge: 60000,
+        timeout: 10000,
+      },
+    )
+  }
+
+  const statusMessage = {
+    idle: '',
+    pending: 'Pidiendo permiso de ubicación...',
+    unsupported: 'Este navegador no permite compartir ubicación aquí. Escribe ciudad o coordenadas.',
+    failed: 'No pude acceder a tu ubicación. Puedes escribir ciudad o coordenadas.',
+    manual: 'Escribe una ciudad o coordenadas en el mensaje para continuar.',
+  }[status]
+
+  return (
+    <Card className="border-assistant bg-muted">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <MapPinned className="size-4 text-assistant" aria-hidden="true" />
+          {text(block.props.title)}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-sm leading-6 text-body">{text(block.props.body)}</p>
+        {manualFields.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {manualFields.map((field) => (
+              <Badge key={field} variant="secondary">
+                {field}
+              </Badge>
+            ))}
+          </div>
+        ) : null}
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Button type="button" className="h-11 w-full font-semibold" onClick={requestLocation} disabled={status === 'pending'}>
+            <Navigation className="size-4" aria-hidden="true" />
+            {status === 'pending' ? 'Solicitando...' : 'Usar mi ubicación'}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 w-full"
+            onClick={() => {
+              setStatus('manual')
+              onManualLocationRequest?.()
+            }}
+          >
+            Escribir ubicación
+          </Button>
+        </div>
+        {statusMessage ? <p className="text-xs leading-5 text-muted-foreground">{statusMessage}</p> : null}
+      </CardContent>
+    </Card>
+  )
 }
 
 function MessageCard({

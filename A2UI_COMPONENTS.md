@@ -34,6 +34,7 @@ The agent chooses the UI that best fits the user request and tool results. The b
 - `MapPreviewCard`: contextual visual route preview or placeholder.
 - `ActionButtons`: next actions such as open navigation, save, adjust.
 - `ClarifyingQuestionCard`: missing critical data.
+- `LocationRequestCard`: request browser location or manual city/coordinates when location is critical.
 - `PreferenceChips`: quick preference controls.
 - `ErrorFallbackCard`: unknown or broken component.
 
@@ -44,6 +45,7 @@ The agent chooses the UI that best fits the user request and tool results. The b
 - Missing or stale provider data must expose uncertainty in the relevant card.
 - Action buttons cannot claim unsupported actions such as booking or payment.
 - Preference chips may send a new user message back to the conversation agent.
+- Location requests may trigger browser geolocation only through the frontend renderer and must offer manual city/coordinate entry.
 
 ## Semantic Rules
 

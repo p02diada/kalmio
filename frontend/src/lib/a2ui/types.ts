@@ -14,6 +14,7 @@ export type A2UIType =
   | 'MapPreviewCard'
   | 'ActionButtons'
   | 'ClarifyingQuestionCard'
+  | 'LocationRequestCard'
   | 'PreferenceChips'
   | 'ErrorFallbackCard'
 

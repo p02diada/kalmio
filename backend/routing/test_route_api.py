@@ -180,7 +180,7 @@ def test_conversation_message_preserves_urgent_charge_intent_for_location_follow
     )
 
     assert first_response.status_code == 200
-    assert first_response.json()["blocks"][-1]["type"] == "ClarifyingQuestionCard"
+    assert first_response.json()["blocks"][-1]["type"] == "LocationRequestCard"
 
     second_response = client.post(
         "/api/conversation/message",
@@ -200,6 +200,7 @@ def test_conversation_message_preserves_urgent_charge_intent_for_location_follow
     assert "UrgentChargeCard" in new_block_types
     assert "AlternativeStopsList" in new_block_types
     assert "ClarifyingQuestionCard" not in new_block_types
+    assert "LocationRequestCard" not in new_block_types
     urgent_block = next(block for block in new_blocks if block["type"] == "UrgentChargeCard")
     assert urgent_block["props"]["nearest"] == station.name
 

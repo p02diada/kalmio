@@ -7,6 +7,7 @@ import {
   createRoute,
   createRouter,
   useNavigate,
+  useRouterState,
 } from '@tanstack/react-router'
 import {
   Activity,
@@ -16,22 +17,41 @@ import {
   ClipboardList,
   Home,
   Loader2,
+  MapPinned,
   MessageCircle,
   Navigation,
   RotateCcw,
   Settings,
-  Sparkles,
+  ShieldCheck,
   UserRound,
   Zap,
+  type LucideIcon,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { A2UIRenderer } from '@/components/a2ui/a2ui-renderer'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+} from '@/components/ui/sidebar'
 import { Textarea } from '@/components/ui/textarea'
 import { Toaster } from '@/components/ui/sonner'
 import {
@@ -49,6 +69,7 @@ import {
   sendConversationMessage,
 } from '@/lib/api/conversation'
 import { listRoutePlans, type RoutePlanResponse } from '@/lib/api/route-plan'
+import { cn } from '@/lib/utils'
 
 const queryClient = new QueryClient()
 const routePlansQueryKey = ['route-plans'] as const
@@ -61,69 +82,147 @@ const defaultAuthForm: AuthCredentials = {
 
 const quickPrompts = [
   {
-    label: 'Cargar cerca de un hotel',
+    title: 'Cargar cerca de un hotel',
+    description: 'Para estancias y carga al llegar.',
     value: 'Quiero ver cargadores cerca de un hotel en Valencia.',
     icon: BatteryCharging,
   },
   {
-    label: 'Preparar ruta',
+    title: 'Preparar ruta',
+    description: 'Incluye batería, consumo y conector.',
     value: 'Voy desde Córdoba hasta Valencia con 58%, batería útil 64 kWh, consumo 17.8 kWh/100km, CCS2 y potencia 150 kW.',
     icon: Navigation,
   },
   {
-    label: 'Necesito cargar ya',
+    title: 'Necesito cargar ya',
+    description: 'Te pediré ubicación si hace falta.',
     value: 'Necesito cargar ya cerca de mi ubicación.',
     icon: Zap,
   },
 ]
 
+const navItems = [
+  { to: '/', icon: Home, label: 'Inicio' },
+  { to: '/chat', icon: MessageCircle, label: 'Chat' },
+  { to: '/activity', icon: Activity, label: 'Planes' },
+  { to: '/settings', icon: Settings, label: 'Cuenta' },
+] as const
+
 function AppShell() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
+
   return (
-    <div className="app-frame">
-      <div className="app-shell">
-        <header className="sticky top-0 z-10 border-b border-border bg-surface px-6 py-3">
+    <SidebarProvider className="app-frame">
+      <DesktopSidebar pathname={pathname} />
+      <SidebarInset className="app-shell">
+        <header className="mobile-app-header">
           <div className="flex items-center justify-between gap-3">
             <Link to="/" className="flex items-baseline gap-1" aria-label="Kalmio home">
               <span className="text-sm font-semibold leading-none text-foreground">Kalmio</span>
               <span className="font-mono text-xs leading-none text-muted-foreground">EV</span>
             </Link>
-            <span className="grid size-8 place-items-center rounded-full border border-border bg-surface text-foreground">
+            <Link to="/settings" className="grid size-8 place-items-center rounded-full border border-border bg-surface text-foreground" aria-label="Cuenta">
               <UserRound className="size-4" aria-hidden="true" />
-            </span>
+            </Link>
           </div>
         </header>
 
-        <main className="app-main">
+        <div className="app-main">
           <Outlet />
-        </main>
+        </div>
 
-        <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface px-3 py-2 md:sticky md:bottom-auto">
+        <nav className="mobile-bottom-nav" aria-label="Navegación principal">
           <div className="mx-auto grid max-w-app-width grid-cols-4 gap-1">
-            <NavItem to="/" icon={Home} label="Inicio" />
-            <NavItem to="/chat" icon={MessageCircle} label="Chat" />
-            <NavItem to="/activity" icon={Activity} label="Planes" />
-            <NavItem to="/settings" icon={Settings} label="Cuenta" />
+            {navItems.map((item) => (
+              <MobileNavItem key={item.to} {...item} isActive={isActivePath(pathname, item.to)} />
+            ))}
           </div>
         </nav>
-      </div>
+      </SidebarInset>
       <Toaster richColors position="top-center" />
-    </div>
+    </SidebarProvider>
   )
 }
 
-function NavItem({
+function DesktopSidebar({ pathname }: { pathname: string }) {
+  return (
+    <Sidebar collapsible="icon" className="hidden md:flex">
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" asChild tooltip="Kalmio">
+              <Link to="/" aria-label="Kalmio home">
+                <span className="grid size-8 place-items-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
+                  <MapPinned aria-hidden="true" />
+                </span>
+                <span className="flex flex-col gap-0.5 leading-none">
+                  <span className="font-semibold">Kalmio</span>
+                  <span className="text-xs text-sidebar-foreground/70">EV assistant</span>
+                </span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Viaje</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {navItems.slice(0, 3).map((item) => (
+                <DesktopNavItem key={item.to} {...item} isActive={isActivePath(pathname, item.to)} />
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <DesktopNavItem {...navItems[3]} isActive={isActivePath(pathname, navItems[3].to)} />
+        </SidebarMenu>
+      </SidebarFooter>
+    </Sidebar>
+  )
+}
+
+function DesktopNavItem({
   to,
   icon: Icon,
   label,
+  isActive,
 }: {
   to: string
-  icon: typeof Home
+  icon: LucideIcon
   label: string
+  isActive: boolean
+}) {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild isActive={isActive} tooltip={label}>
+        <Link to={to}>
+          <Icon aria-hidden="true" />
+          <span>{label}</span>
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  )
+}
+
+function MobileNavItem({
+  to,
+  icon: Icon,
+  label,
+  isActive,
+}: {
+  to: string
+  icon: LucideIcon
+  label: string
+  isActive: boolean
 }) {
   return (
     <Link
       to={to}
-      className="app-nav-item"
+      className={cn('app-nav-item', isActive && 'app-nav-item-active')}
     >
       <Icon className="size-4" aria-hidden="true" />
       <span>{label}</span>
@@ -131,84 +230,95 @@ function NavItem({
   )
 }
 
+function isActivePath(pathname: string, to: string) {
+  return to === '/' ? pathname === '/' : pathname.startsWith(to)
+}
+
 function HomePage() {
   const navigate = useNavigate()
   const [intent, setIntent] = useState('')
+  const trimmedIntent = intent.trim()
 
   const startChat = (value: string) => {
     const text = value.trim()
-    if (text) {
-      sessionStorage.setItem(pendingPromptKey, text)
+    if (!text) {
+      return
     }
+    sessionStorage.setItem(pendingPromptKey, text)
     navigate({ to: '/chat' })
   }
 
   return (
-    <section className="space-y-6">
-      <div className="space-y-3 pt-2">
+    <section className="flex flex-col gap-6">
+      <div className="flex flex-col gap-3 pt-2">
         <p className="font-mono text-xs leading-4 text-muted-foreground">Viaja sin ansiedad de carga</p>
-        <h1 className="max-w-hero-width text-hero font-semibold leading-none tracking-display text-foreground">¿Qué necesitas hacer ahora?</h1>
+        <h1 className="max-w-hero-width text-hero font-semibold leading-none tracking-display text-foreground">Dime tu ruta o urgencia de carga</h1>
         <p className="text-base leading-7 text-body">
-          Dime la intención. El agente decidirá si necesita aclarar datos, buscar cargadores o calcular una ruta.
+          Kalmio abrirá el chat con tu contexto y preguntará lo que falte antes de recomendar.
         </p>
       </div>
 
       <form
-        className="rounded-sm border border-border bg-surface"
         onSubmit={(event) => {
           event.preventDefault()
           startChat(intent)
         }}
       >
-        <div className="flex min-h-14 items-center gap-2 px-4 py-2">
-          <Input
-            aria-label="Describe lo que necesitas"
-            value={intent}
-            onChange={(event) => setIntent(event.target.value)}
-            placeholder="Ruta, hotel, carga urgente..."
-            className="h-10 flex-1 rounded-none border-0 bg-transparent px-0 py-0 text-input shadow-none focus-visible:outline-none"
-          />
-          <Button type="submit" size="icon" aria-label="Abrir chat" className="size-11 shrink-0 rounded-full">
-            <ArrowUp className="size-5" aria-hidden="true" />
-          </Button>
-        </div>
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor="home-intent" className="sr-only">Describe lo que necesitas</FieldLabel>
+            <InputGroup className="h-14 rounded-sm bg-surface">
+              <InputGroupInput
+                id="home-intent"
+                value={intent}
+                onChange={(event) => setIntent(event.target.value)}
+                placeholder="Ruta, hotel, carga urgente..."
+                className="h-12 text-input"
+              />
+              <InputGroupAddon align="inline-end">
+                <InputGroupButton type="submit" size="icon-sm" aria-label="Abrir chat" disabled={!trimmedIntent}>
+                  <ArrowUp aria-hidden="true" />
+                </InputGroupButton>
+              </InputGroupAddon>
+            </InputGroup>
+            <FieldDescription>
+              Si faltan batería, conector, origen o destino, te preguntaré antes de recomendar.
+            </FieldDescription>
+          </Field>
+        </FieldGroup>
       </form>
 
-      <div className="space-y-2.5">
+      <div className="flex flex-col gap-2.5">
         <p className="text-compact font-semibold text-foreground">Inicio rápido</p>
-        <div className="flex flex-wrap items-start gap-2">
+        <div className="grid gap-2 sm:grid-cols-3">
           {quickPrompts.map((prompt) => {
             const Icon = prompt.icon
             return (
               <Button
-                key={prompt.label}
+                key={prompt.title}
                 type="button"
                 variant="outline"
-                size="sm"
-                className="h-9 justify-start gap-2 border-border bg-surface px-3 text-compact font-medium hover:bg-muted"
+                className="h-auto w-full justify-start gap-3 whitespace-normal rounded-md px-3 py-3 text-left"
                 onClick={() => startChat(prompt.value)}
               >
-                <Icon className="size-4 text-foreground" aria-hidden="true" />
-                {prompt.label}
+                <Icon data-icon="inline-start" aria-hidden="true" />
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="text-compact font-semibold">{prompt.title}</span>
+                  <span className="text-xs font-normal leading-4 text-muted-foreground">{prompt.description}</span>
+                </span>
               </Button>
             )
           })}
         </div>
       </div>
 
-      <Card className="bg-muted">
-        <CardContent className="flex items-start gap-3 p-3">
-          <span className="grid size-9 shrink-0 place-items-center rounded-md bg-surface text-foreground">
-            <Sparkles className="size-5" aria-hidden="true" />
-          </span>
-          <div className="space-y-1">
-            <h2 className="font-semibold text-foreground">Chat primero, mapa después.</h2>
-            <p className="text-sm leading-6 text-body">
-              Las respuestas se pintan con componentes A2UI permitidos. Si falta una fuente fiable, Kalmio lo dirá.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <Alert>
+        <ShieldCheck aria-hidden="true" />
+        <AlertTitle>Chat primero, mapa después.</AlertTitle>
+        <AlertDescription>
+          Solo se pintan componentes A2UI permitidos. Si falta una fuente fiable, Kalmio lo dirá.
+        </AlertDescription>
+      </Alert>
     </section>
   )
 }

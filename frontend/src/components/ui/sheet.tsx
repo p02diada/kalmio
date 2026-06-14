@@ -8,11 +8,16 @@ export const Sheet = DialogPrimitive.Root
 export const SheetTrigger = DialogPrimitive.Trigger
 export const SheetClose = DialogPrimitive.Close
 
-export function SheetContent({ className, children, ...props }: React.ComponentProps<typeof DialogPrimitive.Content>) {
+type SheetContentProps = React.ComponentProps<typeof DialogPrimitive.Content> & {
+  side?: 'left' | 'right'
+}
+
+export function SheetContent({ className, children, side = 'right', ...props }: SheetContentProps) {
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="ui-overlay" />
       <DialogPrimitive.Content
+        data-side={side}
         className={cn('ui-sheet-content', className)}
         {...props}
       >

@@ -23,7 +23,7 @@ describe('App', () => {
     render(<App />)
 
     expect((await screen.findAllByText('Kalmio'))[0]).toBeInTheDocument()
-    expect(screen.getByText('¿Qué necesitas hacer ahora?')).toBeInTheDocument()
+    expect(screen.getByText('Dime tu ruta o urgencia de carga')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Abrir chat/i })).toBeInTheDocument()
     expect(fetchSpy).not.toHaveBeenCalled()
   })
@@ -123,7 +123,7 @@ describe('App', () => {
     })
 
     render(<App />)
-    fireEvent.click(await screen.findByRole('link', { name: /Chat/i }))
+    fireEvent.click((await screen.findAllByRole('link', { name: /Chat/i }))[0])
 
     expect(await screen.findByText('Bloque no disponible')).toBeInTheDocument()
     expect(screen.getByText('MadeUpComponent')).toBeInTheDocument()

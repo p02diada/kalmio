@@ -36,6 +36,7 @@ A2UI_COMPONENT_TYPES = {
     "MapPreviewCard",
     "ActionButtons",
     "ClarifyingQuestionCard",
+    "LocationRequestCard",
     "PreferenceChips",
     "ErrorFallbackCard",
 }
@@ -113,9 +114,13 @@ def run_local_agent(message: str, history_blocks: list[dict] | None = None) -> l
         location = intent.origin or intent.destination_search or intent.destination
         if not location:
             blocks.append(
-                clarifying_block(
-                    "Para buscar cargadores cercanos necesito tu ubicación o unas coordenadas.",
-                    ["ubicación actual", "latitud", "longitud"],
+                location_request_block(
+                    reason="urgent_charge",
+                    title="Necesito tu ubicación",
+                    body=(
+                        "Para buscar cargadores cercanos sin inventar resultados, "
+                        "comparte tu ubicación o escribe una ciudad/coordenadas."
+                    ),
                 )
             )
             return blocks
@@ -289,6 +294,7 @@ def codex_prompt(
         "Tipos A2UI permitidos: "
         f"{', '.join(sorted(A2UI_COMPONENT_TYPES))}. "
         "Para aclaraciones usa ClarifyingQuestionCard con props question y fields. "
+        "Si falta ubicación actual para una petición cercana o urgente, usa LocationRequestCard en vez de inventar coordenadas. "
         "Si el usuario pide cargadores cerca de un hotel, destino o ciudad conocida y tienes ciudad o coordenadas, "
         "llama search_destination_chargers con esa ubicación y marca la respuesta final como aproximada/necesita confirmación. "
         "Solo pregunta por el hotel exacto si no hay ninguna ciudad, coordenada o ubicación conocida. "
@@ -587,7 +593,7 @@ def has_open_clarification(history_blocks: list[dict]) -> bool:
         if not isinstance(item, dict):
             continue
         block_type = item.get("type")
-        if block_type == "ClarifyingQuestionCard":
+        if block_type in {"ClarifyingQuestionCard", "LocationRequestCard"}:
             return True
         if block_type == "UserMessage":
             return False
@@ -991,6 +997,20 @@ def clarifying_block(question: str, fields: list[str]) -> dict:
     return block(f"clarify-{uuid4().hex[:10]}", "ClarifyingQuestionCard", {"question": question, "fields": fields})
 
 
+def location_request_block(reason: str, title: str, body: str) -> dict:
+    return block(
+        f"location-{uuid4().hex[:10]}",
+        "LocationRequestCard",
+        {
+            "reason": reason,
+            "title": title,
+            "body": body,
+            "precision": "approximate",
+            "manualFields": ["ciudad", "latitud", "longitud"],
+        },
+    )
+
+
 def block(block_id: str, block_type: str, props: dict) -> dict:
     return {"id": block_id, "type": block_type, "version": 1, "props": props}
 
@@ -1062,6 +1082,26 @@ def normalize_block_props(block_type: str, props: dict) -> dict:
         if not text_value:
             text_value = props.get("title") or "Hay incertidumbre que debes confirmar antes de depender de este resultado."
         return {"level": str(props.get("level") or "medio"), "text": str(text_value)}
+    if block_type == "LocationRequestCard":
+        reason = props.get("reason")
+        if reason not in {"urgent_charge", "nearby_chargers", "route_origin"}:
+            reason = "nearby_chargers"
+        precision = props.get("precision")
+        if precision not in {"exact", "approximate"}:
+            precision = "approximate"
+        manual_fields = props.get("manualFields")
+        if not isinstance(manual_fields, list):
+            manual_fields = ["ciudad", "latitud", "longitud"]
+        return {
+            "reason": reason,
+            "title": str(props.get("title") or "Necesito tu ubicación"),
+            "body": str(
+                props.get("body")
+                or "Comparte tu ubicación o escribe una ciudad/coordenadas para continuar sin inventar resultados."
+            ),
+            "precision": precision,
+            "manualFields": [str(item) for item in manual_fields if item],
+        }
     return props
 
 
