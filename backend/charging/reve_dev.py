@@ -28,6 +28,7 @@ SPAIN_BBOX = {
 }
 REVE_PAGE_SIZE = 10
 REVE_MAX_PAGE_SIZE = 25
+REVE_MAX_REASONABLE_PRICE_PER_KWH = Decimal("10")
 
 
 class ReveDevScrapeError(ValueError):
@@ -331,17 +332,24 @@ def extract_energy_price(tariffs: list[dict[str, Any]]) -> str | None:
         for element in tariff.get("elements") or []:
             for component in element.get("price_components") or []:
                 if str(component.get("type") or "").upper() == "ENERGY":
-                    price = value_as_decimal_string(component.get("price"))
-                    if price is not None:
-                        return price
+                    price = value_as_decimal(component.get("price"))
+                    if price is not None and Decimal("0") <= price <= REVE_MAX_REASONABLE_PRICE_PER_KWH:
+                        return str(price.normalize())
         if any("gratuito" in str(item).lower() for item in tariff_entry.get("human") or []):
             return "0"
     return None
 
 
 def value_as_decimal_string(value: Any) -> str | None:
+    decimal_value = value_as_decimal(value)
+    if decimal_value is None:
+        return None
+    return str(decimal_value.normalize())
+
+
+def value_as_decimal(value: Any) -> Decimal | None:
     try:
-        return str(Decimal(str(value)).normalize())
+        return Decimal(str(value))
     except (InvalidOperation, TypeError):
         return None
 

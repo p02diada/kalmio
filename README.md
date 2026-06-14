@@ -231,7 +231,7 @@ python manage.py scrape_reve_dev --output .dev-data/reve-chargers.json --page-si
 python manage.py import_chargers .dev-data/reve-chargers.json --replace-source
 ```
 
-`scrape_reve_dev` is disabled when `DEBUG=false` unless `KALMIO_ALLOW_REVE_DEV_SCRAPE=1` is explicitly set for an isolated non-production environment. It caches raw REVE pages under `.dev-data/reve-pages`, so a rate-limited run can be repeated later without refetching completed pages. REVE currently accepts up to `--page-size 25`; larger values are rejected by the provider. Use `python manage.py scrape_reve_dev --offline --output .dev-data/reve-chargers.json --page-size 25` to rebuild the import file from cached pages only. The generated files are ignored by git and are not approved production data.
+`scrape_reve_dev` is disabled when `DEBUG=false` unless `KALMIO_ALLOW_REVE_DEV_SCRAPE=1` is explicitly set for an isolated non-production environment. It caches raw REVE pages under `.dev-data/reve-pages`, so a rate-limited run can be repeated later without refetching completed pages. REVE currently accepts up to `--page-size 25`; larger values are rejected by the provider. Use `python manage.py scrape_reve_dev --offline --output .dev-data/reve-chargers.json --page-size 25` to rebuild the import file from cached pages only. The raw cached pages are ignored by git; `.dev-data/reve-chargers.json` can be committed as a development fixture, but is not approved production data.
 
 ## Product Boundaries
 

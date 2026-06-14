@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 from decimal import Decimal
 from io import StringIO
 
@@ -224,6 +225,20 @@ def test_reve_dev_locations_are_converted_to_import_records():
             "currency": "EUR",
         }
     ]
+
+
+def test_reve_dev_locations_skip_implausible_energy_prices():
+    payload = deepcopy(reve_location_payload())
+    payload["evses"][0]["connectors"][0]["tariffs"][0]["human"] = ["10498.95 EUR/kWh"]
+    payload["evses"][0]["connectors"][0]["tariffs"][0]["tariff"]["elements"][0]["price_components"][0][
+        "price"
+    ] = 10498.95
+
+    records = reve_locations_to_charger_records([payload])
+
+    assert len(records) == 1
+    assert "price_per_kwh" not in records[0]
+    assert "currency" not in records[0]
 
 
 def test_reve_dev_connector_normalization_keeps_common_vehicle_values():
