@@ -177,7 +177,7 @@ def run_local_agent(message: str, history_blocks: list[dict] | None = None) -> l
 
 
 def run_codex_agent(message: str, history_blocks: list[dict] | None = None) -> list[dict]:
-    decision_message = contextualized_message(message, history_blocks or [])
+    decision_message = contextualized_prompt(message, history_blocks or [])
     tool_history: list[dict[str, Any]] = []
     seen_calls: set[str] = set()
     max_tool_calls = getattr(settings, "KALMIO_CODEX_MAX_TOOL_CALLS", 3)
@@ -575,29 +575,84 @@ def blocks_of_type(blocks: list[dict], block_type: str) -> list[dict]:
 
 def contextualized_message(message: str, history_blocks: list[dict]) -> str:
     current_message = message.strip()
-    if not current_message or not has_open_clarification(history_blocks):
+    if not current_message:
         return current_message
 
     current_intent = parse_intent(current_message)
     if current_intent.is_route_request or current_intent.is_destination_charge_request or current_intent.is_urgent_request:
         return current_message
 
-    previous_messages = recent_user_message_texts(history_blocks)
+    previous_messages = recent_user_message_texts(history_blocks, limit=8)
     if not previous_messages:
         return current_message
     return " ".join([*previous_messages, current_message])
 
 
-def has_open_clarification(history_blocks: list[dict]) -> bool:
-    for item in reversed(history_blocks):
+def contextualized_prompt(message: str, history_blocks: list[dict]) -> str:
+    current_message = message.strip()
+    transcript = conversation_transcript(history_blocks)
+    if not transcript:
+        return current_message
+    return (
+        "Conversación disponible de Kalmio. Usa el historial para resolver referencias y datos parciales; "
+        "si el usuario cambia claramente de objetivo, sigue el mensaje actual.\n"
+        f"{transcript}\n"
+        f"Mensaje actual del usuario: {current_message}"
+    )
+
+
+def conversation_transcript(history_blocks: list[dict], limit: int = 80) -> str:
+    entries = []
+    for item in history_blocks[-limit:]:
         if not isinstance(item, dict):
             continue
         block_type = item.get("type")
-        if block_type in {"ClarifyingQuestionCard", "LocationRequestCard"}:
-            return True
-        if block_type == "UserMessage":
-            return False
-    return False
+        props = item.get("props") if isinstance(item.get("props"), dict) else {}
+        summary = summarize_block_for_context(block_type, props)
+        if summary:
+            entries.append(summary)
+    return "\n".join(entries)
+
+
+def summarize_block_for_context(block_type: str, props: dict) -> str:
+    if block_type == "UserMessage":
+        text = str(props.get("text") or "").strip()
+        return f"Usuario: {text}" if text else ""
+    if block_type == "AssistantMessage":
+        text = str(props.get("text") or "").strip()
+        return f"Asistente: {text}" if text else ""
+    if block_type == "LocationRequestCard":
+        title = str(props.get("title") or "Necesito ubicación").strip()
+        body = str(props.get("body") or "").strip()
+        return f"Asistente pidió ubicación: {title}. {body}".strip()
+    if block_type == "ClarifyingQuestionCard":
+        question = str(props.get("question") or "").strip()
+        fields = props.get("fields") if isinstance(props.get("fields"), list) else []
+        fields_text = ", ".join(str(field) for field in fields if field)
+        return f"Asistente pidió aclaración: {question} Campos: {fields_text}".strip()
+    if block_type == "UrgentChargeCard":
+        return (
+            "Resultado previo de carga urgente: "
+            f"cargador cercano {props.get('nearest')}, distancia {props.get('distanceKm')} km, "
+            f"batería {props.get('battery')}."
+        )
+    if block_type == "DestinationChargingCard":
+        return f"Resultado previo de carga en destino: {props.get('destination')}."
+    if block_type == "RouteSummaryCard":
+        return (
+            "Resultado previo de ruta: "
+            f"{props.get('distanceKm')} km, {props.get('durationMin')} min, "
+            f"llegada {props.get('arrivalBattery')}%."
+        )
+    if block_type == "AlternativeStopsList":
+        stops = props.get("stops") if isinstance(props.get("stops"), list) else []
+        stop_names = [str(stop.get("name")) for stop in stops if isinstance(stop, dict) and stop.get("name")]
+        if stop_names:
+            return "Cargadores mostrados: " + ", ".join(stop_names[:5])
+    if block_type == "RiskExplanationCard":
+        text = str(props.get("text") or "").strip()
+        return f"Aviso mostrado: {text}" if text else ""
+    return ""
 
 
 def recent_user_message_texts(history_blocks: list[dict], limit: int = 3) -> list[str]:

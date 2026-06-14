@@ -66,7 +66,7 @@ describe('App', () => {
                   id: 'user-1',
                   type: 'UserMessage',
                   version: 1,
-                  props: { text: 'Quiero ver cargadores cerca de un hotel en Valencia.' },
+                  props: { text: 'Quiero buscar carga al llegar a mi hotel o destino en Valencia. Si falta la ubicación exacta, pregúntame.' },
                 },
                 {
                   id: 'destination-1',
@@ -85,7 +85,7 @@ describe('App', () => {
     })
 
     render(<App />)
-    fireEvent.click(await screen.findByRole('button', { name: /Cargar cerca de un hotel/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /Cargar al llegar/i }))
 
     await waitFor(() =>
       expect(fetchSpy.mock.calls.some(([input]) => input.toString().includes('/api/conversation/message'))).toBe(true),
@@ -93,7 +93,7 @@ describe('App', () => {
     expect(fetchSpy.mock.calls.some(([input]) => input.toString().includes('/api/conversation/route'))).toBe(false)
     const messageCall = fetchSpy.mock.calls.find(([input]) => input.toString().endsWith('/api/conversation/message'))
     expect(JSON.parse(messageCall?.[1]?.body?.toString() ?? '{}')).toEqual({
-      text: 'Quiero ver cargadores cerca de un hotel en Valencia.',
+      text: 'Quiero buscar carga al llegar a mi hotel o destino en Valencia. Si falta la ubicación exacta, pregúntame.',
     })
     expect(await screen.findByText('Carga en destino')).toBeInTheDocument()
     expect(screen.getByText('Valencia')).toBeInTheDocument()

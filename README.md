@@ -145,6 +145,8 @@ The chat screen uses `/api/conversation/message`. The backend stores A2UI blocks
 
 In `codex` mode, Codex does not access the database or providers directly. It can request a bounded sequence of allowlisted Django tool calls (`resolve_location`, `search_destination_chargers`, or `plan_route`), Django executes them, and Codex receives only the validated tool results to compose final A2UI blocks. Codex chooses the UI blocks that best fit the user request and tool results; Django validates the catalog, factual constraints, and semantic obligations. If the final A2UI is incomplete, Django asks Codex for one repair with the concrete contract issues. If Codex asks for an unknown tool, repeats the same tool call, exceeds `KALMIO_CODEX_MAX_TOOL_CALLS`, fails repair, or fails to return final A2UI, the backend returns safe fallback A2UI instead of executing arbitrary behavior.
 
+Codex receives the available conversation context for each turn so it can resolve natural follow-ups; Django should validate the resulting structured tool arguments instead of parsing natural phrasing with feature-specific regexes.
+
 Conversation endpoints are throttled by session/IP to reduce abuse. Tune in settings:
 
 - `KALMIO_ROUTE_CONVERSATION_THROTTLE_LIMIT` (default `30`)

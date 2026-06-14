@@ -35,6 +35,8 @@ Backend: Django, Django Ninja, Django ORM, GeoDjango, Postgres/PostGIS, provider
 - Do not invent availability, prices, stations, coordinates, or vehicle state.
 - Ask clarifying questions when critical data is missing.
 - Fail explicitly when provider-backed routing or authorized charger data is unavailable.
+- The agent should interpret natural conversation and follow-ups from the full useful conversation context; do not add regex/intent parsers as the primary way to understand user phrasing.
+- Backend code may validate structured arguments, enforce safety constraints, and execute approved tools, but should not become the conversational reasoning layer.
 
 ## Design Rules
 

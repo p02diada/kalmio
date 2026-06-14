@@ -8,6 +8,7 @@ from django.test import Client
 from django.utils import timezone
 
 from charging.models import AvailabilitySnapshot, Connector, DataSource, EVSE, Operator, ReliabilityScore, Station, Tariff
+from routing.api import ACTIVE_CONVERSATION_BLOCKS_KEY
 from routing.models import RoutePlan
 from routing.production_planner import station_to_score_payload
 from routing.providers import Coordinate, ProviderRoute, RoutingProviderError
@@ -203,6 +204,133 @@ def test_conversation_message_preserves_urgent_charge_intent_for_location_follow
     assert "LocationRequestCard" not in new_block_types
     urgent_block = next(block for block in new_blocks if block["type"] == "UrgentChargeCard")
     assert urgent_block["props"]["nearest"] == station.name
+
+
+@pytest.mark.django_db
+def test_local_conversation_uses_history_for_followup_after_urgent_recommendation(client):
+    source = DataSource.objects.create(name="Authorized provider Córdoba", kind="ocpi", is_authorized=True)
+    operator = Operator.objects.create(name="Córdoba Operator")
+    station = Station.objects.create(
+        external_id="real-cordoba-002",
+        operator=operator,
+        data_source=source,
+        name="Córdoba Centro HPC",
+        address="Córdoba",
+        latitude=Decimal("37.880900"),
+        longitude=Decimal("-4.782300"),
+        amenities=["bathroom"],
+        is_sample_data=False,
+    )
+    evse = EVSE.objects.create(station=station, evse_uid="real-cordoba-002-1", max_power_kw=150, status="available")
+    Connector.objects.create(evse=evse, connector_type="CCS2", max_power_kw=150)
+    ReliabilityScore.objects.create(station=station, score=84, reasons=["provider_history"])
+
+    client.post(
+        "/api/conversation/message",
+        data={"text": "Necesito cargar ya"},
+        content_type="application/json",
+    )
+    location_response = client.post(
+        "/api/conversation/message",
+        data={"text": "Estoy en 37.880729, -4.782446"},
+        content_type="application/json",
+    )
+    assert location_response.status_code == 200
+    assert any(block["type"] == "UrgentChargeCard" for block in location_response.json()["blocks"])
+
+    battery_response = client.post(
+        "/api/conversation/message",
+        data={"text": "Tengo un 20%"},
+        content_type="application/json",
+    )
+
+    assert battery_response.status_code == 200
+    blocks = battery_response.json()["blocks"]
+    latest_user_index = max(
+        index
+        for index, item in enumerate(blocks)
+        if item["type"] == "UserMessage" and item["props"]["text"] == "Tengo un 20%"
+    )
+    new_blocks = blocks[latest_user_index + 1 :]
+    new_block_types = [block["type"] for block in new_blocks]
+    assert "UrgentChargeCard" in new_block_types
+    assert "AlternativeStopsList" in new_block_types
+    assert "ClarifyingQuestionCard" not in new_block_types
+
+    urgent_block = next(block for block in new_blocks if block["type"] == "UrgentChargeCard")
+    assert urgent_block["props"]["nearest"] == station.name
+
+
+@pytest.mark.django_db
+def test_codex_conversation_agent_interprets_vehicle_followup_from_available_transcript(
+    client, settings, monkeypatch
+):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+    captured_messages = []
+    session = client.session
+    session[ACTIVE_CONVERSATION_BLOCKS_KEY] = [
+        {"id": "user-urgent", "type": "UserMessage", "version": 1, "props": {"text": "Necesito cargar ya"}},
+        {
+            "id": "location-request",
+            "type": "LocationRequestCard",
+            "version": 1,
+            "props": {
+                "reason": "urgent_charge",
+                "title": "Necesito tu ubicación",
+                "body": "Comparte ubicación para buscar cargadores.",
+            },
+        },
+        {
+            "id": "user-location",
+            "type": "UserMessage",
+            "version": 1,
+            "props": {"text": "Estoy en 37.880729, -4.782446"},
+        },
+        {
+            "id": "urgent-result",
+            "type": "UrgentChargeCard",
+            "version": 1,
+            "props": {"battery": None, "nearest": "Eurostars Maimonides - 135", "distanceKm": 0.16},
+        },
+    ]
+    session.save()
+
+    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+        captured_messages.append(message)
+        return {
+            "type": "final",
+            "blocks": [
+                {
+                    "id": "urgent-with-battery",
+                    "type": "UrgentChargeCard",
+                    "version": 1,
+                    "props": {
+                        "battery": 20,
+                        "nearest": "Eurostars Maimonides - 135",
+                        "distanceKm": 0.16,
+                    },
+                }
+            ],
+        }
+
+    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+
+    response = client.post(
+        "/api/conversation/message",
+        data={"text": "Tengo un 20%"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert captured_messages
+    assert "Usuario: Necesito cargar ya" in captured_messages[0]
+    assert "Usuario: Estoy en 37.880729, -4.782446" in captured_messages[0]
+    assert "Resultado previo de carga urgente" in captured_messages[0]
+    assert "Mensaje actual del usuario: Tengo un 20%" in captured_messages[0]
+    body = response.json()
+    latest_urgent_block = body["blocks"][-1]
+    assert latest_urgent_block["type"] == "UrgentChargeCard"
+    assert latest_urgent_block["props"]["battery"] == 20
 
 
 @pytest.mark.django_db

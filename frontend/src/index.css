@@ -37,7 +37,7 @@
   --radius-full: 9999px;
   --spacing-app-width: 430px;
   --spacing-app-height: 880px;
-  --spacing-hero-width: 11ch;
+  --spacing-hero-width: 13ch;
   --spacing-chat-panel: calc(100svh - 9rem);
   --text-caption: 0.75rem;
   --text-caption--line-height: 1rem;
@@ -45,7 +45,7 @@
   --text-compact--line-height: 1.25rem;
   --text-input: 0.95rem;
   --text-input--line-height: 1.25rem;
-  --text-hero: 3rem;
+  --text-hero: 2.5rem;
   --text-hero--line-height: 1;
   --tracking-display: -0.04em;
 }

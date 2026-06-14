@@ -13,7 +13,6 @@ import {
   Activity,
   AlertTriangle,
   ArrowUp,
-  BatteryCharging,
   ClipboardList,
   Home,
   Loader2,
@@ -82,22 +81,23 @@ const defaultAuthForm: AuthCredentials = {
 
 const quickPrompts = [
   {
-    title: 'Cargar cerca de un hotel',
-    description: 'Para estancias y carga al llegar.',
-    value: 'Quiero ver cargadores cerca de un hotel en Valencia.',
-    icon: BatteryCharging,
+    title: 'Carga urgente',
+    description: 'Ubicación, batería y conector primero.',
+    value: 'Necesito cargar ya. Pregúntame ubicación, batería y conector si hace falta.',
+    icon: Zap,
+    priority: true,
   },
   {
-    title: 'Preparar ruta',
-    description: 'Incluye batería, consumo y conector.',
-    value: 'Voy desde Córdoba hasta Valencia con 58%, batería útil 64 kWh, consumo 17.8 kWh/100km, CCS2 y potencia 150 kW.',
+    title: 'Planificar ruta larga',
+    description: 'Origen, destino, batería y conector.',
+    value: 'Quiero planificar una ruta de Córdoba a Valencia con 58%, batería útil 64 kWh, consumo 17.8 kWh/100km, CCS2 y potencia 150 kW.',
     icon: Navigation,
   },
   {
-    title: 'Necesito cargar ya',
-    description: 'Te pediré ubicación si hace falta.',
-    value: 'Necesito cargar ya cerca de mi ubicación.',
-    icon: Zap,
+    title: 'Cargar al llegar',
+    description: 'Hotel, destino o parada de noche.',
+    value: 'Quiero buscar carga al llegar a mi hotel o destino en Valencia. Si falta la ubicación exacta, pregúntame.',
+    icon: MapPinned,
   },
 ]
 
@@ -252,9 +252,9 @@ function HomePage() {
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-3 pt-2">
         <p className="font-mono text-xs leading-4 text-muted-foreground">Viaja sin ansiedad de carga</p>
-        <h1 className="max-w-hero-width text-hero font-semibold leading-none tracking-display text-foreground">Dime tu ruta o urgencia de carga</h1>
-        <p className="text-base leading-7 text-body">
-          Kalmio abrirá el chat con tu contexto y preguntará lo que falte antes de recomendar.
+        <h1 className="max-w-hero-width text-balance text-hero font-semibold leading-none tracking-display text-foreground">Dime tu ruta o urgencia de carga</h1>
+        <p className="text-pretty text-base leading-7 text-body">
+          Kalmio preguntará lo que falte antes de recomendar. No asumimos disponibilidad, precios ni estaciones.
         </p>
       </div>
 
@@ -282,7 +282,7 @@ function HomePage() {
               </InputGroupAddon>
             </InputGroup>
             <FieldDescription>
-              Si faltan batería, conector, origen o destino, te preguntaré antes de recomendar.
+              Si falta una fuente fiable o algún dato crítico, te lo diré antes de seguir.
             </FieldDescription>
           </Field>
         </FieldGroup>
@@ -297,14 +297,14 @@ function HomePage() {
               <Button
                 key={prompt.title}
                 type="button"
-                variant="outline"
+                variant={prompt.priority ? 'default' : 'outline'}
                 className="h-auto w-full justify-start gap-3 whitespace-normal rounded-md px-3 py-3 text-left"
                 onClick={() => startChat(prompt.value)}
               >
                 <Icon data-icon="inline-start" aria-hidden="true" />
                 <span className="flex min-w-0 flex-col gap-0.5">
                   <span className="text-compact font-semibold">{prompt.title}</span>
-                  <span className="text-xs font-normal leading-4 text-muted-foreground">{prompt.description}</span>
+                  <span className={cn('text-xs font-normal leading-4', prompt.priority ? 'text-primary-foreground/80' : 'text-muted-foreground')}>{prompt.description}</span>
                 </span>
               </Button>
             )
@@ -314,9 +314,9 @@ function HomePage() {
 
       <Alert>
         <ShieldCheck aria-hidden="true" />
-        <AlertTitle>Chat primero, mapa después.</AlertTitle>
+        <AlertTitle>Sin recomendaciones a ciegas.</AlertTitle>
         <AlertDescription>
-          Solo se pintan componentes A2UI permitidos. Si falta una fuente fiable, Kalmio lo dirá.
+          Te pediré los datos mínimos para entender la situación. Si no hay una fuente fiable, te lo diré en vez de rellenar huecos.
         </AlertDescription>
       </Alert>
     </section>
