@@ -43,7 +43,7 @@ describe('A2UIRenderer', () => {
               lat: 37.8882,
               lon: -4.7794,
               precision: 'approximate',
-              context: 'Ubicación usada para buscar cargadores urgentes',
+              context: 'Ubicación usada para buscar una parada de carga urgente',
               needsConfirmation: true,
             },
           },
@@ -95,9 +95,54 @@ describe('A2UIRenderer', () => {
       />,
     )
 
-    expect(screen.getByText('Recomendación principal')).toBeInTheDocument()
+    expect(screen.getByText('Parada recomendada')).toBeInTheDocument()
     expect(screen.getByText('Almansa HPC')).toBeInTheDocument()
     expect(screen.getByText('1.2 km')).toBeInTheDocument()
+  })
+
+  it('renders place-first stop recommendations with traceable charging point detail', () => {
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'recommended',
+            type: 'RecommendedStopCard',
+            version: 1,
+            props: {
+              placeName: 'Área de servicio Almansa',
+              stationName: 'Almansa HPC',
+              name: 'Almansa HPC',
+              powerKw: 180,
+              distanceKm: 1.2,
+              detourMin: 8,
+              confidence: 'media',
+            },
+          },
+          {
+            id: 'alternatives',
+            type: 'AlternativeStopsList',
+            version: 1,
+            props: {
+              stops: [
+                {
+                  placeName: 'Parking centro',
+                  stationName: 'Centro CCS',
+                  name: 'Centro CCS',
+                  powerKw: 90,
+                  distanceKm: 0.7,
+                },
+              ],
+            },
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('Área de servicio Almansa')).toBeInTheDocument()
+    expect(screen.getByText('Punto de carga: Almansa HPC')).toBeInTheDocument()
+    expect(screen.getByText('Otras paradas viables')).toBeInTheDocument()
+    expect(screen.getByText('Parking centro')).toBeInTheDocument()
+    expect(screen.getByText(/Punto de carga: Centro CCS/)).toBeInTheDocument()
   })
 
   it('labels medium uncertainty as data to confirm', () => {
@@ -145,6 +190,25 @@ describe('A2UIRenderer', () => {
 
     expect(screen.getByRole('button', { name: 'Abrir en Maps' })).toBeDisabled()
     expect(screen.getByText('Faltan coordenadas u origen confirmado.')).toBeInTheDocument()
+  })
+
+  it('allows long preference chips to wrap instead of forcing horizontal scroll', () => {
+    const longChip = 'Paradas cerca del hotel con servicios para una parada larga'
+
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'chips',
+            type: 'PreferenceChips',
+            version: 1,
+            props: { chips: [longChip] },
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: longChip })).toHaveClass('max-w-full', 'whitespace-normal', 'break-words')
   })
 
   it('opens registered local function actions', () => {

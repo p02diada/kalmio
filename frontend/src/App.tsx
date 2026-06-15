@@ -83,7 +83,7 @@ const defaultAuthForm: AuthCredentials = {
 const quickPrompts = [
   {
     title: 'Carga urgente',
-    description: 'Para cuando necesitas decidir ahora.',
+    description: 'Para decidir una parada ahora.',
     value: 'Necesito cargar ya. Te daré ubicación, batería actual y conector. Si falta algún dato crítico, pregúntame antes de recomendar.',
     icon: Zap,
   },
@@ -94,9 +94,9 @@ const quickPrompts = [
     icon: Navigation,
   },
   {
-    title: 'Cargar al llegar',
+    title: 'Plan al llegar',
     description: 'Hotel, destino o parada de noche.',
-    value: 'Quiero cargar al llegar a mi hotel o destino. Si falta la ubicación exacta, pregúntame antes de buscar opciones.',
+    value: 'Quiero planificar dónde cargar al llegar a mi hotel o destino. Si falta la ubicación exacta, pregúntame antes de buscar opciones.',
     icon: MapPinned,
   },
 ]
@@ -111,14 +111,14 @@ const intakeItems = [
 
 const reassuranceSteps = [
   'Te pediré ubicación, batería y conector si faltan.',
-  'Comprobaré ruta y cargadores con fuentes autorizadas.',
-  'Si no hay datos fiables, no recomendaré una estación.',
+  'Comprobaré ruta y paradas con datos autorizados de carga.',
+  'Si no hay datos fiables, no recomendaré una parada.',
 ] as const
 
 const conversationPhases = [
   'Interpretando tu petición',
   'Comprobando ruta o ubicación',
-  'Buscando cargadores autorizados',
+  'Buscando paradas con carga autorizada',
   'Validando riesgo y próximos pasos',
 ] as const
 
@@ -136,18 +136,6 @@ function AppShell() {
     <SidebarProvider className="app-frame">
       <DesktopSidebar pathname={pathname} />
       <SidebarInset className="app-shell">
-        <header className="mobile-app-header">
-          <div className="flex items-center justify-between gap-3">
-            <Link to="/" className="flex items-baseline gap-1" aria-label="Kalmio home">
-              <span className="text-sm font-semibold leading-none text-foreground">Kalmio</span>
-              <span className="font-mono text-xs leading-none text-muted-foreground">EV</span>
-            </Link>
-            <Link to="/settings" className="grid size-8 place-items-center rounded-full border border-border bg-surface text-foreground" aria-label="Cuenta">
-              <UserRound className="size-4" aria-hidden="true" />
-            </Link>
-          </div>
-        </header>
-
         <div className="app-main">
           <Outlet />
         </div>
@@ -257,7 +245,6 @@ function isActivePath(pathname: string, to: string) {
 
 function HomePage() {
   const navigate = useNavigate()
-  const inputRef = useRef<HTMLInputElement>(null)
   const [intent, setIntent] = useState('')
   const trimmedIntent = intent.trim()
 
@@ -268,11 +255,6 @@ function HomePage() {
     }
     sessionStorage.setItem(pendingPromptKey, text)
     navigate({ to: '/chat' })
-  }
-
-  const selectPrompt = (value: string) => {
-    setIntent(value)
-    window.requestAnimationFrame(() => inputRef.current?.focus())
   }
 
   return (
@@ -296,7 +278,6 @@ function HomePage() {
             <FieldLabel htmlFor="home-intent" className="sr-only">Describe lo que necesitas</FieldLabel>
             <InputGroup className="h-16 rounded-md bg-surface">
               <InputGroupInput
-                ref={inputRef}
                 id="home-intent"
                 value={intent}
                 onChange={(event) => setIntent(event.target.value)}
@@ -329,7 +310,7 @@ function HomePage() {
       <div className="flex flex-col gap-2.5">
         <div className="flex flex-col gap-1">
           <p className="text-compact font-semibold text-foreground">Inicio guiado</p>
-          <p className="text-sm leading-5 text-muted-foreground">Elige una guía, revisa el texto y envíalo cuando esté listo.</p>
+          <p className="text-sm leading-5 text-muted-foreground">Elige una guía para abrir el chat con el primer mensaje preparado.</p>
         </div>
         <div className="grid gap-2 sm:grid-cols-3">
           {quickPrompts.map((prompt) => {
@@ -340,7 +321,7 @@ function HomePage() {
                 type="button"
                 variant="outline"
                 className="h-auto w-full justify-start gap-3 whitespace-normal rounded-md px-3 py-3 text-left"
-                onClick={() => selectPrompt(prompt.value)}
+                onClick={() => startChat(prompt.value)}
               >
                 <Icon data-icon="inline-start" aria-hidden="true" />
                 <span className="flex min-w-0 flex-col gap-0.5">
@@ -475,9 +456,14 @@ function ChatPage() {
     if (!pending) {
       return
     }
-    sentInitialPrompt.current = true
-    sessionStorage.removeItem(pendingPromptKey)
-    const timer = window.setTimeout(() => sendText(pending), 0)
+    const timer = window.setTimeout(() => {
+      if (sentInitialPrompt.current) {
+        return
+      }
+      sentInitialPrompt.current = true
+      sessionStorage.removeItem(pendingPromptKey)
+      sendText(pending)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [sendText])
 
@@ -508,18 +494,11 @@ function ChatPage() {
 
   return (
     <section className="chat-page">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-normal">Chat</h1>
-          <p className="text-sm leading-6 text-muted-foreground">Dime ruta, batería o destino. Si falta algo crítico, te lo pediré antes de recomendar.</p>
-        </div>
-        <Button type="button" variant="ghost" size="icon" aria-label="Reiniciar chat" onClick={() => clearMutation.mutate()}>
-          <RotateCcw className="size-4" aria-hidden="true" />
-        </Button>
-      </div>
+      <h1 className="sr-only">Chat</h1>
 
       <div ref={scrollRef} className="chat-scroll" aria-live="polite">
         {messagesQuery.isPending ? <ConversationSkeleton /> : null}
+        {!messagesQuery.isPending && renderedBlocks.length === 0 && !isSending && !error ? <ChatEmptyState /> : null}
         {renderedBlocks.length > 0 ? (
           <A2UIRenderer blocks={renderedBlocks} onChipClick={sendText} onActionEvent={sendA2UIEvent} />
         ) : null}
@@ -535,22 +514,41 @@ function ChatPage() {
           sendText(draft)
         }}
       >
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-9 shrink-0 rounded-full"
+          aria-label="Reiniciar chat"
+          onClick={() => clearMutation.mutate()}
+          disabled={clearMutation.isPending}
+        >
+          <RotateCcw className="size-4" aria-hidden="true" />
+        </Button>
         <Textarea
           ref={composerRef}
           aria-label="Mensaje para Kalmio"
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
-          placeholder="Añade origen, destino, hotel, batería o preferencias..."
-          className="min-h-20 border-0 px-2 shadow-none focus-visible:outline-none"
+          placeholder="Ruta, batería o destino"
+          rows={1}
+          className="chat-composer-input border-0 px-2 shadow-none focus-visible:outline-none"
         />
-        <div className="flex items-center justify-end pt-2">
-          <Button type="submit" size="sm" disabled={isSending || draft.trim().length === 0}>
-            <ArrowUp className="size-4" aria-hidden="true" />
-            Enviar
-          </Button>
-        </div>
+        <Button type="submit" size="icon" className="size-9 shrink-0 rounded-full md:w-auto md:px-3" aria-label="Enviar" disabled={isSending || draft.trim().length === 0}>
+          <ArrowUp className="size-4" aria-hidden="true" />
+          <span className="hidden md:inline">Enviar</span>
+        </Button>
       </form>
     </section>
+  )
+}
+
+function ChatEmptyState() {
+  return (
+    <div className="chat-empty">
+      <p className="text-compact font-semibold text-foreground">Cuéntame lo esencial.</p>
+      <p className="text-sm leading-5 text-body">Ruta, batería, conector, hotel o preferencia de parada. Si falta algo crítico, te lo pediré antes de recomendar.</p>
+    </div>
   )
 }
 
@@ -580,7 +578,7 @@ function ActivityPage() {
             <div className="space-y-1">
               <h2 className="font-bold">Todavía no hay planes guardados</h2>
               <p className="text-sm leading-6 text-muted-foreground">
-                El agente puede explorar cargadores sin cuenta. El guardado queda reservado para planes EV completos.
+                El agente puede explorar paradas de carga sin cuenta. El guardado queda reservado para planes EV completos.
               </p>
             </div>
           </CardContent>
@@ -620,7 +618,7 @@ function RoutePlanHistory({ plans }: { plans: RoutePlanResponse[] }) {
             </div>
             <MetricRows
               rows={[
-                ['Cargador', plan.recommendation.name],
+                ['Parada', plan.recommendation.name],
                 ['Ruta', `${plan.distance_km} km · ${plan.duration_min} min`],
                 ['Energía', plan.energy_kwh !== null ? `${plan.energy_kwh} kWh` : 'No calculada'],
               ]}

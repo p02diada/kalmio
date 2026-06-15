@@ -59,7 +59,7 @@ def plan_route_with_persisted_stations(
             energy_kwh=None,
             arrival_battery_percent=None,
             warnings=[
-                "Sin datos de autonomía, solo mostramos cargadores en ruta. No calculamos llegada estimada ni paradas óptimas.",
+                "Sin datos de autonomía, solo mostramos paradas de carga en ruta. No calculamos llegada estimada ni paradas óptimas.",
             ],
         )
 
@@ -177,7 +177,7 @@ def station_to_exploration_payload(station: Station, distance_to_route_km: float
 
 def score_exploration_station(station: dict, preferences: Preferences, plan_type: PlanType) -> StationScore:
     score = 45.0
-    reasons = ["Cargador en el corredor"]
+    reasons = ["Punto de carga en el corredor"]
     effective_power_kw = min(station["power_kw"], preferences.max_useful_power_kw or station["power_kw"])
 
     if effective_power_kw >= 150:

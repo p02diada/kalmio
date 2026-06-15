@@ -68,7 +68,8 @@ Backend: Django, Django Ninja, Django ORM, GeoDjango, Postgres/PostGIS, provider
 - Kalmio's current `{id, type, version, props}` block shape is an internal adapter only. Do not treat it as the official protocol, and do not expand it as a new public wire contract.
 - Production protocol work must be designed around A2UI envelopes: `createSurface`, `updateComponents`, `updateDataModel`, and `deleteSurface`.
 - Conversation endpoints expose A2UI only through a `messages` envelope list. Do not add or consume a public `blocks` response field.
-- Kalmio must maintain an application-specific, versioned A2UI catalog. Any new component, prop, action, function, theme value, or semantic hint must be added to the catalog/schema and documented before agent use.
+- Kalmio must maintain an application-specific, versioned A2UI catalog at `frontend/src/lib/a2ui/kalmio-catalog.json`. This catalog is the normative source of truth for components, props, actions, functions, theme values, semantic hints, and versioning.
+- Do not maintain a second component-prop contract in markdown. Architecture docs and agent instructions may explain boundaries and behavior, but component props must be changed in the catalog/schema before agent use.
 - Use stable catalog IDs, preferably URI-shaped, and bump or migrate catalog versions when component semantics or required props change.
 - Only allowlisted components can render as dynamic UI.
 - Validate every backend response.

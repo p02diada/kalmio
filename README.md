@@ -1,6 +1,6 @@
 # Kalmio
 
-Kalmio is a mobile-first PWA assistant for EV drivers. It helps plan charging stops through provider-backed routing and authorized charger data.
+Kalmio is a mobile-first PWA assistant for EV drivers. It helps plan useful charging stops through provider-backed routing and authorized charger data.
 
 Claim: "Viaja sin ansiedad de carga."
 
@@ -186,7 +186,7 @@ Create an anonymous session and CSRF token, then send a free-form message to the
 curl -c cookies.txt http://localhost:8000/api/auth/csrf
 CSRF_TOKEN=$(grep csrftoken cookies.txt | awk '{print $7}')
 curl -b cookies.txt -H 'Content-Type: application/json' -H "X-CSRFToken: $CSRF_TOKEN" \
-  -d '{"text":"Quiero ver cargadores cerca de un hotel en Valencia"}' \
+  -d '{"text":"Quiero buscar una parada de carga cerca de un hotel en Valencia"}' \
   http://localhost:8000/api/conversation/message
 curl -b cookies.txt http://localhost:8000/api/conversation/messages
 ```
@@ -241,7 +241,7 @@ curl -b cookies.txt -H 'Content-Type: application/json' -H "X-CSRFToken: $CSRF_T
   http://localhost:8000/api/plans/route
 ```
 
-Anonymous A2UI chat state is stored only in the Django session and is not added to account history. Route calculations require CSRF, a reachable routing provider, and authorized charger records. Without vehicle characteristics, Kalmio only shows chargers near the route and does not calculate autonomy, arrival battery, or optimal charging stops.
+Anonymous A2UI chat state is stored only in the Django session and is not added to account history. Route calculations require CSRF, a reachable routing provider, and authorized charger records. Without vehicle characteristics, Kalmio only shows charge-backed stops near the route and does not calculate autonomy, arrival battery, or optimal charging stops.
 
 Create a local account when you want route-plan history and feedback:
 
@@ -252,7 +252,7 @@ curl -b cookies.txt -c cookies.txt -H 'Content-Type: application/json' -H "X-CSR
 CSRF_TOKEN=$(grep csrftoken cookies.txt | awk '{print $7}')
 ```
 
-Prepare a route from an authenticated account. Until EV planning returns, this produces a non-persisted charger exploration response:
+Prepare a route from an authenticated account. Until EV planning returns, this produces a non-persisted charging-stop exploration response:
 
 ```bash
 curl -b cookies.txt -H 'Content-Type: application/json' -H "X-CSRFToken: $CSRF_TOKEN" \
@@ -306,7 +306,6 @@ The home screen is a quick-start launcher and the chat screen uses `/api/convers
 - `DESIGN.md`
 - `docs/CODEX_AI.md`
 - `docs/VEHICLE_DATA_SOURCES.md`
-- `A2UI_COMPONENTS.md`
 - `DATA_MODEL.md`
 - `TEST_CASES.md`
 - `AGENTS.md`

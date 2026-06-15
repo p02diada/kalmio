@@ -7,6 +7,7 @@ import tempfile
 import time
 from dataclasses import dataclass
 from typing import Any, Callable
+from urllib.parse import unquote
 from uuid import uuid4
 
 from charging.selectors import get_nearby_stations
@@ -90,7 +91,7 @@ def initial_blocks() -> list[dict]:
             {
                 "text": (
                     "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, "
-                    "o cargadores cerca de un hotel o destino. Si falta un dato crítico, te lo pediré."
+                    "o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré."
                 )
             },
         ),
@@ -101,7 +102,7 @@ def initial_blocks() -> list[dict]:
                 "chips": [
                     "Necesito cargar ya",
                     "Ruta con parada segura",
-                    "Cargadores cerca del hotel",
+                    "Parada cerca del hotel",
                     "Priorizar servicios",
                 ]
             },
@@ -138,7 +139,7 @@ def run_local_agent(message: str, history_blocks: list[dict] | None = None) -> l
                     reason="urgent_charge",
                     title="Necesito tu ubicación",
                     body=(
-                        "Para buscar cargadores cercanos sin inventar resultados, "
+                        "Para buscar una parada de carga cercana sin inventar resultados, "
                         "comparte tu ubicación o escribe una ciudad/coordenadas."
                     ),
                 )
@@ -189,7 +190,7 @@ def run_local_agent(message: str, history_blocks: list[dict] | None = None) -> l
 
     blocks.append(
         clarifying_block(
-            "¿Quieres calcular una ruta EV o buscar cargadores cerca de un destino concreto?",
+            "¿Quieres calcular una ruta EV o buscar una parada de carga cerca de un destino concreto?",
             ["tipo de búsqueda", "ubicación o ruta"],
         )
     )
@@ -614,7 +615,7 @@ def deepseek_tool_definitions() -> list[dict[str, Any]]:
             "type": "function",
             "function": {
                 "name": "resolve_location",
-                "description": "Resuelve una ciudad, zona o POI conocido antes de buscar cargadores o calcular ruta.",
+                "description": "Resuelve una ciudad, zona o POI conocido antes de buscar paradas de carga o calcular ruta.",
                 "parameters": {
                     "type": "object",
                     "properties": {"query": {"type": "string", "description": "Ciudad, zona, hotel o POI textual."}},
@@ -627,7 +628,7 @@ def deepseek_tool_definitions() -> list[dict[str, Any]]:
             "type": "function",
             "function": {
                 "name": "search_destination_chargers",
-                "description": "Busca cargadores autorizados cerca de una ubicación ya resuelta o coordenadas explícitas.",
+                "description": "Busca puntos de carga autorizados cerca de una ubicación ya resuelta o coordenadas explícitas.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -645,7 +646,7 @@ def deepseek_tool_definitions() -> list[dict[str, Any]]:
             "type": "function",
             "function": {
                 "name": "plan_route",
-                "description": "Calcula ruta EV con proveedor de rutas y cargadores autorizados cuando hay origen y destino.",
+                "description": "Calcula ruta EV con proveedor de rutas y puntos de carga autorizados cuando hay origen y destino.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -751,48 +752,56 @@ def codex_prompt(
     tool_instructions = (
         "Herramientas permitidas. Puedes llamar solo una por respuesta tool_call:\n"
         '- resolve_location: resuelve una ciudad o texto conocido. Args: {"query":"ciudad o texto"}\n'
-        "- search_destination_chargers: busca cargadores autorizados alrededor de una ubicación ya resuelta o "
+        "- search_destination_chargers: busca puntos de carga autorizados alrededor de una ubicación ya resuelta o "
         'coordenadas dadas por el usuario. Args: {"location":{"label":"...","lat":0,"lon":0},"connector":null,'
         '"radius_km":80,"limit":3}\n'
         "- plan_route: calcula ruta y paradas con proveedor y datos autorizados. Args: "
         '{"origin":{"label":"...","lat":0,"lon":0},"destination":{"label":"...","lat":0,"lon":0},'
         '"vehicle":null,"preferences":{"reserve_min_percent":20,"max_useful_power_kw":null},"corridor_radius_km":25}\n'
+        "Nunca llames herramientas con label vacío, lat/lon 0,0, placeholders o ubicaciones no dadas/resueltas; pregunta antes.\n"
         "Ubicaciones internas conocidas para argumentos de herramienta, sin inventar otras coordenadas: "
         f"{known_locations}.\n"
     )
     behavior_instructions = (
         "Comportamiento EV esperado:\n"
         "- Usa el historial útil, acepta correcciones naturales y no suenes como formulario.\n"
+        "- Presenta las recomendaciones como paradas o lugares útiles para el viaje; usa name/stationName como punto de carga trazable y placeName solo si sale de herramienta o del usuario. No inventes lugares, servicios ni POIs.\n"
         "- Carga urgente sin ubicación: pide solo ubicación actual, ciudad/zona o coordenadas. No pidas destino para una carga urgente.\n"
         "- Tras una urgencia, una ciudad/zona/coordenadas es continuación de la urgencia; usa herramientas si hay ubicación suficiente.\n"
         "- Si el usuario corrige la ubicación, descarta la anterior, conserva batería, conector y preferencias si siguen teniendo sentido y busca con la nueva.\n"
         "- Si pregunta por un fallo anterior, no contradigas bloques ya validados; explica validación, cobertura, aproximación o datos autorizados.\n"
         "- Calle/POI/zona: intenta resolver la parte conocida con resolve_location. Si no puedes ubicar esa calle exacta, dilo y ofrece ciudad aproximada o coordenadas; no inventes coordenadas.\n"
-        "- Ruta sin consumo/modelo: puedes usar plan_route para explorar cargadores, pero no inventes autonomía, energía ni llegada. Si plan_route devuelve planningLevel=chargers_only, dilo.\n"
-        "- Hotel/destino/estancia: si hay ciudad/POI suficiente, busca cargadores alrededor como aproximación; no lo conviertas en ruta salvo que pidan origen-destino.\n"
+        "- Ruta sin consumo/modelo: puedes usar plan_route para explorar paradas de carga, pero no inventes autonomía, energía ni llegada. Si plan_route devuelve planningLevel=chargers_only, dilo.\n"
+        "- Hotel/destino/estancia: si hay ciudad/POI suficiente y el usuario necesita cargar durante la estancia, llama search_destination_chargers directamente; no devuelvas solo un botón para buscar. Una ciudad conocida ya es ubicación suficiente para una búsqueda aproximada; no esperes hotel/zona exacta para la primera búsqueda, puedes pedir refinamiento después de mostrar resultados trazados. No lo conviertas en ruta salvo que pidan origen-destino.\n"
+        "- Si el usuario menciona ida y vuelta, volver, regreso o fechas de salida/vuelta, reconoce contexto de viaje redondo. Si falta origen para planificar ida/vuelta, pregunta por el origen antes de pedir hotel/zona.\n"
         "- Si resolve_location recibe un hotel, calle o POI pero solo devuelve una ciudad/zona, no afirmes que conoces el lugar exacto; di que usas esa ciudad/zona como aproximación o pide coordenadas/dirección exacta.\n"
-        "- Si search_destination_chargers devuelve stops, usa nombres y métricas exactas trazables; no uses placeholders cuando hay estaciones.\n"
+        "- Si search_destination_chargers devuelve stops, usa nombres y métricas exactas trazables; no uses placeholders cuando hay estaciones. Puedes llamar a esos resultados paradas, pero el punto de carga mostrado debe seguir siendo trazable.\n"
         "- Si ya hay stops con potencia/distancia/disponibilidad y el usuario pide comparar potencia o alternativas, responde con esos resultados; no repitas la misma búsqueda sin cambiar ubicación, radio, conector o criterio material.\n"
         "- Si una herramienta permitida falla, explica el fallo en contexto y pide una acción mínima; no fabriques datos.\n"
         "- Batería baja: pocas opciones, riesgo explícito, y CTA de navegación solo con lat/lon trazables. Si conoces batería, consérvala.\n"
-        "- Cargador ocupado: no lo repitas como plan B; usa alternativas trazables o vuelve a buscar con la ubicación previa.\n"
+        "- Punto de carga ocupado: no lo repitas como plan B; usa alternativas trazables o vuelve a buscar con la ubicación previa.\n"
         "- En carretera y poco desvío: pide carretera/destino u origen-destino si faltan; no lo reduzcas a búsqueda urbana arbitraria.\n"
         "- Si el coche carga máximo a X kW, pasa X como preferences.max_useful_power_kw; si recomiendas un cargador de más potencia, di que el coche no aprovechará más de 100 kW cuando X=100 y no presentes la potencia superior como ventaja.\n"
         "- Restricción dura de llegada: sin perfil de vehículo no la presentes como cumplida; pide modelo/consumo/autonomía.\n"
-        "- Viajes futuros: disponibilidad, tarifas y acceso pueden cambiar. Niños/comodidad: prioriza servicios solo si la herramienta los trae.\n"
-        "- Estancias de varios días: piensa en carga durante estancia y vuelta; si falta origen para ida/vuelta, pídelo; si no, busca en destino.\n"
+        "- Viajes futuros: disponibilidad, tarifas y acceso pueden cambiar. Niños/comodidad: menciona servicios solo como comodidad potencial si la herramienta los trae; no uses claims absolutos como ideal, perfecto, seguro o apto para niños salvo que el dato venga explícitamente trazado.\n"
+        "- Estancias de varios días: piensa en carga durante estancia y vuelta; si hay viaje redondo y falta origen, pídelo; si solo pide carga en destino y hay ubicación suficiente, busca en destino. Tras una búsqueda para estancia de varios días, incluye StayPlanningCard para el contexto de estancia junto a los puntos de carga trazados.\n"
+        "- Rutas baratas, reservas duras, carga justa o comparativas rápida/barata necesitan origen, destino y datos de vehículo/batería para calcular; si faltan, pregunta por esos datos y no inventes tarifas, kWh ni llegada.\n"
         "Ejemplos críticos por analogía, no reglas rígidas: 'Necesito cargar ya' -> pide ubicación, no destino; 'En Córdoba' tras urgencia -> busca Córdoba; "
         "'Paseo de la Victoria de Córdoba' -> si solo resuelves Córdoba, explica la aproximación; "
-        "'Voy a dormir en Valencia, busca cargadores cerca del hotel' -> busca Valencia como aproximación o pide hotel/zona; "
+        "'Voy a dormir en Valencia, busca cargadores cerca del hotel' -> llama search_destination_chargers con Valencia como aproximación y explica que el hotel exacto refina; "
         "'Valencia centro' tras hotel -> DestinationChargingCard + AlternativeStopsList o RecommendedStopCard; "
-        "'Voy a Granada y duermo cerca de la Alhambra' -> busca Alhambra/Granada aproximado; "
+        "'Voy a Granada y duermo cerca de la Alhambra' -> llama search_destination_chargers con Alhambra/Granada aproximado; "
+        "'Me voy 3 días a Córdoba y me quedo en el hotel Meliá' -> llama search_destination_chargers con Córdoba como aproximación, no ActionButtons; "
+        "'Voy una semana a Cádiz y necesito cargar durante la estancia' -> llama search_destination_chargers con Cádiz como aproximación e incluye StayPlanningCard, no preguntes primero por hotel/zona; "
+        "'Quiero la ruta más barata, pero sin bajar del 20%' sin origen/destino -> no llames plan_route, pregunta origen, destino y datos de vehículo/batería; "
+        "'Voy a Córdoba el viernes y vuelvo el domingo' -> pregunta por origen para planificar ida/vuelta antes de buscar solo alojamiento; "
         "'Zaragoza a Barcelona con 25%' sin consumo/modelo -> no valides ese 25%; "
         "'Mi coche carga máximo a 100 kW, no necesito ultrarrápidos' -> usa preferences.max_useful_power_kw=100.\n"
     )
     catalog_instructions = (
         "Catálogo A2UI permitido por propósito, no por reglas rígidas de intención:\n"
         "AssistantMessage texto breve; TripSummaryCard ruta clara; RouteSummaryCard solo plan_route; "
-        "RecommendedStopCard/AlternativeStopsList solo estaciones de herramientas; RiskExplanationCard incertidumbre concreta; "
+        "RecommendedStopCard/AlternativeStopsList solo paradas de carga respaldadas por estaciones de herramientas; en esos bloques name/stationName debe ser la estación trazable y placeName solo un lugar confirmado; RiskExplanationCard incertidumbre concreta; "
         "CostComparisonCard solo costes de herramienta; UrgentChargeCard carga inmediata trazable; "
         "DestinationChargingCard hotel/destino/ciudad; StayPlanningCard estancia; MapPreviewCard sin inventar geometría; "
         "ActionButtons usa event para backend/agente, functionCall.openUrl para abrir mapas, o disabled con reason; "
@@ -812,7 +821,10 @@ def codex_prompt(
         "Para ActionButtons usa actions con event {name, context} o functionCall {call:'openUrl', args:{url:'https://...'}}; "
         "no uses handlers arbitrarios. "
         "No inventes disponibilidad, precios, estaciones, coordenadas ni estado del vehículo. "
-        "No afirmes cargadores o rutas si no vienen de herramientas, datos autorizados o texto explícito del usuario. "
+        "No uses ActionButtons para sustituir una herramienta de búsqueda cuando ya tienes ciudad/POI suficiente. "
+        "No llames plan_route con coordenadas vacías o 0,0; si faltan origen/destino reales, usa ClarifyingQuestionCard o AssistantMessage. "
+        "No afirmes paradas/puntos de carga disponibles/encontrados ni incluyas listas vacías como resultado si no llamaste una herramienta de búsqueda/ruta. "
+        "No afirmes paradas, puntos de carga o rutas si no vienen de herramientas, datos autorizados o texto explícito del usuario. "
         "Si faltan datos críticos, pregunta. Si el proveedor o los datos autorizados no permiten responder, falla de forma explícita. "
         "Puedes pedir otra herramienta si falta un dato necesario, pero no repitas una llamada ya hecha con los mismos argumentos. "
         "Elige los bloques A2UI que aporten claridad al usuario según la conversación completa. "
@@ -1064,7 +1076,7 @@ def blocks_from_tool_result(tool_result: dict[str, Any], message: str = "") -> l
             return [
                 location_detail_block(
                     location,
-                    context="Ubicación usada para buscar cargadores urgentes",
+                    context="Ubicación usada para buscar una parada de carga urgente",
                     needs_confirmation=True,
                 ),
                 block(
@@ -1072,7 +1084,8 @@ def blocks_from_tool_result(tool_result: dict[str, Any], message: str = "") -> l
                     "UrgentChargeCard",
                     {
                         "battery": intent.vehicle_fields.get("battery"),
-                        "nearest": str(nearest.get("name") or "Cargador cercano por confirmar"),
+                        "nearest": str(nearest.get("name") or "Punto de carga cercano por confirmar"),
+                        "stationName": str(nearest.get("stationName") or nearest.get("name") or ""),
                         "distanceKm": nearest.get("distanceKm"),
                     },
                 ),
@@ -1087,7 +1100,7 @@ def blocks_from_tool_result(tool_result: dict[str, Any], message: str = "") -> l
                     {
                         "level": "medio",
                         "text": (
-                            "Muestro cargadores autorizados importados cerca de la ubicación indicada. "
+                            "Muestro paradas con puntos de carga autorizados cerca de la ubicación indicada. "
                             "Confirma acceso final, tarifa y disponibilidad antes de depender de ellos."
                         ),
                     },
@@ -1099,11 +1112,11 @@ def blocks_from_tool_result(tool_result: dict[str, Any], message: str = "") -> l
                 "DestinationChargingCard",
                 {"destination": str(location.get("label") or "Destino"), "needsConfirmation": True},
             ),
-            location_detail_block(
-                location,
-                context="Destino usado para buscar cargadores",
-                needs_confirmation=True,
-            ),
+                location_detail_block(
+                    location,
+                    context="Destino usado para buscar paradas de carga",
+                    needs_confirmation=True,
+                ),
             block(
                 f"stops-{uuid4().hex[:10]}",
                 "AlternativeStopsList",
@@ -1112,7 +1125,7 @@ def blocks_from_tool_result(tool_result: dict[str, Any], message: str = "") -> l
             block(
                 f"risk-{uuid4().hex[:10]}",
                 "RiskExplanationCard",
-                {"level": "medio", "text": "Muestro solo cargadores autorizados devueltos por la herramienta interna."},
+                {"level": "medio", "text": "Muestro solo paradas respaldadas por puntos de carga autorizados devueltos por la herramienta interna."},
             ),
         ]
     if tool == "plan_route":
@@ -1132,7 +1145,8 @@ def blocks_from_tool_result(tool_result: dict[str, Any], message: str = "") -> l
                 f"stop-{uuid4().hex[:10]}",
                 "RecommendedStopCard",
                 {
-                    "name": str(recommendation.get("name") or "Cargador recomendado"),
+                    "name": str(recommendation.get("name") or "Punto de carga recomendado"),
+                    "stationName": str(recommendation.get("stationName") or recommendation.get("name") or ""),
                     "powerKw": recommendation.get("powerKw") or 0,
                     "detourMin": recommendation.get("detourMin") or 0,
                     "confidence": recommendation.get("confidence") or "media",
@@ -1167,11 +1181,11 @@ def fallback_from_tool_history(tool_history: list[dict[str, Any]], reason: str, 
 def user_facing_failure_text(reason: str) -> str:
     normalized = normalize(reason)
     if "herramienta no permitida" in normalized:
-        return "No puedo hacer esa acción desde el chat. Puedo ayudarte a calcular una ruta, buscar cargadores autorizados o pedir los datos que falten."
+        return "No puedo hacer esa acción desde el chat. Puedo ayudarte a calcular una ruta, buscar paradas con puntos de carga autorizados o pedir los datos que falten."
     if "proveedor" in normalized or "ruta" in normalized:
-        return "No he podido validar la ruta ahora mismo. Reinténtalo con origen y destino concretos, o busca primero cargadores cerca de una ciudad."
+        return "No he podido validar la ruta ahora mismo. Reinténtalo con origen y destino concretos, o busca primero una parada de carga cerca de una ciudad."
     if "datos" in normalized or "cargadores" in normalized:
-        return "No he podido validar cargadores suficientes con datos autorizados. Puedo intentarlo con otra ubicación o un radio más amplio."
+        return "No he podido validar suficientes puntos de carga con datos autorizados. Puedo intentarlo con otra ubicación o un radio más amplio."
     return "No he podido completar esta respuesta con fiabilidad. Reintenta con menos datos ambiguos o corrige origen, destino, batería y conector."
 
 
@@ -1229,17 +1243,26 @@ def a2ui_contract_issues(
         elif block_type == "MapPreviewCard":
             issues.extend(station_reference_contract_issues("MapPreviewCard.stop", props.get("stop"), facts))
         elif block_type == "ActionButtons":
-            issues.extend(action_buttons_contract_issues(props))
+            issues.extend(action_buttons_contract_issues(props, facts, explicit_coordinates))
         elif block_type == "CostComparisonCard":
             issues.extend(cost_contract_issues(props))
         elif block_type == "RiskExplanationCard":
             issues.extend(risk_explanation_contract_issues(props))
 
+    issues.extend(factual_charger_copy_contract_issues(blocks, facts))
+    issues.extend(approximate_location_contract_issues(blocks, facts))
     return dedupe_preserve_order(issues)
 
 
 def tool_fact_index(tool_history: list[dict[str, Any]], history_blocks: list[dict] | None = None) -> dict[str, Any]:
-    facts: dict[str, Any] = {"stations": {}, "locations": [], "approximateLocations": [], "routes": [], "vehicle": {}}
+    facts: dict[str, Any] = {
+        "stations": {},
+        "locations": [],
+        "approximateLocations": [],
+        "routes": [],
+        "vehicle": {},
+        "stationSearches": 0,
+    }
     add_history_facts(facts, history_blocks or [])
     for entry in tool_history:
         if not isinstance(entry, dict):
@@ -1252,8 +1275,11 @@ def tool_fact_index(tool_history: list[dict[str, Any]], history_blocks: list[dic
         result = entry.get("result")
         if not isinstance(result, dict) or not result.get("ok"):
             continue
-        if (result.get("tool") or call.get("tool")) == "resolve_location":
+        tool_name = result.get("tool") or call.get("tool")
+        if tool_name == "resolve_location":
             add_approximate_location_fact(facts, args.get("query"), result.get("location"))
+        if tool_name in {"search_destination_chargers", "plan_route"}:
+            facts["stationSearches"] += 1
         for key in ("location", "origin", "destination"):
             add_location_fact(facts, result.get(key))
         stops = result.get("stops")
@@ -1265,7 +1291,7 @@ def tool_fact_index(tool_history: list[dict[str, Any]], history_blocks: list[dic
             for stop in alternatives:
                 add_station_fact(facts, stop)
         add_station_fact(facts, result.get("recommendation"))
-        if (result.get("tool") or call.get("tool")) == "plan_route":
+        if tool_name == "plan_route":
             facts["routes"].append(result)
     return facts
 
@@ -1308,18 +1334,57 @@ def add_station_fact(facts: dict[str, Any], value: Any) -> None:
         return
     key = station_key(name)
     current = facts["stations"].setdefault(key, {"name": name})
-    for field in (
-        "powerKw",
-        "distanceKm",
-        "detourMin",
-        "confidence",
-        "lat",
-        "lon",
-        "availableEvses",
-        "connectorTypes",
-    ):
-        if field in value:
-            current[field] = value.get(field)
+    normalized_values = station_value_aliases(value)
+    for field in ("powerKw", "distanceKm", "detourMin", "confidence", "lat", "lon", "availableEvses", "connectorTypes"):
+        if field in normalized_values:
+            current[field] = normalized_values.get(field)
+
+
+def station_value_aliases(value: dict[str, Any]) -> dict[str, Any]:
+    normalized: dict[str, Any] = {}
+    aliases = {
+        "powerKw": ("powerKw", "power_kw"),
+        "distanceKm": ("distanceKm", "distance_km"),
+        "detourMin": ("detourMin", "detour_min"),
+        "confidence": ("confidence",),
+        "lat": ("lat",),
+        "lon": ("lon",),
+        "availableEvses": ("availableEvses", "available_evses", "availableConnectors", "available_connectors"),
+        "connectorTypes": ("connectorTypes", "connector_types"),
+    }
+    for canonical, keys in aliases.items():
+        for key in keys:
+            if key in value:
+                normalized[canonical] = value.get(key)
+                break
+
+    location = value.get("location")
+    if isinstance(location, dict):
+        normalized.setdefault("lat", location.get("lat"))
+        normalized.setdefault("lon", location.get("lon"))
+
+    connectors = value.get("connectors")
+    if isinstance(connectors, list):
+        connector_types = []
+        available_count = 0
+        max_power_kw = optional_float(normalized.get("powerKw")) or 0
+        for connector in connectors:
+            if not isinstance(connector, dict):
+                continue
+            connector_type = display_text(connector.get("type"), "")
+            if connector_type:
+                connector_types.append(connector_type)
+            count = int(optional_float(connector.get("count")) or 0)
+            if connector.get("available") is True:
+                available_count += count or 1
+            max_power_kw = max(max_power_kw, optional_float(connector.get("power_kw")) or 0)
+        if connector_types:
+            normalized.setdefault("connectorTypes", connector_types)
+        if available_count:
+            normalized.setdefault("availableEvses", available_count)
+        if max_power_kw:
+            normalized.setdefault("powerKw", max_power_kw)
+    return normalized
 
 
 def add_location_fact(facts: dict[str, Any], value: Any) -> None:
@@ -1343,9 +1408,61 @@ def add_approximate_location_fact(facts: dict[str, Any], query: Any, location: A
     normalized_label = normalize(label)
     if normalized_query == normalized_label or normalized_label not in normalized_query:
         return
-    if not any(term in normalized_query for term in ("hotel", "calle", "paseo", "avenida", "plaza", "melia", "alhambra")):
+    if location.get("precision") in {"city_approximation", "known_location_approximation"}:
+        facts["approximateLocations"].append({"query": query_text, "resolvedLabel": label})
+        return
+    if not any(term in normalized_query for term in ("hotel", "calle", "paseo", "avenida", "plaza", "melia", "alhambra", "atocha")):
         return
     facts["approximateLocations"].append({"query": query_text, "resolvedLabel": label})
+
+
+def approximate_location_contract_issues(blocks: list[dict], facts: dict[str, Any]) -> list[str]:
+    if not facts.get("approximateLocations"):
+        return []
+    if not any(block_uses_factual_location(block) for block in blocks):
+        return []
+    visible_text = normalize(" ".join(block_visible_text(block) for block in blocks))
+    if has_approximation_disclaimer(visible_text):
+        return []
+    location = facts["approximateLocations"][-1]
+    return [
+        "La respuesta usa una ubicación resuelta solo como aproximación "
+        f"('{location['query']}' -> '{location['resolvedLabel']}') y debe decirlo de forma visible."
+    ]
+
+
+def block_uses_factual_location(block: dict) -> bool:
+    return block.get("type") in {
+        "AlternativeStopsList",
+        "DestinationChargingCard",
+        "LocationDetailCard",
+        "MapPreviewCard",
+        "RecommendedStopCard",
+        "RouteSummaryCard",
+        "StayPlanningCard",
+        "UrgentChargeCard",
+    }
+
+
+def block_visible_text(block: dict) -> str:
+    props = block.get("props") if isinstance(block.get("props"), dict) else {}
+    return visible_text_from_value(props)
+
+
+def visible_text_from_value(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        parts = []
+        for key, nested in value.items():
+            if key in {"text", "question", "title", "description", "summary", "risk", "context", "warning", "warnings"}:
+                parts.append(visible_text_from_value(nested))
+            elif isinstance(nested, (dict, list)):
+                parts.append(visible_text_from_value(nested))
+        return " ".join(part for part in parts if part)
+    if isinstance(value, list):
+        return " ".join(visible_text_from_value(item) for item in value)
+    return ""
 
 
 def assistant_message_contract_issues(props: dict, facts: dict[str, Any]) -> list[str]:
@@ -1389,6 +1506,8 @@ def alternative_stops_contract_issues(props: dict, facts: dict[str, Any]) -> lis
     stops = props.get("stops")
     if not isinstance(stops, list):
         return ["AlternativeStopsList.props.stops debe ser una lista."]
+    if not stops and not facts.get("stationSearches"):
+        return ["AlternativeStopsList.stops está vacío sin una búsqueda o ruta de herramienta trazable."]
     issues: list[str] = []
     for index, stop in enumerate(stops):
         if not isinstance(stop, dict):
@@ -1401,6 +1520,56 @@ def alternative_stops_contract_issues(props: dict, facts: dict[str, Any]) -> lis
         issues.extend(station_reference_contract_issues(f"AlternativeStopsList.stops[{index}].name", name, facts))
         issues.extend(station_metric_contract_issues(f"AlternativeStopsList.stops[{index}]", stop, facts))
     return issues
+
+
+def factual_charger_copy_contract_issues(blocks: list[dict], facts: dict[str, Any]) -> list[str]:
+    if facts.get("stations") or facts.get("stationSearches"):
+        return []
+    visible_text = normalize(" ".join(block_visible_text(block) for block in blocks))
+    if not visible_text or negates_found_chargers(visible_text):
+        return []
+    if claims_chargers_found(visible_text):
+        return [
+            "La respuesta afirma paradas o puntos de carga disponibles/encontrados sin resultado de herramienta trazable. "
+            "Debe llamar search_destination_chargers/plan_route o formularlo como una búsqueda pendiente."
+        ]
+    return []
+
+
+def claims_chargers_found(normalized_text: str) -> bool:
+    return any(
+        term in normalized_text
+        for term in (
+            "he encontrado",
+            "encontre",
+            "te muestro cargadores",
+            "te muestro paradas",
+            "cargadores disponibles",
+            "paradas disponibles",
+            "paradas con carga",
+            "cargadores autorizados devueltos",
+            "estos son los cargadores",
+            "estas son las paradas",
+            "estos cargadores",
+            "estas paradas",
+        )
+    )
+
+
+def negates_found_chargers(normalized_text: str) -> bool:
+    return any(
+        term in normalized_text
+        for term in (
+            "no he encontrado",
+            "no encontre",
+            "sin resultados",
+            "no hay cargadores",
+            "no hay paradas",
+            "no puedo listar",
+            "necesito validar",
+            "puedo buscar",
+        )
+    )
 
 
 def station_reference_contract_issues(label: str, value: Any, facts: dict[str, Any]) -> list[str]:
@@ -1430,15 +1599,18 @@ def station_metric_contract_issues(label: str, props: dict, facts: dict[str, Any
         return []
 
     issues: list[str] = []
+    rendered_values = station_value_aliases(props)
     for field in ("powerKw", "distanceKm", "detourMin", "lat", "lon", "availableEvses"):
-        if field not in props:
+        if field not in rendered_values:
             continue
-        rendered = props.get(field)
+        rendered = rendered_values.get(field)
         expected = source.get(field)
         if rendered is None:
             continue
         if expected is None:
             issues.append(f"{label}.{field} no está en el resultado de herramienta para {name}.")
+        elif field in {"lat", "lon"} and not coordinate_value_matches(rendered, expected):
+            issues.append(f"{label}.{field} no coincide con el dato de herramienta para {name}.")
         elif not values_match(rendered, expected):
             issues.append(f"{label}.{field} no coincide con el dato de herramienta para {name}.")
     for price_field in ("price", "priceKwh", "pricePerKwh", "pricePerKwhEur"):
@@ -1494,7 +1666,13 @@ def location_detail_contract_issues(
     return ["LocationDetailCard muestra coordenadas que no vienen del usuario ni de una herramienta."]
 
 
-def action_buttons_contract_issues(props: dict) -> list[str]:
+def action_buttons_contract_issues(
+    props: dict,
+    facts: dict[str, Any] | None = None,
+    explicit_coordinates: list[tuple[float, float]] | None = None,
+) -> list[str]:
+    facts = facts or {"stations": {}, "locations": []}
+    explicit_coordinates = explicit_coordinates or []
     actions = props.get("actions")
     if not isinstance(actions, list):
         return ["ActionButtons.props.actions debe ser una lista."]
@@ -1533,6 +1711,30 @@ def action_buttons_contract_issues(props: dict) -> list[str]:
                     issues.append(f"ActionButtons.actions[{index}].functionCall.args.url no puede ejecutar scripts.")
                 else:
                     has_supported_action = True
+                    issues.extend(
+                        action_coordinate_contract_issues(
+                            f"ActionButtons.actions[{index}].functionCall.args.url",
+                            label,
+                            coordinates_from_text(unquote(url)),
+                            facts,
+                            explicit_coordinates,
+                        )
+                    )
+
+        if isinstance(event, dict):
+            context = event.get("context") if isinstance(event.get("context"), dict) else {}
+            lat = optional_float(context.get("lat"))
+            lon = optional_float(context.get("lon"))
+            if lat is not None and lon is not None:
+                issues.extend(
+                    action_coordinate_contract_issues(
+                        f"ActionButtons.actions[{index}].event.context",
+                        label,
+                        [(lat, lon)],
+                        facts,
+                        explicit_coordinates,
+                    )
+                )
 
         href = action.get("href")
         if href not in (None, ""):
@@ -1541,6 +1743,59 @@ def action_buttons_contract_issues(props: dict) -> list[str]:
         if not has_supported_action and not action.get("disabled"):
             issues.append(f"ActionButtons.actions[{index}] necesita event, functionCall.openUrl, o estar deshabilitada.")
     return issues
+
+
+def action_coordinate_contract_issues(
+    label: str,
+    action_label: str,
+    coordinates: list[tuple[float, float]],
+    facts: dict[str, Any],
+    explicit_coordinates: list[tuple[float, float]],
+) -> list[str]:
+    issues: list[str] = []
+    if not coordinates:
+        return issues
+    station = station_referenced_by_action_label(action_label, facts)
+    for lat, lon in coordinates:
+        if station is not None:
+            if not close_station_coordinates(lat, lon, station.get("lat"), station.get("lon")):
+                issues.append(f"{label} usa coordenadas que no coinciden con la estación trazable '{station['name']}'.")
+            continue
+        if not coordinate_traced_by_any_fact(lat, lon, facts, explicit_coordinates):
+            issues.append(f"{label} usa coordenadas que no vienen del usuario, estación, origen, destino ni herramienta.")
+    return issues
+
+
+def station_referenced_by_action_label(action_label: str, facts: dict[str, Any]) -> dict[str, Any] | None:
+    normalized_label = normalize(action_label)
+    for station in facts.get("stations", {}).values():
+        station_name = display_text(station.get("name"), "")
+        normalized_station = station_key(station_name)
+        if normalized_station and normalized_station in normalized_label:
+            return station
+    return None
+
+
+def coordinate_traced_by_any_fact(
+    lat: float,
+    lon: float,
+    facts: dict[str, Any],
+    explicit_coordinates: list[tuple[float, float]],
+) -> bool:
+    if coordinate_traced(lat, lon, facts.get("locations", []), explicit_coordinates):
+        return True
+    for station in facts.get("stations", {}).values():
+        if close_coordinates(lat, lon, station.get("lat"), station.get("lon")):
+            return True
+    return False
+
+
+def close_station_coordinates(lat: float, lon: float, expected_lat: Any, expected_lon: Any) -> bool:
+    other_lat = optional_float(expected_lat)
+    other_lon = optional_float(expected_lon)
+    if other_lat is None or other_lon is None:
+        return False
+    return abs(lat - other_lat) <= 0.0005 and abs(lon - other_lon) <= 0.0005
 
 
 def cost_contract_issues(props: dict) -> list[str]:
@@ -1604,6 +1859,14 @@ def values_match(rendered: Any, expected: Any) -> bool:
     if rendered_number is not None and expected_number is not None:
         return abs(rendered_number - expected_number) <= 0.1
     return str(rendered).strip() == str(expected).strip()
+
+
+def coordinate_value_matches(rendered: Any, expected: Any) -> bool:
+    rendered_number = optional_float(rendered)
+    expected_number = optional_float(expected)
+    if rendered_number is None or expected_number is None:
+        return str(rendered).strip() == str(expected).strip()
+    return abs(rendered_number - expected_number) <= 0.0005
 
 
 def optional_float(value: Any) -> float | None:
@@ -1743,7 +2006,7 @@ def summarize_block_for_context(block_type: str, props: dict) -> str:
     if block_type == "UrgentChargeCard":
         return (
             "Resultado previo de carga urgente: "
-            f"cargador cercano {props.get('nearest')}, distancia {props.get('distanceKm')} km, "
+            f"parada/punto de carga cercano {props.get('placeName') or props.get('nearest')}, distancia {props.get('distanceKm')} km, "
             f"batería {props.get('battery')}."
         )
     if block_type == "RecommendedStopCard":
@@ -1774,9 +2037,13 @@ def summarize_block_for_context(block_type: str, props: dict) -> str:
         )
     if block_type == "AlternativeStopsList":
         stops = props.get("stops") if isinstance(props.get("stops"), list) else []
-        stop_names = [str(stop.get("name")) for stop in stops if isinstance(stop, dict) and stop.get("name")]
+        stop_names = [
+            str(stop.get("placeName") or stop.get("name"))
+            for stop in stops
+            if isinstance(stop, dict) and (stop.get("placeName") or stop.get("name"))
+        ]
         if stop_names:
-            return "Cargadores mostrados: " + ", ".join(stop_names[:5])
+            return "Paradas mostradas: " + ", ".join(stop_names[:5])
     if block_type == "RiskExplanationCard":
         text = str(props.get("text") or "").strip()
         return f"Aviso mostrado: {text}" if text else ""
@@ -1813,7 +2080,7 @@ def urgent_charge_blocks(intent: ParsedIntent, location: ParsedLocation) -> list
                 {
                     "level": "alto",
                     "text": (
-                        f"No hay cargadores autorizados importados cerca de {location.label}. "
+                        f"No hay paradas con puntos de carga autorizados importados cerca de {location.label}. "
                         "No voy a inventar estaciones; comparte otra ubicación o coordenadas más precisas."
                     ),
                 },
@@ -1822,7 +2089,7 @@ def urgent_charge_blocks(intent: ParsedIntent, location: ParsedLocation) -> list
                 reason="urgent_charge",
                 title="Prueba con otra ubicación cercana",
                 body=(
-                    "No encuentro cargadores autorizados importados alrededor de esa ubicación. "
+                    "No encuentro paradas con puntos de carga autorizados alrededor de esa ubicación. "
                     "Comparte una ubicación más precisa o una ciudad cercana y volveré a comprobarlo."
                 ),
             ),
@@ -1833,7 +2100,7 @@ def urgent_charge_blocks(intent: ParsedIntent, location: ParsedLocation) -> list
     return [
         location_detail_block(
             location,
-            context="Ubicación usada para buscar cargadores urgentes",
+            context="Ubicación usada para buscar una parada de carga urgente",
             needs_confirmation=True,
         ),
         block(
@@ -1842,6 +2109,7 @@ def urgent_charge_blocks(intent: ParsedIntent, location: ParsedLocation) -> list
             {
                 "battery": intent.vehicle_fields.get("battery"),
                 "nearest": nearest.station.name,
+                "stationName": nearest.station.name,
                 "distanceKm": nearest.distance_km,
             },
         ),
@@ -1852,6 +2120,7 @@ def urgent_charge_blocks(intent: ParsedIntent, location: ParsedLocation) -> list
                 "stops": [
                     {
                         "name": item.station.name,
+                        "stationName": item.station.name,
                         "powerKw": item.max_power_kw,
                         "distanceKm": item.distance_km,
                     }
@@ -1865,7 +2134,7 @@ def urgent_charge_blocks(intent: ParsedIntent, location: ParsedLocation) -> list
             {
                 "level": "medio",
                 "text": (
-                    "Muestro cargadores autorizados importados cerca de la ubicación indicada. "
+                    "Muestro paradas con puntos de carga autorizados cerca de la ubicación indicada. "
                     "Confirma acceso final, tarifa y disponibilidad antes de depender de ellos."
                 ),
             },
@@ -1878,7 +2147,7 @@ def destination_charge_blocks(intent: ParsedIntent) -> list[dict]:
     if location is None:
         return [
             clarifying_block(
-                "Puedo buscar cargadores cerca de un hotel o destino, pero necesito una ciudad conocida o coordenadas.",
+                "Puedo buscar una parada de carga cerca de un hotel o destino, pero necesito una ciudad conocida o coordenadas.",
                 ["ciudad o coordenadas", "conector si lo sabes"],
             )
         ]
@@ -1897,17 +2166,17 @@ def destination_charge_blocks(intent: ParsedIntent) -> list[dict]:
                 "DestinationChargingCard",
                 {"destination": location.label, "needsConfirmation": True},
             ),
-            location_detail_block(
-                location,
-                context="Destino usado para buscar cargadores",
-                needs_confirmation=True,
-            ),
+                location_detail_block(
+                    location,
+                    context="Destino usado para buscar paradas de carga",
+                    needs_confirmation=True,
+                ),
             block(
                 f"risk-{uuid4().hex[:10]}",
                 "RiskExplanationCard",
                 {
                     "level": "alto",
-                    "text": "No hay cargadores autorizados importados cerca de ese destino. No voy a inventar estaciones.",
+                    "text": "No hay paradas con puntos de carga autorizados cerca de ese destino. No voy a inventar estaciones.",
                 },
             ),
         ]
@@ -1921,7 +2190,7 @@ def destination_charge_blocks(intent: ParsedIntent) -> list[dict]:
         ),
         location_detail_block(
             location,
-            context="Destino usado para buscar cargadores",
+            context="Destino usado para buscar paradas de carga",
             needs_confirmation=True,
         ),
         block(
@@ -1931,6 +2200,7 @@ def destination_charge_blocks(intent: ParsedIntent) -> list[dict]:
                 "stops": [
                     {
                         "name": item.station.name,
+                        "stationName": item.station.name,
                         "powerKw": item.max_power_kw,
                         "distanceKm": item.distance_km,
                     }
@@ -1943,7 +2213,7 @@ def destination_charge_blocks(intent: ParsedIntent) -> list[dict]:
             "RiskExplanationCard",
             {
                 "level": "medio",
-                "text": "Muestro cargadores autorizados importados cerca del destino. Confirma acceso final, tarifa y disponibilidad antes de depender de ellos.",
+                "text": "Muestro paradas con puntos de carga autorizados cerca del destino. Confirma acceso final, tarifa y disponibilidad antes de depender de ellos.",
             },
         ),
     ]
@@ -1974,7 +2244,7 @@ def route_planning_blocks(intent: ParsedIntent) -> list[dict]:
                 "text": (
                     "He decidido calcular ruta porque hay origen y destino. "
                     if intent.vehicle
-                    else "He decidido explorar cargadores en ruta. Sin datos completos del coche no calculo autonomía."
+                    else "He decidido explorar paradas de carga en ruta. Sin datos completos del coche no calculo autonomía."
                 )
             },
         ),
@@ -2003,6 +2273,7 @@ def route_planning_blocks(intent: ParsedIntent) -> list[dict]:
             "RecommendedStopCard",
             {
                 "name": station["name"],
+                "stationName": station["name"],
                 "powerKw": station["power_kw"],
                 "detourMin": station["detour_min"],
                 "confidence": "media",
@@ -2018,6 +2289,7 @@ def route_planning_blocks(intent: ParsedIntent) -> list[dict]:
                     "stops": [
                         {
                             "name": alternative.station["name"],
+                            "stationName": alternative.station["name"],
                             "powerKw": alternative.station["power_kw"],
                             "distanceKm": alternative.station["distance_to_route_km"],
                         }
@@ -2041,7 +2313,7 @@ def route_planning_blocks(intent: ParsedIntent) -> list[dict]:
                 {
                     "actions": [
                         {
-                            "label": "Abrir cargador en Maps",
+                            "label": "Abrir parada en Maps",
                             "functionCall": {
                                 "call": "openUrl",
                                 "args": {
@@ -2306,11 +2578,19 @@ def normalize_block_props(block_type: str, props: dict) -> dict:
         return {"question": str(question), "fields": fields}
     if block_type == "UrgentChargeCard":
         recommended_stop = props.get("recommendedStop") if isinstance(props.get("recommendedStop"), dict) else {}
+        place_name = (
+            props.get("placeName")
+            or props.get("locationName")
+            or props.get("stopName")
+            or recommended_stop.get("placeName")
+            or recommended_stop.get("locationName")
+        )
         nearest = (
             props.get("nearest")
-            or props.get("name")
             or props.get("stationName")
+            or props.get("name")
             or props.get("chargerName")
+            or recommended_stop.get("stationName")
             or recommended_stop.get("name")
             or props.get("station")
             or props.get("charger")
@@ -2327,14 +2607,34 @@ def normalize_block_props(block_type: str, props: dict) -> dict:
         distance_km = props.get("distanceKm")
         if distance_km is None:
             distance_km = recommended_stop.get("distanceKm")
-        return {
+        normalized = {
             "battery": battery,
-            "nearest": display_text(nearest, "Cargador cercano por confirmar"),
+            "nearest": display_text(nearest, "Punto de carga cercano por confirmar"),
+            "stationName": display_text(nearest, ""),
             "distanceKm": distance_km,
         }
+        if place_name:
+            normalized["placeName"] = display_text(place_name, "")
+        else:
+            normalized.pop("placeName", None)
+        return normalized
     if block_type == "RecommendedStopCard":
         recommended_stop = props.get("recommendedStop") if isinstance(props.get("recommendedStop"), dict) else {}
-        name = props.get("name") or recommended_stop.get("name") or props.get("station") or props.get("charger")
+        place_name = (
+            props.get("placeName")
+            or props.get("locationName")
+            or props.get("stopName")
+            or recommended_stop.get("placeName")
+            or recommended_stop.get("locationName")
+        )
+        name = (
+            props.get("stationName")
+            or props.get("name")
+            or recommended_stop.get("stationName")
+            or recommended_stop.get("name")
+            or props.get("station")
+            or props.get("charger")
+        )
         power_kw = props.get("powerKw")
         if power_kw is None:
             power_kw = recommended_stop.get("powerKw")
@@ -2344,14 +2644,20 @@ def normalize_block_props(block_type: str, props: dict) -> dict:
         detour_min = props.get("detourMin")
         if detour_min is None:
             detour_min = recommended_stop.get("detourMin")
-        return {
+        normalized = {
             **props,
-            "name": display_text(name, "Cargador recomendado"),
+            "name": display_text(name, "Punto de carga recomendado"),
+            "stationName": display_text(name, ""),
             "powerKw": power_kw,
             "distanceKm": distance_km,
             "detourMin": detour_min,
             "confidence": str(props.get("confidence") or recommended_stop.get("confidence") or "media"),
         }
+        if place_name:
+            normalized["placeName"] = display_text(place_name, "")
+        else:
+            normalized.pop("placeName", None)
+        return normalized
     if block_type == "DestinationChargingCard":
         destination = (
             props.get("destination")
@@ -2373,8 +2679,8 @@ def normalize_block_props(block_type: str, props: dict) -> dict:
         if nights is None:
             days = optional_float(props.get("days"))
             nights = max(1, int(days) - 1) if days is not None and days >= 1 else None
-        if nights is None and props.get("durationText"):
-            nights = nights_from_duration_text(str(props.get("durationText")))
+        if nights is None and (props.get("durationText") or props.get("duration")):
+            nights = nights_from_duration_text(str(props.get("durationText") or props.get("duration")))
         city = (
             props.get("city")
             or props.get("locationLabel")
@@ -2382,7 +2688,10 @@ def normalize_block_props(block_type: str, props: dict) -> dict:
             or props.get("location")
             or "Destino"
         )
+        chargers = props.get("chargers") if isinstance(props.get("chargers"), list) else []
         primary_stop = props.get("primaryStop") if isinstance(props.get("primaryStop"), dict) else {}
+        if not primary_stop and chargers and isinstance(chargers[0], dict):
+            primary_stop = chargers[0]
         recommendation = (
             props.get("recommendation")
             or props.get("plan")
@@ -2475,7 +2784,7 @@ def extra_blocks_from_props(block_type: str, props: dict, index: int) -> list[di
                     primary_stop,
                 )
             )
-        stops = props.get("stops") or props.get("alternatives")
+        stops = props.get("stops") or props.get("alternatives") or props.get("chargers")
         if isinstance(stops, list):
             extra.append(
                 block(

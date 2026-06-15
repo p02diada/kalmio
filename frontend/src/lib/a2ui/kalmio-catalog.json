@@ -2,8 +2,8 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
   "catalogId": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
-  "version": "v1",
-  "description": "Kalmio EV assistant A2UI catalog. Agents may use only these domain components and registered functions.",
+  "version": "v1.0",
+  "description": "Kalmio EV assistant A2UI catalog. Agents may use only these domain components and registered functions. Stop recommendations are place-first and backed by traceable charging-point data.",
   "components": {
     "AssistantMessage": {
       "type": "object",
@@ -53,7 +53,7 @@
     },
     "RecommendedStopCard": {
       "allOf": [
-        { "$ref": "#/$defs/stationDecisionProps" },
+        { "$ref": "#/$defs/stopDecisionProps" },
         { "$ref": "#/$defs/decisionProps" }
       ]
     },
@@ -76,7 +76,7 @@
         "stops": {
           "type": "array",
           "maxItems": 5,
-          "items": { "$ref": "#/$defs/stationDecisionProps" }
+          "items": { "$ref": "#/$defs/stopDecisionProps" }
         },
         "uncertainty": { "$ref": "#/$defs/uncertainty" }
       },
@@ -110,7 +110,7 @@
     },
     "UrgentChargeCard": {
       "allOf": [
-        { "$ref": "#/$defs/stationDecisionProps" },
+        { "$ref": "#/$defs/stopDecisionProps" },
         { "$ref": "#/$defs/decisionProps" },
         {
           "type": "object",
@@ -357,10 +357,24 @@
       },
       "additionalProperties": true
     },
-    "stationDecisionProps": {
+    "stopDecisionProps": {
       "type": "object",
       "properties": {
+        "placeName": { "$ref": "#/$defs/displayValue" },
+        "stationName": { "$ref": "#/$defs/displayValue" },
         "name": { "$ref": "#/$defs/displayValue" },
+        "address": { "$ref": "#/$defs/displayValue" },
+        "connectorTypes": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "maxItems": 8
+        },
+        "availableEvses": { "type": ["number", "null"], "minimum": 0 },
+        "amenities": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "maxItems": 12
+        },
         "powerKw": { "type": ["number", "null"], "minimum": 0 },
         "distanceKm": { "type": ["number", "null"], "minimum": 0 },
         "detourMin": { "type": ["number", "null"] },
@@ -370,6 +384,7 @@
       },
       "additionalProperties": true
     },
+    "stationDecisionProps": { "$ref": "#/$defs/stopDecisionProps" },
     "listItem": {
       "type": "object",
       "properties": {

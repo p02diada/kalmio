@@ -27,7 +27,13 @@ from routing.models import RoutePlan
 from routing.production_planner import score_exploration_station, station_to_score_payload
 from routing.providers import Coordinate, ProviderRoute, RoutingProviderError
 from routing.scoring import Preferences
-from routing.tools import parse_preferences_arg, resolve_location_tool, search_destination_chargers_tool
+from routing.tools import (
+    ConversationToolError,
+    parse_location_arg,
+    parse_preferences_arg,
+    resolve_location_tool,
+    search_destination_chargers_tool,
+)
 
 
 class StaticRouteProvider:
@@ -296,6 +302,7 @@ def test_urgent_charge_card_normalizes_nested_recommended_stop():
     assert blocks[0]["props"] == {
         "battery": 18,
         "nearest": "BALLENOIL-ES336090-COLON",
+        "stationName": "BALLENOIL-ES336090-COLON",
         "distanceKm": 0.3,
     }
 
@@ -377,6 +384,33 @@ def test_stay_planning_card_normalizes_stay_variants_and_extracts_primary_stop()
     assert blocks[1]["props"]["name"] == "ONCE DZ Cádiz"
 
 
+def test_stay_planning_card_extracts_chargers_variant_as_alternative_stops():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "stay",
+                "type": "StayPlanningCard",
+                "version": 1,
+                "props": {
+                    "duration": "1 semana",
+                    "location": {"label": "Cádiz", "lat": 36.5271, "lon": -6.2886},
+                    "chargers": [
+                        {
+                            "name": "ONCE DZ Cádiz",
+                            "powerKw": 22,
+                            "distanceKm": 0.23,
+                        }
+                    ],
+                },
+            }
+        ]
+    )
+
+    assert blocks[0]["props"] == {"nights": 7, "city": "Cádiz", "recommendation": "ONCE DZ Cádiz"}
+    assert blocks[1]["type"] == "AlternativeStopsList"
+    assert blocks[1]["props"]["stops"][0]["name"] == "ONCE DZ Cádiz"
+
+
 def test_urgent_tool_fallback_preserves_user_battery():
     blocks = blocks_from_tool_result(
         {
@@ -395,7 +429,11 @@ def test_urgent_tool_fallback_preserves_user_battery():
 def test_resolve_location_tool_accepts_accented_city_inside_zone_text():
     result = resolve_location_tool({"query": "Paseo de la Victoria de Córdoba"})
 
-    assert result == {"ok": True, "location": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794}}
+    assert result["ok"] is True
+    assert result["location"]["label"] == "Córdoba"
+    assert result["location"]["lat"] == 37.8882
+    assert result["location"]["lon"] == -4.7794
+    assert result["location"]["precision"] == "city_approximation"
 
 
 def test_resolve_location_tool_knows_new_route_matrix_cities():
@@ -476,6 +514,14 @@ def test_codex_prompt_guides_followups_without_backend_intent_mapping():
     assert "DestinationChargingCard + AlternativeStopsList" in prompt
     assert "preferences.max_useful_power_kw" in prompt
     assert "no presentes la potencia superior como ventaja" in prompt
+    assert "llama search_destination_chargers directamente" in prompt
+    assert "ida y vuelta, volver, regreso" in prompt
+    assert "pregunta por el origen" in prompt
+    assert "Una ciudad conocida ya es ubicación suficiente" in prompt
+    assert "no esperes hotel/zona exacta" in prompt
+    assert "no ActionButtons" in prompt
+    assert "No llames plan_route con coordenadas vacías o 0,0" in prompt
+    assert "incluye StayPlanningCard" in prompt
 
 
 def test_codex_prompt_exposes_max_useful_power_tool_argument():
@@ -484,6 +530,76 @@ def test_codex_prompt_exposes_max_useful_power_tool_argument():
     assert '"max_useful_power_kw":null' in prompt
     assert "pasa X como preferences.max_useful_power_kw" in prompt
     assert "que el coche no aprovechará más de 100 kW" in prompt
+
+
+def test_conversation_tool_rejects_placeholder_coordinates():
+    with pytest.raises(ConversationToolError, match="placeholder 0,0"):
+        parse_location_arg({"label": "", "lat": 0, "lon": 0})
+
+
+def test_a2ui_contract_rejects_empty_stops_without_station_tool_result():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "destination",
+                "type": "DestinationChargingCard",
+                "version": 1,
+                "props": {"destination": "Cádiz", "stops": []},
+            }
+        ]
+    )
+
+    issues = a2ui_contract_issues(blocks, tool_history=[], message="Voy una semana a Cádiz")
+
+    assert any("AlternativeStopsList.stops está vacío" in issue for issue in issues)
+
+
+def test_a2ui_contract_allows_empty_stops_after_station_tool_result():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "destination",
+                "type": "DestinationChargingCard",
+                "version": 1,
+                "props": {"destination": "Cádiz", "stops": []},
+            }
+        ]
+    )
+    tool_history = [
+        {
+            "call": {
+                "tool": "search_destination_chargers",
+                "args": {"location": {"label": "Cádiz", "lat": 36.5271, "lon": -6.2886}},
+            },
+            "result": {
+                "ok": True,
+                "tool": "search_destination_chargers",
+                "location": {"label": "Cádiz", "lat": 36.5271, "lon": -6.2886},
+                "stops": [],
+            },
+        }
+    ]
+
+    issues = a2ui_contract_issues(blocks, tool_history=tool_history, message="Voy una semana a Cádiz")
+
+    assert not any("AlternativeStopsList.stops está vacío" in issue for issue in issues)
+
+
+def test_a2ui_contract_rejects_found_chargers_copy_without_station_tool_result():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {"text": "Te muestro cargadores disponibles en Cádiz para tu estancia."},
+            }
+        ]
+    )
+
+    issues = a2ui_contract_issues(blocks, tool_history=[], message="Voy una semana a Cádiz")
+
+    assert any("sin resultado de herramienta trazable" in issue for issue in issues)
 
 
 def test_decode_codex_json_accepts_stdout_when_output_file_is_empty():
@@ -1634,7 +1750,7 @@ def test_action_buttons_accept_protocol_event_and_function_call():
                             "label": "Abrir en Maps",
                             "functionCall": {
                                 "call": "openUrl",
-                                "args": {"url": "https://www.google.com/maps/search/?api=1&query=37.88,-4.78"},
+                                "args": {"url": "https://www.google.com/maps/search/?api=1&query=Kalmio"},
                             },
                         },
                         {
@@ -1646,6 +1762,258 @@ def test_action_buttons_accept_protocol_event_and_function_call():
             }
         ],
         [],
+    )
+
+    assert issues == []
+
+
+def test_action_buttons_reject_station_navigation_with_wrong_coordinates_from_city_location():
+    station = {
+        "name": "E-V-Valencia-076",
+        "distance_km": 0.3,
+        "connectors": [{"type": "CCS2", "count": 2, "power_kw": 100, "available": True}],
+        "location": {"lat": 39.472345, "lon": -0.381234},
+    }
+    issues = a2ui_contract_issues(
+        [
+            {
+                "id": "actions",
+                "type": "ActionButtons",
+                "version": 1,
+                "props": {
+                    "actions": [
+                        {
+                            "label": "Navegar a E-V-Valencia-076",
+                            "functionCall": {
+                                "call": "openUrl",
+                                "args": {"url": "https://maps.google.com/?daddr=39.4699,-0.3763"},
+                            },
+                        }
+                    ]
+                },
+            }
+        ],
+        [],
+        history_blocks=[
+            {
+                "id": "previous-stops",
+                "type": "AlternativeStopsList",
+                "version": 1,
+                "props": {"stops": [station]},
+            }
+        ],
+    )
+
+    assert any("no coinciden con la estación trazable 'E-V-Valencia-076'" in issue for issue in issues)
+
+
+def test_action_buttons_accept_station_navigation_with_variant_station_coordinates():
+    station = {
+        "name": "E-V-Valencia-076",
+        "distance_km": 0.3,
+        "connectors": [{"type": "CCS2", "count": 2, "power_kw": 100, "available": True}],
+        "location": {"lat": 39.472345, "lon": -0.381234},
+    }
+    issues = a2ui_contract_issues(
+        [
+            {
+                "id": "actions",
+                "type": "ActionButtons",
+                "version": 1,
+                "props": {
+                    "actions": [
+                        {
+                            "label": "Navegar a E-V-Valencia-076",
+                            "functionCall": {
+                                "call": "openUrl",
+                                "args": {"url": "https://maps.google.com/?daddr=39.472345,-0.381234"},
+                            },
+                        }
+                    ]
+                },
+            }
+        ],
+        [],
+        history_blocks=[
+            {
+                "id": "previous-stops",
+                "type": "AlternativeStopsList",
+                "version": 1,
+                "props": {"stops": [station]},
+            }
+        ],
+    )
+
+    assert issues == []
+
+
+def test_variant_station_coordinates_are_validated_against_traced_history():
+    traced_station = {
+        "name": "E-V-Valencia-076",
+        "powerKw": 100,
+        "distanceKm": 0.3,
+        "lat": 39.472345,
+        "lon": -0.381234,
+    }
+    issues = a2ui_contract_issues(
+        [
+            {
+                "id": "stops",
+                "type": "AlternativeStopsList",
+                "version": 1,
+                "props": {
+                    "stops": [
+                        {
+                            "name": "E-V-Valencia-076",
+                            "distance_km": 0.3,
+                            "connectors": [{"type": "CCS2", "count": 2, "power_kw": 100, "available": True}],
+                            "location": {"lat": 39.4699, "lon": -0.3763},
+                        }
+                    ]
+                },
+            }
+        ],
+        [],
+        history_blocks=[
+            {
+                "id": "previous-stops",
+                "type": "AlternativeStopsList",
+                "version": 1,
+                "props": {"stops": [traced_station]},
+            }
+        ],
+    )
+
+    assert any("AlternativeStopsList.stops[0].lat no coincide" in issue for issue in issues)
+    assert any("AlternativeStopsList.stops[0].lon no coincide" in issue for issue in issues)
+
+
+def test_resolve_location_marks_poi_query_as_city_approximation():
+    result = resolve_location_tool({"query": "Atocha, Madrid"})
+
+    assert result["ok"] is True
+    assert result["location"]["label"] == "Madrid"
+    assert result["location"]["precision"] == "city_approximation"
+    assert result["location"]["query"] == "Atocha, Madrid"
+
+
+def test_structured_blocks_require_visible_copy_when_location_is_approximate():
+    tool_history = [
+        {
+            "call": {"tool": "resolve_location", "args": {"query": "Atocha, Madrid"}},
+            "result": {
+                "ok": True,
+                "location": {
+                    "label": "Madrid",
+                    "lat": 40.4168,
+                    "lon": -3.7038,
+                    "precision": "city_approximation",
+                    "query": "Atocha, Madrid",
+                },
+            },
+        },
+        {
+            "call": {
+                "tool": "search_destination_chargers",
+                "args": {"location": {"label": "Madrid", "lat": 40.4168, "lon": -3.7038}},
+            },
+            "result": {
+                "ok": True,
+                "tool": "search_destination_chargers",
+                "location": {"label": "Madrid", "lat": 40.4168, "lon": -3.7038},
+                "stops": [
+                    {
+                        "name": "Telpark - Plaza del Carmen",
+                        "powerKw": 360,
+                        "distanceKm": 0.23,
+                        "availableEvses": 23,
+                        "lat": 40.418803,
+                        "lon": -3.703231,
+                    }
+                ],
+            },
+        },
+    ]
+    issues = a2ui_contract_issues(
+        [
+            {
+                "id": "urgent",
+                "type": "UrgentChargeCard",
+                "version": 1,
+                "props": {
+                    "battery": 8,
+                    "nearest": "Telpark - Plaza del Carmen",
+                    "distanceKm": 0.23,
+                    "risk": "Batería crítica. Ve al cargador cercano.",
+                },
+            }
+        ],
+        tool_history,
+        "Estoy cerca de Atocha, Madrid",
+    )
+
+    assert any("'Atocha, Madrid' -> 'Madrid'" in issue for issue in issues)
+
+
+def test_structured_blocks_allow_visible_copy_when_location_is_approximate():
+    tool_history = [
+        {
+            "call": {"tool": "resolve_location", "args": {"query": "Atocha, Madrid"}},
+            "result": {
+                "ok": True,
+                "location": {
+                    "label": "Madrid",
+                    "lat": 40.4168,
+                    "lon": -3.7038,
+                    "precision": "city_approximation",
+                    "query": "Atocha, Madrid",
+                },
+            },
+        },
+        {
+            "call": {
+                "tool": "search_destination_chargers",
+                "args": {"location": {"label": "Madrid", "lat": 40.4168, "lon": -3.7038}},
+            },
+            "result": {
+                "ok": True,
+                "tool": "search_destination_chargers",
+                "location": {"label": "Madrid", "lat": 40.4168, "lon": -3.7038},
+                "stops": [
+                    {
+                        "name": "Telpark - Plaza del Carmen",
+                        "powerKw": 360,
+                        "distanceKm": 0.23,
+                        "availableEvses": 23,
+                        "lat": 40.418803,
+                        "lon": -3.703231,
+                    }
+                ],
+            },
+        },
+    ]
+    issues = a2ui_contract_issues(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {"text": "No tengo la ubicación exacta de Atocha; uso Madrid como aproximación."},
+            },
+            {
+                "id": "urgent",
+                "type": "UrgentChargeCard",
+                "version": 1,
+                "props": {
+                    "battery": 8,
+                    "nearest": "Telpark - Plaza del Carmen",
+                    "distanceKm": 0.23,
+                    "risk": "Batería crítica. Ve al cargador cercano.",
+                },
+            },
+        ],
+        tool_history,
+        "Estoy cerca de Atocha, Madrid",
     )
 
     assert issues == []

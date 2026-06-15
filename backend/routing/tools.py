@@ -50,16 +50,34 @@ def execute_conversation_tool(call: ToolCall) -> dict[str, Any]:
 
 
 def resolve_location_tool(args: dict[str, Any]) -> dict[str, Any]:
-    query = normalize_location_query(str(args.get("query") or "").strip())
+    raw_query = str(args.get("query") or "").strip()
+    query = normalize_location_query(raw_query)
     for key, (label, lat, lon) in KNOWN_LOCATIONS.items():
         if key in query:
-            return {"ok": True, "location": {"label": label, "lat": lat, "lon": lon}}
+            return {
+                "ok": True,
+                "location": {
+                    "label": label,
+                    "lat": lat,
+                    "lon": lon,
+                    "precision": location_resolution_precision(query, key),
+                    "query": raw_query,
+                },
+            }
     return {"ok": False, "error": "No conozco esa ubicación. Pide ciudad o coordenadas exactas."}
 
 
 def normalize_location_query(value: str) -> str:
     substitutions = str.maketrans("áéíóúüñ", "aeiouun")
     return value.lower().translate(substitutions)
+
+
+def location_resolution_precision(query: str, matched_key: str) -> str:
+    if query.strip(" .,") == matched_key:
+        return "known_location"
+    if any(term in query for term in ("hotel", "calle", "paseo", "avenida", "plaza", "melia", "alhambra", "atocha")):
+        return "city_approximation"
+    return "known_location"
 
 
 def search_destination_chargers_tool(args: dict[str, Any]) -> dict[str, Any]:
@@ -78,6 +96,7 @@ def search_destination_chargers_tool(args: dict[str, Any]) -> dict[str, Any]:
     stops = [
         {
             "name": item.station.name,
+            "stationName": item.station.name,
             "powerKw": item.max_power_kw,
             "distanceKm": item.distance_km,
             "connectorTypes": item.connector_types,
@@ -96,10 +115,10 @@ def search_destination_chargers_tool(args: dict[str, Any]) -> dict[str, Any]:
         "location": location,
         "stops": stops,
         "warnings": [
-            "Datos procedentes solo de cargadores autorizados importados.",
+            "Datos procedentes solo de puntos de carga autorizados importados.",
             "Confirma acceso final, tarifa y disponibilidad antes de depender de ellos.",
         ],
-        "error": None if stops else "No hay cargadores autorizados importados cerca de esa ubicación.",
+        "error": None if stops else "No hay puntos de carga autorizados importados cerca de esa ubicación.",
     }
 
 
@@ -146,6 +165,7 @@ def plan_route_tool(args: dict[str, Any]) -> dict[str, Any]:
 def station_score_payload(score) -> dict[str, Any]:
     return {
         "name": score.station["name"],
+        "stationName": score.station["name"],
         "powerKw": score.station["power_kw"],
         "distanceKm": score.station["distance_to_route_km"],
         "detourMin": score.station["detour_min"],
@@ -163,11 +183,16 @@ def station_score_payload(score) -> dict[str, Any]:
 def parse_location_arg(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ConversationToolError("La herramienta necesita una ubicación estructurada.")
-    label = str(value.get("label") or "Ubicación indicada").strip()[:120]
+    raw_label = value.get("label")
+    label = str(raw_label or "Ubicación indicada").strip()[:120]
     lat = bounded_float(value.get("lat"), default=None, minimum=-90, maximum=90)
     lon = bounded_float(value.get("lon"), default=None, minimum=-180, maximum=180)
     if lat is None or lon is None:
         raise ConversationToolError("La herramienta necesita latitud y longitud válidas.")
+    if lat == 0 and lon == 0:
+        raise ConversationToolError("La herramienta recibió coordenadas placeholder 0,0; pide origen o destino reales.")
+    if raw_label is not None and not str(raw_label).strip():
+        raise ConversationToolError("La herramienta necesita una etiqueta de ubicación real, no vacía.")
     return {"label": label, "lat": lat, "lon": lon}
 
 

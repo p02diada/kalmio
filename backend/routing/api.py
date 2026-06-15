@@ -305,7 +305,7 @@ def preferences_from_payload(payload: ConversationRoutePlanRequest) -> Preferenc
 def serialize_plan(plan: ProductionPlanResult, payload: RoutePlanRequest, route_plan: RoutePlan | None = None) -> dict:
     warnings = [
         *plan.warnings,
-        "El tiempo de acceso al cargador se estima por distancia a la geometría de ruta; confirma navegación final.",
+        "El tiempo de acceso al punto de carga se estima por distancia a la geometría de ruta; confirma navegación final.",
     ]
     if plan.planning_level == "chargers_only":
         warnings.append("No uses esta respuesta como garantía de llegada: no hay datos de autonomía ni compatibilidad.")

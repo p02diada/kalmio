@@ -39,7 +39,7 @@ export function A2UIRenderer({
   const actions = { onChipClick, onActionEvent, onLocationSubmit, onManualLocationRequest }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-w-0 max-w-full flex-col gap-3">
       {blocks.map((block) => (
         <A2UIBoundary key={block.id} block={block} actions={actions} />
       ))}
@@ -96,11 +96,14 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
           ]}
         />
       )
-    case 'RecommendedStopCard':
+    case 'RecommendedStopCard': {
+      const title = stopTitle(block.props)
+      const station = stationLabel(block.props)
       return (
         <RecommendationCard
           icon={BatteryCharging}
-          title={text(block.props.name)}
+          title={title}
+          station={station !== title ? station : ''}
           rows={[
             ['Potencia', metric(block.props.powerKw, 'kW')],
             ['Distancia', metric(block.props.distanceKm, 'km')],
@@ -109,10 +112,11 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
           ]}
         />
       )
+    }
     case 'AlternativeRoutesList':
       return <ListCard title="Rutas alternativas" items={list(block.props.routes)} />
     case 'AlternativeStopsList':
-      return <ListCard title="Cargadores alternativos" items={list(block.props.stops)} />
+      return <ListCard title="Otras paradas viables" items={list(block.props.stops)} itemKind="stop" />
     case 'RiskExplanationCard':
       return <RiskBand level={text(block.props.level, 'medio')} body={text(block.props.text)} />
     case 'CostComparisonCard':
@@ -127,24 +131,28 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
           ]}
         />
       )
-    case 'UrgentChargeCard':
+    case 'UrgentChargeCard': {
+      const title = stopTitle(block.props, text(block.props.nearest, 'Parada por confirmar'))
+      const station = stationLabel(block.props)
       return (
         <MetricCard
           icon={BatteryCharging}
-          title="Carga urgente"
+          title="Dónde ir ahora"
           tone="warning"
-          rows={[
+          rows={compactRows([
             ['Batería', percentOrUnknown(block.props.battery)],
-            ['Más cercano', text(block.props.nearest)],
+            ['Parada', title],
+            station && station !== title ? ['Punto', station] : null,
             ['Distancia', metric(block.props.distanceKm, 'km')],
-          ]}
+          ])}
         />
       )
+    }
     case 'DestinationChargingCard':
       return (
         <MetricCard
           icon={MapPinned}
-          title="Carga en destino"
+          title="Plan al llegar"
           tone="assistant"
           rows={[
             ['Destino', text(block.props.destination)],
@@ -208,9 +216,16 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
       return <LocationDetailCard block={block} />
     case 'PreferenceChips':
       return (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex min-w-0 max-w-full flex-wrap gap-2">
               {strings(block.props.chips).map((chip) => (
-                <Button key={chip} type="button" variant="outline" size="sm" onClick={() => actions.onChipClick?.(chip)}>
+                <Button
+                  key={chip}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-auto min-h-9 max-w-full min-w-0 whitespace-normal break-words text-left leading-5"
+                  onClick={() => actions.onChipClick?.(chip)}
+                >
                   {chip}
                 </Button>
               ))}
@@ -288,14 +303,14 @@ function LocationRequestCard({
           </div>
         ) : null}
         <div className="grid gap-2 sm:grid-cols-2">
-          <Button type="button" className="h-11 w-full font-semibold" onClick={requestLocation} disabled={status === 'pending'}>
+          <Button type="button" className="h-auto min-h-11 w-full whitespace-normal font-semibold leading-5" onClick={requestLocation} disabled={status === 'pending'}>
             <Navigation className="size-4" aria-hidden="true" />
             {status === 'pending' ? 'Solicitando...' : 'Usar mi ubicación'}
           </Button>
           <Button
             type="button"
             variant="outline"
-            className="h-11 w-full"
+            className="h-auto min-h-11 w-full whitespace-normal leading-5"
             onClick={() => {
               setStatus('manual')
               onManualLocationRequest?.()
@@ -452,10 +467,12 @@ function MetricCard({
 function RecommendationCard({
   icon: Icon,
   title,
+  station,
   rows,
 }: {
   icon: typeof Route
   title: string
+  station?: string
   rows: Array<[string, string]>
 }) {
   return (
@@ -466,8 +483,13 @@ function RecommendationCard({
             <Icon className="size-4" aria-hidden="true" />
           </span>
           <span className="flex min-w-0 flex-col gap-1">
-            <span className="text-caption font-medium text-primary-foreground/70">Recomendación principal</span>
-            <span className="truncate">{title || 'Cargador recomendado'}</span>
+            <span className="text-caption font-medium text-primary-foreground/70">Parada recomendada</span>
+            <span className="truncate">{title || 'Parada recomendada'}</span>
+            {station ? (
+              <span className="truncate text-caption font-medium text-primary-foreground/70">
+                Punto de carga: {station}
+              </span>
+            ) : null}
           </span>
         </CardTitle>
       </CardHeader>
@@ -495,7 +517,15 @@ function MetricGridRows({ rows, inverted = false }: { rows: Array<[string, strin
   )
 }
 
-function ListCard({ title, items }: { title: string; items: RecordList }) {
+function ListCard({
+  title,
+  items,
+  itemKind = 'default',
+}: {
+  title: string
+  items: RecordList
+  itemKind?: 'default' | 'stop'
+}) {
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -504,16 +534,16 @@ function ListCard({ title, items }: { title: string; items: RecordList }) {
       <CardContent>
         <div className="flex flex-col divide-y divide-border">
         {items.map((item, index) => (
-          <div key={`${text(item.name)}-${index}`} className="flex items-center gap-3 py-2.5 text-sm first:pt-0 last:pb-0">
+          <div key={`${itemKind === 'stop' ? stopTitle(item, 'Parada') : text(item.name)}-${index}`} className="flex items-center gap-3 py-2.5 text-sm first:pt-0 last:pb-0">
             <span className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
               {index + 1}
             </span>
             <div className="min-w-0 flex-1">
-              <div className="truncate font-semibold tracking-tight">{text(item.name)}</div>
+              <div className="truncate font-semibold tracking-tight">
+                {itemKind === 'stop' ? stopTitle(item, 'Parada') : text(item.name)}
+              </div>
               <div className="text-muted-foreground">
-                {isKnownNumber(item.powerKw)
-                  ? `${metric(item.powerKw, 'kW')}${isKnownNumber(item.distanceKm) ? ` · ${metric(item.distanceKm, 'km')}` : ''}`
-                  : metric(item.deltaMin, 'min de diferencia')}
+                {itemKind === 'stop' ? stopDetails(item) : routeDetails(item)}
               </div>
             </div>
           </div>
@@ -580,25 +610,28 @@ function ActionButtons({
   onActionEvent?: (name: string, context?: Record<string, unknown>, sourceComponentId?: string) => void
 }) {
   return (
-    <div className="grid gap-2 sm:grid-cols-2">
+    <div className="grid min-w-0 max-w-full gap-2 sm:grid-cols-2">
       {actions.map((action, index) => {
         const target = actionTarget(action)
         const isDisabled = bool(action.disabled) || target === null
         const isPrimary = text(action.priority, '') === 'primary' || (index === 0 && !isDisabled && !text(action.priority, ''))
 
         return (
-          <div key={`${text(action.label)}-${index}`} className="flex flex-col gap-1">
+          <div key={`${text(action.label)}-${index}`} className="flex min-w-0 flex-col gap-1">
             <Button
               type="button"
               disabled={isDisabled}
               variant={isPrimary ? 'default' : 'outline'}
-              className={isPrimary ? 'h-11 w-full font-bold' : 'h-11 w-full'}
+              className={cn(
+                'h-auto min-h-11 w-full min-w-0 whitespace-normal break-words px-3 py-2 text-left leading-5',
+                isPrimary && 'font-bold',
+              )}
               onClick={() => handleAction(target, onActionEvent, sourceComponentId)}
             >
               {text(action.label)}
             </Button>
             {(isDisabled && text(action.reason, '')) || (!bool(action.disabled) && target === null) ? (
-              <p className="max-w-48 text-xs leading-5 text-muted-foreground">
+              <p className="max-w-full text-xs leading-5 text-muted-foreground">
                 {text(action.reason, '') || 'Esta acción no está disponible en este contexto.'}
               </p>
             ) : null}
@@ -693,6 +726,42 @@ function text(value: unknown, fallback = 'No disponible') {
     return text(value.label ?? value.name ?? value.title ?? value.text ?? value.value, fallback)
   }
   return fallback
+}
+
+function stopTitle(value: Record<string, unknown>, fallback = 'Parada recomendada') {
+  return text(
+    value.placeName ?? value.locationName ?? value.stopName ?? value.name ?? value.stationName ?? value.nearest,
+    fallback,
+  )
+}
+
+function stationLabel(value: Record<string, unknown>) {
+  return text(value.stationName ?? value.name ?? value.nearest ?? value.chargerName, '')
+}
+
+function stopDetails(item: Record<string, unknown>) {
+  const title = stopTitle(item, 'Parada')
+  const station = stationLabel(item)
+  const stationDetail = station && station !== title ? `Punto de carga: ${station}` : ''
+  const metrics = isKnownNumber(item.powerKw)
+    ? `${metric(item.powerKw, 'kW')}${isKnownNumber(item.distanceKm) ? ` · ${metric(item.distanceKm, 'km')}` : ''}`
+    : metric(item.deltaMin, 'min de diferencia')
+
+  return compactParts([stationDetail, metrics]).join(' · ')
+}
+
+function routeDetails(item: Record<string, unknown>) {
+  return isKnownNumber(item.powerKw)
+    ? `${metric(item.powerKw, 'kW')}${isKnownNumber(item.distanceKm) ? ` · ${metric(item.distanceKm, 'km')}` : ''}`
+    : metric(item.deltaMin, 'min de diferencia')
+}
+
+function compactRows(rows: Array<[string, string] | null>): Array<[string, string]> {
+  return rows.filter((row): row is [string, string] => row !== null && row[1].trim().length > 0)
+}
+
+function compactParts(parts: string[]) {
+  return parts.map((part) => part.trim()).filter(Boolean)
 }
 
 function percentOrUnknown(value: unknown) {
