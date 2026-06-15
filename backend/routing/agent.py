@@ -338,7 +338,7 @@ def codex_prompt(
         '"radius_km":80,"limit":3}\n'
         "- plan_route: calcula ruta y paradas con proveedor y datos autorizados. Args: "
         '{"origin":{"label":"...","lat":0,"lon":0},"destination":{"label":"...","lat":0,"lon":0},'
-        '"vehicle":null,"preferences":{"reserve_min_percent":20},"corridor_radius_km":25}\n'
+        '"vehicle":null,"preferences":{"reserve_min_percent":20,"max_useful_power_kw":null},"corridor_radius_km":25}\n'
         "Ubicaciones internas conocidas que puedes usar para argumentos de herramienta, sin inventar otras coordenadas: "
         f"{json.dumps(known_locations, ensure_ascii=False)}.\n"
     )
@@ -364,6 +364,28 @@ def codex_prompt(
         "stops[0].name y sus métricas trazables; evita placeholders como cargador por confirmar cuando ya hay estaciones.\n"
         "- Si una herramienta permitida falla, responde con una explicación específica al contexto y una siguiente acción mínima; "
         "no fabriques resultados para tapar el fallo.\n"
+        "- En urgencia o batería baja, muestra pocos pasos: una recomendación principal, como mucho 2 alternativas, riesgo explícito "
+        "y un CTA de navegación si tienes lat/lon trazables. Si conoces la batería, inclúyela en UrgentChargeCard.\n"
+        "- Con batería muy baja (aprox. 10% o menos) o el usuario no conoce la zona, prioriza menor riesgo: distancia corta, más conectores/EVSEs, fiabilidad, "
+        "potencia compatible y una navegación clara. No listes muchas opciones y marca el riesgo como alto si el margen es crítico.\n"
+        "- Si el cargador previsto está ocupado, no repitas ese mismo cargador como plan B. Usa alternativas ya validadas o vuelve a buscar "
+        "en la ubicación previa, ordenando por menor riesgo y explicando que la disponibilidad puede cambiar.\n"
+        "- Si el usuario está en carretera y quiere poco desvío, piensa en corredor/ruta: pide carretera, destino u origen-destino si faltan. "
+        "Si hay origen y destino suficientes, usa plan_route; no reduzcas el caso a una búsqueda urbana cerca de una ciudad cualquiera.\n"
+        "- En rutas con solo porcentaje de batería pero sin consumo, capacidad o modelo fiable, puedes mostrar cargadores en ruta, "
+        "pero no digas que cumple llegada, reserva mínima, pocas paradas o 'me da' como hecho. Pide modelo/consumo/autonomía para verificarlo.\n"
+        "- Si el usuario dice que su coche carga como máximo a X kW o que no necesita ultrarrápidos, pasa X como "
+        "preferences.max_useful_power_kw en plan_route si haces esa llamada. Si aun así una estación de más potencia es la mejor por "
+        "corredor, fiabilidad o conectores, explícale explícitamente que el cargador ofrece más potencia de la que su coche aprovechará, "
+        "que no la eliges por esos kW extra y no presentes la potencia superior como ventaja.\n"
+        "- Si el usuario pide una restricción dura de llegada, como llegar con 25% o no llegar justo, trátala como límite que no puedes validar "
+        "sin perfil de vehículo; no la presentes como cumplida si plan_route devuelve planningLevel=chargers_only.\n"
+        "- Para viajes futuros, recuerda que disponibilidad, tarifas y acceso pueden cambiar antes de la salida.\n"
+        "- Si el usuario viaja con niños o pide comodidad, prioriza hubs, servicios, baños, cafetería/restaurante, fiabilidad, dirección clara y baja complejidad. "
+        "Si la herramienta no trae servicios suficientes, dilo explícitamente y usa los datos trazables disponibles; no finjas servicios.\n"
+        "- En hotel, destino o estancia, si hay ciudad/POI suficiente, puedes buscar cargadores alrededor como aproximación sin convertirlo en ruta. "
+        "Si la herramienta devuelve stops, muestra bloques estructurados como DestinationChargingCard/StayPlanningCard y AlternativeStopsList o RecommendedStopCard; no dejes las estaciones solo en texto.\n"
+        "- Si el usuario menciona una estancia de varios días, piensa en carga durante la estancia y posible vuelta. Si falta origen para ida/vuelta, pídelo; si no, busca carga en destino.\n"
         "Ejemplos críticos que debes seguir por analogía, no como reglas rígidas:\n"
         "- Usuario: 'Necesito cargar ya' -> pide solo ubicación actual/ciudad/zona/coordenadas; no pidas destino, consumo ni hotel.\n"
         "- Historial: urgencia sin ubicación. Usuario: 'En Córdoba' -> usa Córdoba para buscar cargadores cercanos y devuelve "
@@ -374,6 +396,19 @@ def codex_prompt(
         "todavía y que usas Córdoba como aproximación; si muestras cargadores, deja claro ese límite.\n"
         "- Usuario: 'Voy a dormir en Valencia, busca cargadores cerca del hotel' -> no lo conviertas en ruta; puedes buscar Valencia como "
         "aproximación o pedir hotel/zona para precisión.\n"
+        "- Historial: hotel sin cargador y el usuario añade 'Valencia centro' -> busca cargadores en Valencia centro y devuelve "
+        "DestinationChargingCard + AlternativeStopsList o RecommendedStopCard con estaciones trazables.\n"
+        "- Usuario: 'Voy el finde a Granada y duermo cerca de la Alhambra' -> si conoces Alhambra/Granada, busca cargadores cerca como "
+        "destino aproximado y explica que el hotel exacto afinaría la búsqueda.\n"
+        "- Usuario: 'El cargador al que iba está ocupado, dame un plan B' tras una recomendación -> usa la siguiente alternativa trazable "
+        "y devuelve bloques estructurados, no solo texto.\n"
+        "- Usuario: 'Estoy en carretera con 18%, no quiero desviarme mucho' sin ruta ni ubicación -> pregunta por carretera/destino o "
+        "coordenadas actuales, porque el corredor es crítico.\n"
+        "- Usuario: 'Voy de Zaragoza a Barcelona y quiero llegar con al menos 25%' sin consumo/modelo -> busca cargadores si puedes, "
+        "pero di que no puedes validar ese 25% todavía y pide perfil del coche o consumo.\n"
+        "- Usuario: 'Mi coche carga máximo a 100 kW, no necesito ultrarrápidos. Voy de Madrid a Valencia' -> usa "
+        "preferences.max_useful_power_kw=100 si planificas ruta; si la parada trazable ofrece 240 kW, di que el coche no aprovechará "
+        "más de 100 kW y que la recomiendas por ubicación/fiabilidad/conectores, no por ultrapotencia.\n"
     )
     catalog_instructions = (
         "Catálogo A2UI permitido por propósito, no por reglas rígidas de intención:\n"
@@ -675,6 +710,7 @@ def a2ui_contract_issues(
     history_blocks: list[dict] | None = None,
 ) -> list[str]:
     facts = tool_fact_index(tool_history, history_blocks=history_blocks or [])
+    facts["vehicle"].update(parse_vehicle_fields(normalize(message)))
     explicit_coordinates = coordinates_from_text(message)
     issues: list[str] = []
 
@@ -695,6 +731,7 @@ def a2ui_contract_issues(
             issues.extend(required_station_reference_contract_issues("UrgentChargeCard.nearest", props.get("nearest"), facts))
             issues.extend(station_reference_contract_issues("UrgentChargeCard.nearest", props.get("nearest"), facts))
             issues.extend(station_metric_contract_issues("UrgentChargeCard", {"name": props.get("nearest"), **props}, facts))
+            issues.extend(urgent_battery_contract_issues(props, facts))
         elif block_type == "RouteSummaryCard":
             issues.extend(route_summary_contract_issues(props, facts))
         elif block_type == "LocationDetailCard":
@@ -705,12 +742,14 @@ def a2ui_contract_issues(
             issues.extend(action_buttons_contract_issues(props))
         elif block_type == "CostComparisonCard":
             issues.extend(cost_contract_issues(props))
+        elif block_type == "RiskExplanationCard":
+            issues.extend(risk_explanation_contract_issues(props))
 
     return dedupe_preserve_order(issues)
 
 
 def tool_fact_index(tool_history: list[dict[str, Any]], history_blocks: list[dict] | None = None) -> dict[str, Any]:
-    facts: dict[str, Any] = {"stations": {}, "locations": [], "routes": []}
+    facts: dict[str, Any] = {"stations": {}, "locations": [], "routes": [], "vehicle": {}}
     add_history_facts(facts, history_blocks or [])
     for entry in tool_history:
         if not isinstance(entry, dict):
@@ -745,7 +784,10 @@ def add_history_facts(facts: dict[str, Any], history_blocks: list[dict]) -> None
             continue
         block_type = item.get("type")
         props = item.get("props") if isinstance(item.get("props"), dict) else {}
-        if block_type == "AlternativeStopsList":
+        if block_type == "UserMessage":
+            text = str(props.get("text") or "")
+            facts["vehicle"].update(parse_vehicle_fields(normalize(text)))
+        elif block_type == "AlternativeStopsList":
             stops = props.get("stops")
             if isinstance(stops, list):
                 for stop in stops:
@@ -860,6 +902,18 @@ def station_metric_contract_issues(label: str, props: dict, facts: dict[str, Any
     return issues
 
 
+def urgent_battery_contract_issues(props: dict, facts: dict[str, Any]) -> list[str]:
+    expected = facts.get("vehicle", {}).get("battery")
+    if expected is None:
+        return []
+    rendered = props.get("battery")
+    if rendered is None:
+        return ["UrgentChargeCard.battery debe conservar la batería explícita del conductor."]
+    if not values_match(rendered, expected):
+        return ["UrgentChargeCard.battery no coincide con la batería explícita del conductor."]
+    return []
+
+
 def route_summary_contract_issues(props: dict, facts: dict[str, Any]) -> list[str]:
     if not facts["routes"]:
         return ["RouteSummaryCard necesita un resultado plan_route trazable."]
@@ -926,6 +980,21 @@ def cost_contract_issues(props: dict) -> list[str]:
     for field in ("estimatedCostEur", "savingEur", "price", "pricePerKwh"):
         if props.get(field) is not None:
             return ["CostComparisonCard no puede mostrar costes porque ninguna herramienta actual devuelve precios."]
+    return []
+
+
+def risk_explanation_contract_issues(props: dict) -> list[str]:
+    text = display_text(props.get("text"), "")
+    normalized = normalize(text).strip(" .:")
+    if len(normalized) < 20 or normalized in {
+        "antes de salir",
+        "antes de confiar en ellas",
+        "datos",
+        "riesgo",
+        "aviso",
+        "precaucion",
+    }:
+        return ["RiskExplanationCard.text debe explicar la incertidumbre o el riesgo de forma concreta."]
     return []
 
 
@@ -1660,6 +1729,10 @@ def normalize_block_props(block_type: str, props: dict) -> dict:
             battery = props.get("batteryPercent")
         if battery is None:
             battery = props.get("battery_percent")
+        if battery is None:
+            battery = props.get("batteryLevel")
+        if battery is None:
+            battery = props.get("currentBattery")
         distance_km = props.get("distanceKm")
         if distance_km is None:
             distance_km = recommended_stop.get("distanceKm")
@@ -1692,6 +1765,9 @@ def normalize_block_props(block_type: str, props: dict) -> dict:
         destination = (
             props.get("destination")
             or props.get("location")
+            or props.get("locationLabel")
+            or props.get("hotel")
+            or props.get("hotelName")
             or props.get("city")
             or props.get("label")
             or props.get("name")
@@ -1700,6 +1776,32 @@ def normalize_block_props(block_type: str, props: dict) -> dict:
         return {
             "destination": display_text(destination, "Destino aproximado"),
             "needsConfirmation": bool(props.get("needsConfirmation", props.get("approximate", True))),
+        }
+    if block_type == "StayPlanningCard":
+        nights = props.get("nights")
+        if nights is None:
+            days = optional_float(props.get("days"))
+            nights = max(1, int(days) - 1) if days is not None and days >= 1 else None
+        if nights is None and props.get("durationText"):
+            nights = nights_from_duration_text(str(props.get("durationText")))
+        city = (
+            props.get("city")
+            or props.get("locationLabel")
+            or props.get("destination")
+            or props.get("location")
+            or "Destino"
+        )
+        primary_stop = props.get("primaryStop") if isinstance(props.get("primaryStop"), dict) else {}
+        recommendation = (
+            props.get("recommendation")
+            or props.get("plan")
+            or primary_stop.get("name")
+            or "Controlar carga cerca del alojamiento y confirmar antes de depender de ella."
+        )
+        return {
+            "nights": nights,
+            "city": display_text(city, "Destino"),
+            "recommendation": display_text(recommendation, "Controlar carga cerca del alojamiento."),
         }
     if block_type == "RiskExplanationCard":
         text_value = props.get("text") or props.get("message") or props.get("description")
@@ -1771,9 +1873,47 @@ def extra_blocks_from_props(block_type: str, props: dict, index: int) -> list[di
                 {"stops": props["stops"]},
             )
         ]
+    if block_type == "StayPlanningCard":
+        extra = []
+        primary_stop = props.get("primaryStop") if isinstance(props.get("primaryStop"), dict) else None
+        if primary_stop:
+            extra.append(
+                block(
+                    f"stay-stop-{index}-{uuid4().hex[:8]}",
+                    "RecommendedStopCard",
+                    primary_stop,
+                )
+            )
+        stops = props.get("stops") or props.get("alternatives")
+        if isinstance(stops, list):
+            extra.append(
+                block(
+                    f"stay-stops-{index}-{uuid4().hex[:8]}",
+                    "AlternativeStopsList",
+                    {"stops": stops},
+                )
+            )
+        return extra
     return []
 
 
 def normalize(value: str) -> str:
     substitutions = str.maketrans("áéíóúüñ", "aeiouun")
     return value.lower().translate(substitutions)
+
+
+def first_number(value: str) -> int | None:
+    match = re.search(r"\d+", value)
+    return int(match.group(0)) if match else None
+
+
+def nights_from_duration_text(value: str) -> int | None:
+    normalized = normalize(value)
+    number = first_number(normalized)
+    if "semana" in normalized:
+        return (number or 1) * 7
+    if "finde" in normalized or "fin de semana" in normalized:
+        return 2
+    if "dia" in normalized and number is not None:
+        return max(1, number - 1)
+    return number

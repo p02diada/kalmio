@@ -178,13 +178,16 @@ def station_to_exploration_payload(station: Station, distance_to_route_km: float
 def score_exploration_station(station: dict, preferences: Preferences, plan_type: PlanType) -> StationScore:
     score = 45.0
     reasons = ["Cargador en el corredor"]
+    effective_power_kw = min(station["power_kw"], preferences.max_useful_power_kw or station["power_kw"])
 
-    if station["power_kw"] >= 150:
+    if effective_power_kw >= 150:
         score += 10
         reasons.append("Alta potencia")
-    elif station["power_kw"] >= 50:
+    elif effective_power_kw >= 50:
         score += 5
         reasons.append("Carga rápida")
+    if preferences.max_useful_power_kw and station["power_kw"] > preferences.max_useful_power_kw * 1.25:
+        reasons.append("Potencia por encima del máximo útil no sobreponderada")
 
     available_connectors = station["available_connectors"]
     connector_count = station.get("connector_count", available_connectors)

@@ -236,6 +236,7 @@ def default_preferences() -> Preferences:
         prefer_services=True,
         prefer_large_hubs=True,
         avoid_single_connector=True,
+        max_useful_power_kw=None,
     )
 
 
@@ -260,6 +261,7 @@ def preferences_from_payload(payload: ConversationRoutePlanRequest) -> Preferenc
         prefer_services=payload.preferences.prefer_services,
         prefer_large_hubs=payload.preferences.prefer_large_hubs,
         avoid_single_connector=payload.preferences.avoid_single_connector,
+        max_useful_power_kw=payload.preferences.max_useful_power_kw,
     )
 
 

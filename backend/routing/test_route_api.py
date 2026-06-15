@@ -11,9 +11,10 @@ from charging.models import AvailabilitySnapshot, Connector, DataSource, EVSE, O
 from routing.api import ACTIVE_CONVERSATION_BLOCKS_KEY
 from routing.agent import AgentResponseError, blocks_from_tool_result, codex_prompt, contextualized_prompt, validate_blocks
 from routing.models import RoutePlan
-from routing.production_planner import station_to_score_payload
+from routing.production_planner import score_exploration_station, station_to_score_payload
 from routing.providers import Coordinate, ProviderRoute, RoutingProviderError
-from routing.tools import resolve_location_tool
+from routing.scoring import Preferences
+from routing.tools import parse_preferences_arg, resolve_location_tool, search_destination_chargers_tool
 
 
 class StaticRouteProvider:
@@ -242,6 +243,46 @@ def test_urgent_charge_card_normalizes_station_name_variant_from_codex():
     assert blocks[0]["props"]["nearest"] == "BALLENOIL-ES336090-COLON"
 
 
+def test_destination_charging_card_normalizes_hotel_location_label():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "destination",
+                "type": "DestinationChargingCard",
+                "version": 1,
+                "props": {"locationLabel": "Valencia centro", "needsConfirmation": True},
+            }
+        ]
+    )
+
+    assert blocks[0]["props"]["destination"] == "Valencia centro"
+
+
+def test_stay_planning_card_normalizes_stay_variants_and_extracts_primary_stop():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "stay",
+                "type": "StayPlanningCard",
+                "version": 1,
+                "props": {
+                    "durationText": "1 semana",
+                    "locationLabel": "Cádiz",
+                    "primaryStop": {
+                        "name": "ONCE DZ Cádiz",
+                        "powerKw": 22,
+                        "distanceKm": 0.23,
+                    },
+                },
+            }
+        ]
+    )
+
+    assert blocks[0]["props"] == {"nights": 7, "city": "Cádiz", "recommendation": "ONCE DZ Cádiz"}
+    assert blocks[1]["type"] == "RecommendedStopCard"
+    assert blocks[1]["props"]["name"] == "ONCE DZ Cádiz"
+
+
 def test_urgent_tool_fallback_preserves_user_battery():
     blocks = blocks_from_tool_result(
         {
@@ -263,6 +304,72 @@ def test_resolve_location_tool_accepts_accented_city_inside_zone_text():
     assert result == {"ok": True, "location": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794}}
 
 
+def test_resolve_location_tool_knows_new_route_matrix_cities():
+    assert resolve_location_tool({"query": "Málaga"})["location"]["label"] == "Málaga"
+    assert resolve_location_tool({"query": "Bilbao"})["location"]["label"] == "Bilbao"
+    assert resolve_location_tool({"query": "Almansa"})["location"]["label"] == "Almansa"
+    assert resolve_location_tool({"query": "cerca de la Alhambra"})["location"]["label"] == "Alhambra, Granada"
+
+
+@pytest.mark.django_db
+def test_search_destination_chargers_tool_exposes_traced_comfort_and_reliability(real_station):
+    result = search_destination_chargers_tool(
+        {
+            "location": {"label": "Almansa", "lat": 38.87, "lon": -1.09},
+            "connector": "CCS2",
+            "radius_km": 5,
+            "limit": 1,
+        }
+    )
+
+    stop = result["stops"][0]
+    assert stop["name"] == real_station.name
+    assert stop["amenities"] == ["restaurant", "bathroom"]
+    assert stop["reliability"] == 88
+    assert stop["address"] == "A-31 Almansa"
+
+
+def test_parse_preferences_arg_accepts_max_useful_power_cap():
+    preferences = parse_preferences_arg({"reserve_min_percent": 20, "max_useful_power_kw": 100})
+
+    assert preferences.max_useful_power_kw == 100
+
+
+def test_score_exploration_station_does_not_overweight_power_above_user_cap():
+    station = {
+        "power_kw": 240,
+        "available_connectors": 2,
+        "connector_count": 2,
+        "availability_age_min": 10,
+        "reliability": 70,
+        "detour_min": 2,
+        "price_eur_kwh": None,
+        "services": [],
+    }
+    preferences = Preferences(
+        reserve_min_percent=20,
+        prefer_fast=False,
+        prefer_cheap=False,
+        prefer_low_stress=True,
+        prefer_services=True,
+        prefer_large_hubs=True,
+        avoid_single_connector=True,
+    )
+
+    uncapped = score_exploration_station(station, preferences, "safe")
+    capped = score_exploration_station(
+        station,
+        Preferences(**{**preferences.__dict__, "max_useful_power_kw": 100}),
+        "safe",
+    )
+
+    assert "Alta potencia" in uncapped.reasons
+    assert "Alta potencia" not in capped.reasons
+    assert "Carga rápida" in capped.reasons
+    assert "Potencia por encima del máximo útil no sobreponderada" in capped.reasons
+    assert capped.score < uncapped.score
+
+
 def test_codex_prompt_guides_followups_without_backend_intent_mapping():
     prompt = codex_prompt("Me equivoqué, estoy en Valencia centro")
 
@@ -270,6 +377,20 @@ def test_codex_prompt_guides_followups_without_backend_intent_mapping():
     assert "Si el usuario corrige la ubicación" in prompt
     assert "conserva batería, conector y preferencias" in prompt
     assert "no puedes ubicar esa calle exacta" in prompt
+    assert "sin perfil de vehículo" in prompt
+    assert "planningLevel=chargers_only" in prompt
+    assert "DestinationChargingCard + AlternativeStopsList" in prompt
+    assert "preferences.max_useful_power_kw" in prompt
+    assert "no presentes la potencia superior como ventaja" in prompt
+
+
+def test_codex_prompt_exposes_max_useful_power_tool_argument():
+    prompt = codex_prompt("Mi coche carga máximo a 100 kW, no necesito ultrarrápidos")
+
+    assert '"max_useful_power_kw":null' in prompt
+    assert "pasa X como preferences.max_useful_power_kw" in prompt
+    assert "que el coche no aprovechará más de 100 kW" in prompt
+
 
 
 def test_contextualized_prompt_summarizes_explicit_vehicle_facts_for_codex():
@@ -957,6 +1078,122 @@ def test_codex_conversation_agent_repairs_generic_urgent_nearest_when_tool_has_s
     assert "debe usar una estación trazable" in repair_requests[0][0]
     urgent_block = next(block for block in body["blocks"] if block["type"] == "UrgentChargeCard")
     assert urgent_block["props"]["nearest"] == real_station.name
+
+
+@pytest.mark.django_db
+def test_codex_conversation_agent_repairs_missing_urgent_battery_from_explicit_user_context(
+    client, settings, monkeypatch, real_station
+):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+    repair_requests = []
+
+    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+        tool_history = tool_history or []
+        if not tool_history:
+            return {
+                "type": "tool_call",
+                "tool": "search_destination_chargers",
+                "args": {
+                    "location": {"label": "Almansa", "lat": 38.87, "lon": -1.09},
+                    "radius_km": 5,
+                    "limit": 1,
+                },
+            }
+        tool_result = tool_history[-1]["result"]
+        if repair_issues:
+            repair_requests.append(repair_issues)
+            return {
+                "type": "final",
+                "blocks": [
+                    {
+                        "id": "urgent-with-battery",
+                        "type": "UrgentChargeCard",
+                        "version": 1,
+                        "props": {
+                            "battery": 12,
+                            "nearest": tool_result["stops"][0]["name"],
+                            "distanceKm": tool_result["stops"][0]["distanceKm"],
+                        },
+                    }
+                ],
+            }
+        return {
+            "type": "final",
+            "blocks": [
+                {
+                    "id": "urgent-without-battery",
+                    "type": "UrgentChargeCard",
+                    "version": 1,
+                    "props": {
+                        "nearest": tool_result["stops"][0]["name"],
+                        "distanceKm": tool_result["stops"][0]["distanceKm"],
+                    },
+                }
+            ],
+        }
+
+    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+
+    response = client.post(
+        "/api/conversation/message",
+        data={"text": "Necesito cargar ya, estoy al 12% en Almansa"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert repair_requests
+    assert "debe conservar la batería explícita" in repair_requests[0][0]
+    urgent_block = next(block for block in response.json()["blocks"] if block["type"] == "UrgentChargeCard")
+    assert urgent_block["props"]["battery"] == 12
+
+
+@pytest.mark.django_db
+def test_codex_conversation_agent_repairs_vague_risk_copy(client, settings, monkeypatch):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+    repair_requests = []
+
+    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+        if repair_issues:
+            repair_requests.append(repair_issues)
+            return {
+                "type": "final",
+                "blocks": [
+                    {
+                        "id": "risk-specific",
+                        "type": "RiskExplanationCard",
+                        "version": 1,
+                        "props": {
+                            "level": "medio",
+                            "text": "Confirma acceso final, tarifa y disponibilidad porque los datos pueden cambiar.",
+                        },
+                    }
+                ],
+            }
+        return {
+            "type": "final",
+            "blocks": [
+                {
+                    "id": "risk-vague",
+                    "type": "RiskExplanationCard",
+                    "version": 1,
+                    "props": {"level": "medio", "text": "Antes de salir"},
+                }
+            ],
+        }
+
+    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+
+    response = client.post(
+        "/api/conversation/message",
+        data={"text": "Tengo poca batería y voy con niños"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert repair_requests
+    assert "RiskExplanationCard.text debe explicar" in repair_requests[0][0]
+    risk_block = next(block for block in response.json()["blocks"] if block["type"] == "RiskExplanationCard")
+    assert "Confirma acceso final" in risk_block["props"]["text"]
 
 
 @pytest.mark.django_db

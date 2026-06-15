@@ -22,6 +22,7 @@ class Preferences:
     prefer_services: bool
     prefer_large_hubs: bool
     avoid_single_connector: bool
+    max_useful_power_kw: float | None = None
 
 
 @dataclass(frozen=True)

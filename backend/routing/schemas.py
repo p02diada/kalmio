@@ -33,6 +33,7 @@ class RoutePlanPreferences(Schema):
     avoid_single_connector: bool = True
     prefer_services: bool = True
     prefer_large_hubs: bool = True
+    max_useful_power_kw: float | None = Field(None, gt=0, le=500)
 
 
 class ConversationRoutePlanRequest(RoutePlanRequest):

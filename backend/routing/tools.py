@@ -15,6 +15,14 @@ KNOWN_LOCATIONS = {
     "cordoba": ("Córdoba", 37.8882, -4.7794),
     "sevilla": ("Sevilla", 37.3891, -5.9845),
     "barcelona": ("Barcelona", 41.3874, 2.1686),
+    "malaga": ("Málaga", 36.7213, -4.4214),
+    "granada": ("Granada", 37.1773, -3.5986),
+    "alicante": ("Alicante", 38.3452, -0.4810),
+    "bilbao": ("Bilbao", 43.2630, -2.9350),
+    "zaragoza": ("Zaragoza", 41.6488, -0.8891),
+    "cadiz": ("Cádiz", 36.5271, -6.2886),
+    "alhambra": ("Alhambra, Granada", 37.1761, -3.5881),
+    "almansa": ("Almansa", 38.8690, -1.0971),
     "alcobendas": ("Alcobendas", 40.5317, -3.6419),
     "alcora": ("Alcora", 39.1230, -0.5025),
 }
@@ -74,6 +82,9 @@ def search_destination_chargers_tool(args: dict[str, Any]) -> dict[str, Any]:
             "distanceKm": item.distance_km,
             "connectorTypes": item.connector_types,
             "availableEvses": item.available_evses,
+            "amenities": item.station.amenities,
+            "reliability": item.station.reliability.score if hasattr(item.station, "reliability") else None,
+            "address": item.station.address,
             "lat": float(item.station.latitude),
             "lon": float(item.station.longitude),
         }
@@ -139,6 +150,11 @@ def station_score_payload(score) -> dict[str, Any]:
         "distanceKm": score.station["distance_to_route_km"],
         "detourMin": score.station["detour_min"],
         "confidence": "media",
+        "availableEvses": score.station.get("available_connectors"),
+        "connectorCount": score.station.get("connector_count"),
+        "amenities": score.station.get("services", []),
+        "reliability": score.station.get("reliability"),
+        "scoreReasons": score.reasons,
         "lat": score.station["lat"],
         "lon": score.station["lon"],
     }
@@ -181,6 +197,7 @@ def parse_preferences_arg(value: Any) -> Preferences:
         avoid_single_connector=bool(data.get("avoid_single_connector", True)),
         prefer_services=bool(data.get("prefer_services", True)),
         prefer_large_hubs=bool(data.get("prefer_large_hubs", True)),
+        max_useful_power_kw=bounded_float(data.get("max_useful_power_kw"), default=None, minimum=1, maximum=500),
     )
 
 
