@@ -14,6 +14,7 @@ from routing.production_planner import PlanningDataError, plan_route_with_persis
 from routing.providers import Coordinate, RoutingProviderError, get_route_provider
 from routing.scoring import Preferences, VehicleContext
 from routing.tools import (
+    ALLOWED_CONVERSATION_TOOLS,
     KNOWN_LOCATIONS,
     ConversationToolError,
     ToolCall,
@@ -239,7 +240,7 @@ def run_codex_agent(message: str, history_blocks: list[dict] | None = None) -> l
             result = {"ok": False, "tool": decision["tool"], "error": str(exc)}
         tool_history.append({"call": {"tool": decision["tool"], "args": decision["args"]}, "result": result})
 
-        if not result.get("ok"):
+        if not result.get("ok") and decision["tool"] not in ALLOWED_CONVERSATION_TOOLS:
             return fallback_from_tool_history(
                 tool_history,
                 str(result.get("error") or "La herramienta falló."),
@@ -341,6 +342,39 @@ def codex_prompt(
         "Ubicaciones internas conocidas que puedes usar para argumentos de herramienta, sin inventar otras coordenadas: "
         f"{json.dumps(known_locations, ensure_ascii=False)}.\n"
     )
+    behavior_instructions = (
+        "Comportamiento EV esperado:\n"
+        "- Actúa como copiloto EV: usa el historial útil, acepta correcciones naturales y evita sonar como formulario.\n"
+        "- Si el usuario dice que necesita cargar ya y no hay ubicación, pide solo ubicación actual, ciudad/zona o coordenadas. "
+        "No pidas destino para una carga urgente.\n"
+        "- Si después de una petición urgente el usuario da una ciudad, zona o coordenadas, trátalo como continuación de esa urgencia "
+        "y usa herramientas si hay ubicación suficiente.\n"
+        "- Si el usuario corrige la ubicación, descarta la ubicación anterior para este turno, conserva batería, conector y preferencias "
+        "si siguen teniendo sentido, y vuelve a buscar con la ubicación corregida.\n"
+        "- Si el usuario pregunta por un fallo anterior, no contradigas bloques ya validados: si el historial mostró cargadores, dilo y "
+        "explica que el problema fue de validación, cobertura, ubicación aproximada o datos autorizados, sin culpar al usuario.\n"
+        "- Para una calle, POI o zona concreta, intenta resolver primero la parte conocida con resolve_location. Si no puedes ubicar "
+        "la calle exacta, di explícitamente que todavía no puedes ubicar esa calle exacta; ofrece buscar con la ciudad como aproximación "
+        "o usar coordenadas. No inventes coordenadas de calles.\n"
+        "- Para rutas sin consumo o perfil completo, puedes llamar plan_route para explorar cargadores en ruta, pero no inventes "
+        "autonomía, energía ni batería de llegada si la herramienta no las devuelve.\n"
+        "- Para hotel/destino con ciudad pero sin hotel exacto, puedes buscar alrededor de la ciudad como aproximación o pedir hotel/zona "
+        "si la precisión es crítica. No lo conviertas en ruta salvo que el usuario pida viajar entre origen y destino.\n"
+        "- Si search_destination_chargers devuelve stops y decides mostrar UrgentChargeCard o RecommendedStopCard, usa exactamente "
+        "stops[0].name y sus métricas trazables; evita placeholders como cargador por confirmar cuando ya hay estaciones.\n"
+        "- Si una herramienta permitida falla, responde con una explicación específica al contexto y una siguiente acción mínima; "
+        "no fabriques resultados para tapar el fallo.\n"
+        "Ejemplos críticos que debes seguir por analogía, no como reglas rígidas:\n"
+        "- Usuario: 'Necesito cargar ya' -> pide solo ubicación actual/ciudad/zona/coordenadas; no pidas destino, consumo ni hotel.\n"
+        "- Historial: urgencia sin ubicación. Usuario: 'En Córdoba' -> usa Córdoba para buscar cargadores cercanos y devuelve "
+        "bloques estructurados con estación trazable y riesgo de disponibilidad/tarifa/acceso.\n"
+        "- Historial: 'Estoy en Córdoba con 18% y CCS2'. Usuario: 'Me equivoqué, estoy en Valencia centro' -> vuelve a buscar "
+        "en Valencia, conserva battery=18 y conector CCS2 si filtras o explicas el resultado, y no menciones Córdoba como ubicación actual.\n"
+        "- Usuario pregunta por 'Paseo de la Victoria de Córdoba' -> si solo puedes resolver Córdoba, di que no puedes ubicar esa calle exacta "
+        "todavía y que usas Córdoba como aproximación; si muestras cargadores, deja claro ese límite.\n"
+        "- Usuario: 'Voy a dormir en Valencia, busca cargadores cerca del hotel' -> no lo conviertas en ruta; puedes buscar Valencia como "
+        "aproximación o pedir hotel/zona para precisión.\n"
+    )
     catalog_instructions = (
         "Catálogo A2UI permitido por propósito, no por reglas rígidas de intención:\n"
         "- AssistantMessage: respuesta breve en lenguaje natural, especialmente para aclarar límites o cerrar una respuesta simple.\n"
@@ -364,7 +398,7 @@ def codex_prompt(
         "- ErrorFallbackCard: reservado para fallos o componentes no soportados.\n"
     )
     output_instructions = (
-        "Devuelve solo JSON, sin markdown. Formas válidas:\n"
+        "Devuelve un único objeto JSON compacto, sin markdown, sin texto exterior y sin bloques de código. Formas válidas:\n"
         '{"type":"tool_call","intent":"...","confidence":0.0,"tool":"search_destination_chargers","args":{...},'
         '"rationale":"metadata interna breve"}\n'
         '{"type":"final","intent":"...","confidence":0.0,"blocks":[{"id":"...","type":"AssistantMessage","version":1,'
@@ -393,6 +427,7 @@ def codex_prompt(
             f"Usuario: {message}\n"
             f"Historial de herramientas: {json.dumps(tool_history, ensure_ascii=False)}\n"
             f"Bloques rechazados: {json.dumps(candidate_blocks, ensure_ascii=False)}\n"
+            f"{behavior_instructions}"
             f"{catalog_instructions}"
             f"{output_instructions}"
         )
@@ -403,6 +438,7 @@ def codex_prompt(
             f"Usuario: {message}\n"
             f"Historial de herramientas: {json.dumps(tool_history, ensure_ascii=False)}\n"
             f"{tool_instructions}"
+            f"{behavior_instructions}"
             f"{catalog_instructions}"
             f"{output_instructions}"
         )
@@ -410,6 +446,7 @@ def codex_prompt(
         "Eres el agente conversacional de Kalmio, una PWA móvil para planificar viajes y carga EV. "
         "Interpreta la conversación completa y decide intención, herramientas y bloques A2UI; Django solo validará seguridad y datos.\n"
         f"{tool_instructions}"
+        f"{behavior_instructions}"
         f"{catalog_instructions}"
         f"{output_instructions}\n"
         f"Usuario: {message}"
@@ -433,7 +470,7 @@ def call_codex_json(prompt: str) -> dict[str, Any]:
                     "--sandbox",
                     "read-only",
                     "-m",
-                    getattr(settings, "KALMIO_CODEX_MODEL", "gpt-5-nano"),
+                    getattr(settings, "KALMIO_CODEX_MODEL", "gpt-5.4-mini"),
                     "-o",
                     output.name,
                     prompt,
@@ -651,9 +688,11 @@ def a2ui_contract_issues(
         if block_type == "AlternativeStopsList":
             issues.extend(alternative_stops_contract_issues(props, facts))
         elif block_type == "RecommendedStopCard":
+            issues.extend(required_station_reference_contract_issues("RecommendedStopCard.name", props.get("name"), facts))
             issues.extend(station_reference_contract_issues("RecommendedStopCard.name", props.get("name"), facts))
             issues.extend(station_metric_contract_issues("RecommendedStopCard", props, facts))
         elif block_type == "UrgentChargeCard":
+            issues.extend(required_station_reference_contract_issues("UrgentChargeCard.nearest", props.get("nearest"), facts))
             issues.extend(station_reference_contract_issues("UrgentChargeCard.nearest", props.get("nearest"), facts))
             issues.extend(station_metric_contract_issues("UrgentChargeCard", {"name": props.get("nearest"), **props}, facts))
         elif block_type == "RouteSummaryCard":
@@ -785,6 +824,13 @@ def station_reference_contract_issues(label: str, value: Any, facts: dict[str, A
         return [f"{label} menciona una estación sin resultado de herramienta trazable."]
     if station_key(name) not in facts["stations"]:
         return [f"{label} no coincide con ninguna estación devuelta por las herramientas: {name}."]
+    return []
+
+
+def required_station_reference_contract_issues(label: str, value: Any, facts: dict[str, Any]) -> list[str]:
+    name = display_text(value, "")
+    if facts["stations"] and generic_station_label(name):
+        return [f"{label} debe usar una estación trazable cuando hay resultados de herramienta."]
     return []
 
 
@@ -975,11 +1021,14 @@ def contextualized_message(message: str, history_blocks: list[dict]) -> str:
 def contextualized_prompt(message: str, history_blocks: list[dict]) -> str:
     current_message = message.strip()
     transcript = conversation_transcript(history_blocks)
+    state_summary = conversation_state_summary(history_blocks)
     if not transcript:
         return current_message
+    state_line = f"{state_summary}\n" if state_summary else ""
     return (
         "Conversación disponible de Kalmio. Usa el historial para resolver referencias y datos parciales; "
         "si el usuario cambia claramente de objetivo, sigue el mensaje actual.\n"
+        f"{state_line}"
         f"{transcript}\n"
         f"Mensaje actual del usuario: {current_message}"
     )
@@ -996,6 +1045,27 @@ def conversation_transcript(history_blocks: list[dict], limit: int = 80) -> str:
         if summary:
             entries.append(summary)
     return "\n".join(entries)
+
+
+def conversation_state_summary(history_blocks: list[dict]) -> str:
+    vehicle_fields: dict[str, Any] = {}
+    for text in recent_user_message_texts(history_blocks, limit=8):
+        vehicle_fields.update(parse_vehicle_fields(normalize(text)))
+
+    parts = []
+    battery = vehicle_fields.get("battery")
+    if battery is not None:
+        parts.append(f"batería {battery:g}%")
+    connector = vehicle_fields.get("connector")
+    if connector:
+        parts.append(f"conector {connector}")
+    if not parts:
+        return ""
+    return (
+        "Datos explícitos previos del conductor que pueden seguir vigentes si el usuario no los corrige: "
+        + ", ".join(parts)
+        + "."
+    )
 
 
 def summarize_block_for_context(block_type: str, props: dict) -> str:
@@ -1020,8 +1090,26 @@ def summarize_block_for_context(block_type: str, props: dict) -> str:
             f"cargador cercano {props.get('nearest')}, distancia {props.get('distanceKm')} km, "
             f"batería {props.get('battery')}."
         )
+    if block_type == "RecommendedStopCard":
+        return (
+            "Parada recomendada previa: "
+            f"{props.get('name')}, potencia {props.get('powerKw')} kW, "
+            f"distancia {props.get('distanceKm')} km, desvío {props.get('detourMin')} min."
+        )
     if block_type == "DestinationChargingCard":
         return f"Resultado previo de carga en destino: {props.get('destination')}."
+    if block_type == "LocationDetailCard":
+        return (
+            "Ubicación validada previamente: "
+            f"{props.get('label')} ({props.get('lat')}, {props.get('lon')}), "
+            f"contexto {props.get('context')}, confirmar {props.get('needsConfirmation')}."
+        )
+    if block_type == "TripSummaryCard":
+        return (
+            "Resumen previo de viaje: "
+            f"origen {props.get('origin')}, destino {props.get('destination')}, "
+            f"batería {props.get('battery')}, reserva {props.get('reserve')}."
+        )
     if block_type == "RouteSummaryCard":
         return (
             "Resultado previo de ruta: "
@@ -1558,7 +1646,15 @@ def normalize_block_props(block_type: str, props: dict) -> dict:
         return {"question": str(question), "fields": fields}
     if block_type == "UrgentChargeCard":
         recommended_stop = props.get("recommendedStop") if isinstance(props.get("recommendedStop"), dict) else {}
-        nearest = props.get("nearest") or recommended_stop.get("name") or props.get("station") or props.get("charger")
+        nearest = (
+            props.get("nearest")
+            or props.get("name")
+            or props.get("stationName")
+            or props.get("chargerName")
+            or recommended_stop.get("name")
+            or props.get("station")
+            or props.get("charger")
+        )
         battery = props.get("battery")
         if battery is None:
             battery = props.get("batteryPercent")

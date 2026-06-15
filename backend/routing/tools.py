@@ -18,6 +18,7 @@ KNOWN_LOCATIONS = {
     "alcobendas": ("Alcobendas", 40.5317, -3.6419),
     "alcora": ("Alcora", 39.1230, -0.5025),
 }
+ALLOWED_CONVERSATION_TOOLS = {"resolve_location", "search_destination_chargers", "plan_route"}
 
 
 class ConversationToolError(RuntimeError):
@@ -41,11 +42,16 @@ def execute_conversation_tool(call: ToolCall) -> dict[str, Any]:
 
 
 def resolve_location_tool(args: dict[str, Any]) -> dict[str, Any]:
-    query = str(args.get("query") or "").strip().lower()
+    query = normalize_location_query(str(args.get("query") or "").strip())
     for key, (label, lat, lon) in KNOWN_LOCATIONS.items():
         if key in query:
             return {"ok": True, "location": {"label": label, "lat": lat, "lon": lon}}
     return {"ok": False, "error": "No conozco esa ubicación. Pide ciudad o coordenadas exactas."}
+
+
+def normalize_location_query(value: str) -> str:
+    substitutions = str.maketrans("áéíóúüñ", "aeiouun")
+    return value.lower().translate(substitutions)
 
 
 def search_destination_chargers_tool(args: dict[str, Any]) -> dict[str, Any]:

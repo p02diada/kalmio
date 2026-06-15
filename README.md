@@ -139,11 +139,11 @@ The chat screen uses `/api/conversation/message`. The backend stores A2UI blocks
 - `KALMIO_CONVERSATION_AGENT_MODE=local` for deterministic local development.
 - `KALMIO_CONVERSATION_AGENT_MODE=codex` to use the local Codex CLI adapter.
 - `KALMIO_CODEX_COMMAND` (default `codex`)
-- `KALMIO_CODEX_MODEL` (default `gpt-5-nano`)
-- `KALMIO_CODEX_TIMEOUT_SECONDS` (default `20`)
+- `KALMIO_CODEX_MODEL` (default `gpt-5.4-mini`)
+- `KALMIO_CODEX_TIMEOUT_SECONDS` (default `60`)
 - `KALMIO_CODEX_MAX_TOOL_CALLS` (default `3`)
 
-In `codex` mode, Codex does not access the database or providers directly. It can request a bounded sequence of allowlisted Django tool calls (`resolve_location`, `search_destination_chargers`, or `plan_route`), Django executes them, and Codex receives only the validated tool results to compose final A2UI blocks. Codex chooses the UI blocks that best fit the user request and tool results; Django validates the catalog, factual constraints, and semantic obligations. If the final A2UI is incomplete, Django asks Codex for one repair with the concrete contract issues. If Codex asks for an unknown tool, repeats the same tool call, exceeds `KALMIO_CODEX_MAX_TOOL_CALLS`, fails repair, or fails to return final A2UI, the backend returns safe fallback A2UI instead of executing arbitrary behavior.
+In `codex` mode, Codex does not access the database or providers directly. It can request a bounded sequence of allowlisted Django tool calls (`resolve_location`, `search_destination_chargers`, or `plan_route`), Django executes them, and Codex receives only the validated tool results to compose final A2UI blocks. Codex chooses the UI blocks that best fit the user request and tool results; Django validates the catalog, factual constraints, and semantic obligations. If an allowlisted tool returns no usable data, Codex receives that failure and must answer honestly from the validated state. If the final A2UI is incomplete, Django asks Codex for one repair with the concrete contract issues. If Codex asks for an unknown tool, repeats the same tool call, exceeds `KALMIO_CODEX_MAX_TOOL_CALLS`, fails repair, or fails to return final A2UI, the backend returns safe fallback A2UI instead of executing arbitrary behavior.
 
 Codex receives the available conversation context for each turn so it can resolve natural follow-ups; Django should validate the resulting structured tool arguments instead of parsing natural phrasing with feature-specific regexes.
 

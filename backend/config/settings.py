@@ -240,9 +240,9 @@ KALMIO_CONVERSATION_AGENT_MODE = os.getenv("KALMIO_CONVERSATION_AGENT_MODE", "lo
 if KALMIO_CONVERSATION_AGENT_MODE not in {"local", "codex"}:
     raise ImproperlyConfigured("KALMIO_CONVERSATION_AGENT_MODE must be local or codex.")
 KALMIO_CODEX_COMMAND = os.getenv("KALMIO_CODEX_COMMAND", "codex").strip() or "codex"
-KALMIO_CODEX_MODEL = os.getenv("KALMIO_CODEX_MODEL", "gpt-5-nano").strip() or "gpt-5-nano"
+KALMIO_CODEX_MODEL = os.getenv("KALMIO_CODEX_MODEL", "gpt-5.4-mini").strip() or "gpt-5.4-mini"
 try:
-    KALMIO_CODEX_TIMEOUT_SECONDS = float(os.getenv("KALMIO_CODEX_TIMEOUT_SECONDS", "20"))
+    KALMIO_CODEX_TIMEOUT_SECONDS = float(os.getenv("KALMIO_CODEX_TIMEOUT_SECONDS", "60"))
 except ValueError as exc:
     raise ImproperlyConfigured("KALMIO_CODEX_TIMEOUT_SECONDS must be a number.") from exc
 if KALMIO_CODEX_TIMEOUT_SECONDS <= 0:

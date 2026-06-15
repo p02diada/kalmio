@@ -9,10 +9,11 @@ from django.utils import timezone
 
 from charging.models import AvailabilitySnapshot, Connector, DataSource, EVSE, Operator, ReliabilityScore, Station, Tariff
 from routing.api import ACTIVE_CONVERSATION_BLOCKS_KEY
-from routing.agent import AgentResponseError, blocks_from_tool_result, validate_blocks
+from routing.agent import AgentResponseError, blocks_from_tool_result, codex_prompt, contextualized_prompt, validate_blocks
 from routing.models import RoutePlan
 from routing.production_planner import station_to_score_payload
 from routing.providers import Coordinate, ProviderRoute, RoutingProviderError
+from routing.tools import resolve_location_tool
 
 
 class StaticRouteProvider:
@@ -204,6 +205,43 @@ def test_urgent_charge_card_normalizes_nested_recommended_stop():
     }
 
 
+def test_urgent_charge_card_normalizes_name_variant_from_codex():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "urgent",
+                "type": "UrgentChargeCard",
+                "version": 1,
+                "props": {
+                    "name": "BALLENOIL-ES336090-COLON",
+                    "distanceKm": 0.3,
+                },
+            }
+        ]
+    )
+
+    assert blocks[0]["props"]["nearest"] == "BALLENOIL-ES336090-COLON"
+    assert blocks[0]["props"]["distanceKm"] == 0.3
+
+
+def test_urgent_charge_card_normalizes_station_name_variant_from_codex():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "urgent",
+                "type": "UrgentChargeCard",
+                "version": 1,
+                "props": {
+                    "stationName": "BALLENOIL-ES336090-COLON",
+                    "distanceKm": 0.3,
+                },
+            }
+        ]
+    )
+
+    assert blocks[0]["props"]["nearest"] == "BALLENOIL-ES336090-COLON"
+
+
 def test_urgent_tool_fallback_preserves_user_battery():
     blocks = blocks_from_tool_result(
         {
@@ -217,6 +255,39 @@ def test_urgent_tool_fallback_preserves_user_battery():
 
     urgent_block = next(block for block in blocks if block["type"] == "UrgentChargeCard")
     assert urgent_block["props"]["battery"] == 18
+
+
+def test_resolve_location_tool_accepts_accented_city_inside_zone_text():
+    result = resolve_location_tool({"query": "Paseo de la Victoria de Córdoba"})
+
+    assert result == {"ok": True, "location": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794}}
+
+
+def test_codex_prompt_guides_followups_without_backend_intent_mapping():
+    prompt = codex_prompt("Me equivoqué, estoy en Valencia centro")
+
+    assert "No pidas destino para una carga urgente" in prompt
+    assert "Si el usuario corrige la ubicación" in prompt
+    assert "conserva batería, conector y preferencias" in prompt
+    assert "no puedes ubicar esa calle exacta" in prompt
+
+
+def test_contextualized_prompt_summarizes_explicit_vehicle_facts_for_codex():
+    prompt = contextualized_prompt(
+        "Me equivoqué, estoy en Valencia centro",
+        [
+            {
+                "id": "user-1",
+                "type": "UserMessage",
+                "version": 1,
+                "props": {"text": "Necesito cargar ya. Estoy en Córdoba con un 18% y CCS2"},
+            }
+        ],
+    )
+
+    assert "batería 18%" in prompt
+    assert "conector CCS2" in prompt
+    assert "Mensaje actual del usuario: Me equivoqué, estoy en Valencia centro" in prompt
 
 
 @pytest.mark.django_db
@@ -543,6 +614,49 @@ def test_codex_conversation_agent_rejects_unknown_tool_with_a2ui_risk(client, se
 
 
 @pytest.mark.django_db
+def test_codex_allowed_tool_failure_returns_to_agent_for_contextual_final(client, settings, monkeypatch):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+    calls = []
+
+    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+        tool_history = tool_history or []
+        calls.append((len(tool_history), repair_issues or []))
+        if not tool_history:
+            return {"type": "tool_call", "tool": "resolve_location", "args": {"query": "Paseo de la Victoria"}}
+        assert tool_history[-1]["result"]["ok"] is False
+        return {
+            "type": "final",
+            "blocks": [
+                {
+                    "id": "street-not-resolved",
+                    "type": "AssistantMessage",
+                    "version": 1,
+                    "props": {
+                        "text": (
+                            "No puedo ubicar esa calle exacta todavía; puedo buscar usando Córdoba "
+                            "como aproximación o usar coordenadas."
+                        )
+                    },
+                }
+            ],
+        }
+
+    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+
+    response = client.post(
+        "/api/conversation/message",
+        data={"text": "Y en el Paseo de la Victoria?"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert calls == [(0, []), (1, [])]
+    rendered_text = " ".join(str(block.get("props", {})) for block in response.json()["blocks"])
+    assert "No puedo ubicar esa calle exacta todavía" in rendered_text
+    assert "No he podido cerrar una respuesta fiable" not in rendered_text
+
+
+@pytest.mark.django_db
 def test_codex_destination_card_with_embedded_stops_requires_traced_station_data(client, settings, monkeypatch):
     settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
     repair_requests = []
@@ -779,6 +893,70 @@ def test_codex_conversation_agent_repairs_untraced_structured_station_data(clien
     assert repair_requests
     assert "Fake HPC" not in rendered_text
     assert real_station.name in rendered_text
+
+
+@pytest.mark.django_db
+def test_codex_conversation_agent_repairs_generic_urgent_nearest_when_tool_has_station(
+    client, settings, monkeypatch, real_station
+):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+    repair_requests = []
+
+    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+        tool_history = tool_history or []
+        if not tool_history:
+            return {
+                "type": "tool_call",
+                "tool": "search_destination_chargers",
+                "args": {
+                    "location": {"label": "Almansa", "lat": 38.87, "lon": -1.09},
+                    "radius_km": 5,
+                    "limit": 2,
+                },
+            }
+        tool_result = tool_history[-1]["result"]
+        if repair_issues:
+            repair_requests.append(repair_issues)
+            return {
+                "type": "final",
+                "blocks": [
+                    {
+                        "id": "urgent-repaired",
+                        "type": "UrgentChargeCard",
+                        "version": 1,
+                        "props": {
+                            "nearest": tool_result["stops"][0]["name"],
+                            "distanceKm": tool_result["stops"][0]["distanceKm"],
+                        },
+                    }
+                ],
+            }
+        return {
+            "type": "final",
+            "blocks": [
+                {
+                    "id": "urgent-generic",
+                    "type": "UrgentChargeCard",
+                    "version": 1,
+                    "props": {"nearest": "Cargador cercano por confirmar", "distanceKm": 0.1},
+                }
+            ],
+        }
+
+    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+
+    response = client.post(
+        "/api/conversation/message",
+        data={"text": "Necesito cargar ya cerca de Almansa"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert repair_requests
+    assert "debe usar una estación trazable" in repair_requests[0][0]
+    urgent_block = next(block for block in body["blocks"] if block["type"] == "UrgentChargeCard")
+    assert urgent_block["props"]["nearest"] == real_station.name
 
 
 @pytest.mark.django_db
