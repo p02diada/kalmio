@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kalmio Chat Trace"
+  short_description: "Analyze Kalmio chat trace logs"
+  default_prompt: "Use $kalmio-chat-trace to analyze the latest Kalmio chat run."

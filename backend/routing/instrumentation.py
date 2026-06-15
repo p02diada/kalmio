@@ -169,7 +169,11 @@ def truncate_value(value: Any, max_chars: int) -> Any:
 def sanitize_error(error: str | None) -> str | None:
     if not error:
         return None
-    return str(error).replace(str(getattr(settings, "KALMIO_DEEPSEEK_API_KEY", "") or ""), "[redacted]")
+    text = str(error)
+    api_key = str(getattr(settings, "KALMIO_DEEPSEEK_API_KEY", "") or "")
+    if api_key:
+        text = text.replace(api_key, "[redacted]")
+    return text
 
 
 def to_plain(value: Any) -> Any:

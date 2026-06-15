@@ -265,16 +265,24 @@ def run_provider_agent(
             ensure_ascii=False,
         )
         if call_signature in seen_calls:
-            return fallback_from_tool_history(
-                tool_history,
-                f"El agente repitió la herramienta {decision['tool']} con los mismos argumentos.",
+            return final_or_fallback_after_blocked_tool_call(
                 decision_message,
+                decision,
+                tool_history,
+                history_blocks=history_blocks,
+                request_decision=request_decision,
+                guardrail_name="repeated_tool_call",
+                reason=f"El agente repitió la herramienta {decision['tool']} con los mismos argumentos.",
             )
         if len(tool_history) >= max_tool_calls:
-            return fallback_from_tool_history(
-                tool_history,
-                f"Se alcanzó el máximo de {max_tool_calls} llamadas a herramientas para este turno.",
+            return final_or_fallback_after_blocked_tool_call(
                 decision_message,
+                decision,
+                tool_history,
+                history_blocks=history_blocks,
+                request_decision=request_decision,
+                guardrail_name="tool_budget_exhausted",
+                reason=f"Se alcanzó el máximo de {max_tool_calls} llamadas a herramientas para este turno.",
             )
         seen_calls.add(call_signature)
 
@@ -304,6 +312,51 @@ def run_provider_agent(
             )
 
     return fallback_from_tool_history(tool_history, "El agente no devolvió una respuesta final.", decision_message)
+
+
+def final_or_fallback_after_blocked_tool_call(
+    message: str,
+    decision: dict[str, Any],
+    tool_history: list[dict[str, Any]],
+    *,
+    history_blocks: list[dict],
+    request_decision: DecisionRequester,
+    guardrail_name: str,
+    reason: str,
+) -> list[dict]:
+    record_trace_event(
+        event="agent_guardrail",
+        name=guardrail_name,
+        status="warning",
+        metadata={
+            "reason": reason,
+            "tool": decision.get("tool"),
+            "toolHistoryCount": len(tool_history),
+            "recovery": "final_only_retry",
+        },
+        request_payload=decision,
+    )
+    final_decision = request_decision(
+        message,
+        tool_history=tool_history,
+        repair_issues=[
+            reason,
+            (
+                "No pidas otra herramienta en esta respuesta. Devuelve type=final usando solo el historial "
+                "de herramientas ya ejecutadas o explica claramente por qué esos datos no bastan."
+            ),
+        ],
+        candidate_blocks=[],
+    )
+    if final_decision["type"] != "final":
+        return fallback_from_tool_history(tool_history, reason, message)
+    return validated_or_repaired_final_blocks(
+        message,
+        final_decision["blocks"],
+        tool_history,
+        history_blocks=history_blocks,
+        request_decision=request_decision,
+    )
 
 
 def validated_or_repaired_final_blocks(
@@ -717,7 +770,9 @@ def codex_prompt(
         "- Calle/POI/zona: intenta resolver la parte conocida con resolve_location. Si no puedes ubicar esa calle exacta, dilo y ofrece ciudad aproximada o coordenadas; no inventes coordenadas.\n"
         "- Ruta sin consumo/modelo: puedes usar plan_route para explorar cargadores, pero no inventes autonomía, energía ni llegada. Si plan_route devuelve planningLevel=chargers_only, dilo.\n"
         "- Hotel/destino/estancia: si hay ciudad/POI suficiente, busca cargadores alrededor como aproximación; no lo conviertas en ruta salvo que pidan origen-destino.\n"
+        "- Si resolve_location recibe un hotel, calle o POI pero solo devuelve una ciudad/zona, no afirmes que conoces el lugar exacto; di que usas esa ciudad/zona como aproximación o pide coordenadas/dirección exacta.\n"
         "- Si search_destination_chargers devuelve stops, usa nombres y métricas exactas trazables; no uses placeholders cuando hay estaciones.\n"
+        "- Si ya hay stops con potencia/distancia/disponibilidad y el usuario pide comparar potencia o alternativas, responde con esos resultados; no repitas la misma búsqueda sin cambiar ubicación, radio, conector o criterio material.\n"
         "- Si una herramienta permitida falla, explica el fallo en contexto y pide una acción mínima; no fabriques datos.\n"
         "- Batería baja: pocas opciones, riesgo explícito, y CTA de navegación solo con lat/lon trazables. Si conoces batería, consérvala.\n"
         "- Cargador ocupado: no lo repitas como plan B; usa alternativas trazables o vuelve a buscar con la ubicación previa.\n"
@@ -767,8 +822,8 @@ def codex_prompt(
     )
     if repair_issues:
         return (
-            "Eres el agente conversacional de Kalmio para planificación EV. Tu respuesta final anterior fue rechazada "
-            "por el contrato de seguridad/datos A2UI. No pidas herramientas en esta reparación. "
+            "Eres el agente conversacional de Kalmio para planificación EV. Tu respuesta anterior fue rechazada "
+            "por el contrato de seguridad/datos A2UI o por un guardrail de herramientas. No pidas herramientas en esta reparación. "
             "Devuelve solo type=final con blocks A2UI válidos; puedes simplificar la UI si no puedes demostrar los datos. "
             "Problemas detectados:\n"
             f"{json.dumps(repair_issues, ensure_ascii=False)}\n"
@@ -1156,6 +1211,8 @@ def a2ui_contract_issues(
 
         if block_type == "AlternativeStopsList":
             issues.extend(alternative_stops_contract_issues(props, facts))
+        elif block_type == "AssistantMessage":
+            issues.extend(assistant_message_contract_issues(props, facts))
         elif block_type == "RecommendedStopCard":
             issues.extend(required_station_reference_contract_issues("RecommendedStopCard.name", props.get("name"), facts))
             issues.extend(station_reference_contract_issues("RecommendedStopCard.name", props.get("name"), facts))
@@ -1182,7 +1239,7 @@ def a2ui_contract_issues(
 
 
 def tool_fact_index(tool_history: list[dict[str, Any]], history_blocks: list[dict] | None = None) -> dict[str, Any]:
-    facts: dict[str, Any] = {"stations": {}, "locations": [], "routes": [], "vehicle": {}}
+    facts: dict[str, Any] = {"stations": {}, "locations": [], "approximateLocations": [], "routes": [], "vehicle": {}}
     add_history_facts(facts, history_blocks or [])
     for entry in tool_history:
         if not isinstance(entry, dict):
@@ -1195,6 +1252,8 @@ def tool_fact_index(tool_history: list[dict[str, Any]], history_blocks: list[dic
         result = entry.get("result")
         if not isinstance(result, dict) or not result.get("ok"):
             continue
+        if (result.get("tool") or call.get("tool")) == "resolve_location":
+            add_approximate_location_fact(facts, args.get("query"), result.get("location"))
         for key in ("location", "origin", "destination"):
             add_location_fact(facts, result.get(key))
         stops = result.get("stops")
@@ -1271,6 +1330,59 @@ def add_location_fact(facts: dict[str, Any], value: Any) -> None:
     if lat is None or lon is None:
         return
     facts["locations"].append({"label": display_text(value.get("label"), "Ubicación indicada"), "lat": lat, "lon": lon})
+
+
+def add_approximate_location_fact(facts: dict[str, Any], query: Any, location: Any) -> None:
+    if not isinstance(location, dict):
+        return
+    query_text = display_text(query, "")
+    label = display_text(location.get("label"), "")
+    if not query_text or not label:
+        return
+    normalized_query = normalize(query_text)
+    normalized_label = normalize(label)
+    if normalized_query == normalized_label or normalized_label not in normalized_query:
+        return
+    if not any(term in normalized_query for term in ("hotel", "calle", "paseo", "avenida", "plaza", "melia", "alhambra")):
+        return
+    facts["approximateLocations"].append({"query": query_text, "resolvedLabel": label})
+
+
+def assistant_message_contract_issues(props: dict, facts: dict[str, Any]) -> list[str]:
+    text = display_text(props.get("text"), "")
+    if not text:
+        return []
+    normalized_text = normalize(text)
+    if has_approximation_disclaimer(normalized_text):
+        return []
+
+    issues = []
+    for location in facts.get("approximateLocations", []):
+        query = display_text(location.get("query"), "")
+        resolved_label = display_text(location.get("resolvedLabel"), "")
+        if query and normalize(query) in normalized_text:
+            issues.append(
+                "AssistantMessage.text sugiere ubicación exacta para "
+                f"'{query}', pero la herramienta solo resolvió '{resolved_label}'. "
+                "Debe decir que usa la ciudad/zona como aproximación o pedir coordenadas/dirección exacta."
+            )
+    return issues
+
+
+def has_approximation_disclaimer(normalized_text: str) -> bool:
+    return any(
+        term in normalized_text
+        for term in (
+            "aproximacion",
+            "aproximado",
+            "aproximada",
+            "como referencia",
+            "no puedo ubicar",
+            "no he podido ubicar",
+            "no tengo la ubicacion exacta",
+            "sin ubicacion exacta",
+        )
+    )
 
 
 def alternative_stops_contract_issues(props: dict, facts: dict[str, Any]) -> list[str]:

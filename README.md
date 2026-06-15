@@ -151,10 +151,22 @@ The chat screen uses `/api/conversation/message`. Kalmio targets official A2UI v
 - `KALMIO_DEEPSEEK_MAX_TOKENS` (default `1800`)
 - `KALMIO_DEEPSEEK_USE_NATIVE_TOOLS` (default `true`)
 - `KALMIO_DEEPSEEK_THINKING` (default `false` for cheaper, simpler dev JSON/tool-call behavior)
+- `KALMIO_AGENT_TRACE_ENABLED` (default `true` in development, `false` in production)
+- `KALMIO_AGENT_TRACE_INCLUDE_PAYLOADS` (default `false`; use `true` only in local dev to inspect prompts, tool args, and tool results)
+- `KALMIO_AGENT_TRACE_FILE` (default `.tmp/agent-traces.jsonl`)
 
-In `codex` and `deepseek` modes, the model does not access the database or providers directly. It can request a bounded sequence of allowlisted Django tool calls (`resolve_location`, `search_destination_chargers`, or `plan_route`), Django executes them, and the model receives only the validated tool results to compose final Kalmio A2UI components. The model chooses the UI components that best fit the user request and tool results; Django validates the catalog, factual constraints, action model, and semantic obligations. The DeepSeek adapter uses the OpenAI-compatible Chat Completions SDK with JSON output and optional native tool calls; it also accepts the existing JSON `type=tool_call` shape to keep provider behavior testable. Actions normalize to official A2UI semantics: `event` for backend/agent handling or registered `functionCall` for safe local renderer behavior such as opening a URL. Client-to-server events are posted as `{ "version": "v0.9.1", "action": { ... } }`, not as visible user messages. If an allowlisted tool returns no usable data, the model receives that failure and must answer honestly from the validated state. If the final A2UI is incomplete, Django asks the model for one repair with the concrete contract issues. If the model asks for an unknown tool, repeats the same tool call, exceeds the configured tool-call budget, fails repair, or fails to return final A2UI, the backend returns safe fallback A2UI instead of executing arbitrary behavior.
+In `codex` and `deepseek` modes, the model does not access the database or providers directly. It can request a bounded sequence of allowlisted Django tool calls (`resolve_location`, `search_destination_chargers`, or `plan_route`), Django executes them, and the model receives only the validated tool results to compose final Kalmio A2UI components. The model chooses the UI components that best fit the user request and tool results; Django validates the catalog, factual constraints, action model, and semantic obligations. The DeepSeek adapter uses the OpenAI-compatible Chat Completions SDK with JSON output and optional native tool calls; it also accepts the existing JSON `type=tool_call` shape to keep provider behavior testable. Actions normalize to official A2UI semantics: `event` for backend/agent handling or registered `functionCall` for safe local renderer behavior such as opening a URL. Client-to-server events are posted as `{ "version": "v0.9.1", "action": { ... } }`, not as visible user messages. If an allowlisted tool returns no usable data, the model receives that failure and must answer honestly from the validated state. If the final A2UI is incomplete, Django asks the model for one repair with the concrete contract issues. If the model repeats the same tool call or exceeds the configured tool-call budget after validated results exist, the backend records an `agent_guardrail` event and gives the model one final-only recovery pass using the existing tool history. If the model asks for an unknown tool, fails recovery or repair, or fails to return final A2UI, the backend returns safe fallback A2UI instead of executing arbitrary behavior.
 
 The configured agent receives the available conversation context for each turn so it can resolve natural follow-ups; Django should validate the resulting structured tool arguments instead of parsing natural phrasing with feature-specific regexes.
+
+Agent trace events are written as JSONL and include `agent_turn`, `llm_api_call`, `internal_tool_call`, and `agent_guardrail` records grouped by `turnId`. DeepSeek costs are estimated from API `usage` and configured prices per 1M tokens; if the provider does not return cache-hit/cache-miss token counts, input cost is conservatively estimated as cache miss. Inspect a run with:
+
+```bash
+tail -f backend/.tmp/agent-traces.jsonl
+python .agents/skills/kalmio-chat-trace/scripts/analyze_trace.py --last-turns 5
+```
+
+After a manual chat test, ask Codex to use `$kalmio-chat-trace` to analyze the latest run.
 
 Conversation endpoints are throttled by session/IP to reduce abuse. Tune in settings:
 

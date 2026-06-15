@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 from decimal import Decimal
 
@@ -21,6 +22,7 @@ from routing.agent import (
     run_deepseek_decision,
     validate_blocks,
 )
+from routing.instrumentation import estimate_deepseek_cost, record_trace_event
 from routing.models import RoutePlan
 from routing.production_planner import score_exploration_station, station_to_score_payload
 from routing.providers import Coordinate, ProviderRoute, RoutingProviderError
@@ -549,6 +551,46 @@ def test_deepseek_repair_decision_disables_native_tools(monkeypatch):
     assert calls[0][1] is False
 
 
+def test_deepseek_cost_estimate_uses_provider_cache_breakdown(settings):
+    settings.KALMIO_DEEPSEEK_PRICE_INPUT_CACHE_HIT_PER_MILLION_USD = 0.0028
+    settings.KALMIO_DEEPSEEK_PRICE_INPUT_CACHE_MISS_PER_MILLION_USD = 0.14
+    settings.KALMIO_DEEPSEEK_PRICE_OUTPUT_PER_MILLION_USD = 0.28
+
+    cost = estimate_deepseek_cost(
+        {
+            "inputTokens": 10_000,
+            "cacheHitInputTokens": 4_000,
+            "cacheMissInputTokens": 6_000,
+            "outputTokens": 2_000,
+        }
+    )
+
+    assert cost["basis"] == "provider_cache_breakdown"
+    assert cost["totalCostUsd"] == 0.0014112
+
+
+def test_agent_trace_writes_jsonl_without_payloads_by_default(settings, tmp_path):
+    trace_file = tmp_path / "agent-traces.jsonl"
+    settings.KALMIO_AGENT_TRACE_ENABLED = True
+    settings.KALMIO_AGENT_TRACE_INCLUDE_PAYLOADS = False
+    settings.KALMIO_AGENT_TRACE_FILE = str(trace_file)
+
+    record_trace_event(
+        event="llm_api_call",
+        name="chat.completions.create",
+        status="ok",
+        provider="deepseek",
+        model="deepseek-v4-flash",
+        request_payload={"api_key": "secret", "prompt": "hola"},
+        response_payload={"content": "respuesta"},
+    )
+
+    payload = json.loads(trace_file.read_text(encoding="utf-8").strip())
+    assert payload["event"] == "llm_api_call"
+    assert "request" not in payload
+    assert "response" not in payload
+
+
 def test_contextualized_prompt_summarizes_explicit_vehicle_facts_for_codex():
     prompt = contextualized_prompt(
         "Me equivoqué, estoy en Valencia centro",
@@ -989,9 +1031,12 @@ def test_codex_conversation_agent_executes_allowlisted_tool(client, settings, mo
 
 @pytest.mark.django_db
 def test_deepseek_conversation_agent_uses_same_tool_and_a2ui_validation_loop(
-    client, settings, monkeypatch, real_station
+    client, settings, monkeypatch, real_station, tmp_path
 ):
     settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
+    settings.KALMIO_AGENT_TRACE_ENABLED = True
+    settings.KALMIO_AGENT_TRACE_INCLUDE_PAYLOADS = True
+    settings.KALMIO_AGENT_TRACE_FILE = str(tmp_path / "agent-traces.jsonl")
     calls = []
 
     def fake_deepseek_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
@@ -1038,6 +1083,15 @@ def test_deepseek_conversation_agent_uses_same_tool_and_a2ui_validation_loop(
     assert calls == [(0, []), (1, [])]
     stops_block = next(block for block in blocks_from_a2ui_response(response) if block["type"] == "AlternativeStopsList")
     assert stops_block["props"]["stops"][0]["name"] == real_station.name
+    trace_events = [
+        json.loads(line)
+        for line in (tmp_path / "agent-traces.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    tool_event = next(event for event in trace_events if event["event"] == "internal_tool_call")
+    assert tool_event["name"] == "search_destination_chargers"
+    assert tool_event["metadata"]["stopCount"] == 1
+    assert tool_event["request"]["location"]["label"] == "Almansa"
 
 
 @pytest.mark.django_db
@@ -1597,11 +1651,57 @@ def test_action_buttons_accept_protocol_event_and_function_call():
     assert issues == []
 
 
+def test_assistant_message_requires_approximation_when_hotel_resolves_only_to_city():
+    issues = a2ui_contract_issues(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": "Estos son los cargadores autorizados cerca del Hotel Meliá Córdoba (Plaza de Colón)."
+                },
+            }
+        ],
+        [
+            {
+                "call": {"tool": "resolve_location", "args": {"query": "Hotel Meliá Córdoba"}},
+                "result": {"ok": True, "location": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794}},
+            }
+        ],
+    )
+
+    assert any("solo resolvió 'Córdoba'" in issue for issue in issues)
+
+
+def test_assistant_message_allows_explicit_approximation_for_hotel_city_resolution():
+    issues = a2ui_contract_issues(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": "No tengo la ubicación exacta del Hotel Meliá Córdoba; uso Córdoba como aproximación."
+                },
+            }
+        ],
+        [
+            {
+                "call": {"tool": "resolve_location", "args": {"query": "Hotel Meliá Córdoba"}},
+                "result": {"ok": True, "location": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794}},
+            }
+        ],
+    )
+
+    assert issues == []
+
+
 @pytest.mark.django_db
 def test_codex_conversation_agent_stops_repeated_tool_call(client, settings, monkeypatch):
     settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
 
-    def fake_codex_decision(message, tool_history=None):
+    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
         return {"type": "tool_call", "tool": "resolve_location", "args": {"query": "Valencia"}}
 
     monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
@@ -1618,11 +1718,95 @@ def test_codex_conversation_agent_stops_repeated_tool_call(client, settings, mon
 
 
 @pytest.mark.django_db
+def test_codex_conversation_agent_recovers_repeated_tool_call_with_final_retry(client, settings, monkeypatch):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+    calls = []
+    trace_events = []
+    repeated_args = {
+        "location": {"label": "Córdoba (cerca de Mezquita)", "lat": 37.880729, "lon": -4.782446},
+        "radius_km": 80,
+        "limit": 6,
+    }
+    tool_result = {
+        "ok": True,
+        "tool": "search_destination_chargers",
+        "location": repeated_args["location"],
+        "stops": [
+            {
+                "name": "Parking Calle Sevilla Nº5 - Córdoba",
+                "powerKw": 22,
+                "distanceKm": 0.38,
+                "availableEvses": 2,
+                "connectorTypes": ["TYPE2"],
+                "lat": 37.883857,
+                "lon": -4.780831,
+            }
+        ],
+        "warnings": ["Confirma acceso final, tarifa y disponibilidad antes de depender de ellos."],
+    }
+
+    def fake_execute_conversation_tool(tool_call):
+        assert tool_call.name == "search_destination_chargers"
+        assert tool_call.args == repeated_args
+        return tool_result
+
+    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+        tool_history = tool_history or []
+        calls.append((len(tool_history), repair_issues or []))
+        if repair_issues:
+            assert any("repitió la herramienta" in issue for issue in repair_issues)
+            return {
+                "type": "final",
+                "blocks": [
+                    {
+                        "id": "more-power-message",
+                        "type": "AssistantMessage",
+                        "version": 1,
+                        "props": {
+                            "text": "La opción con más potencia en los datos validados es Parking Calle Sevilla Nº5."
+                        },
+                    },
+                    {
+                        "id": "more-power-stops",
+                        "type": "AlternativeStopsList",
+                        "version": 1,
+                        "props": {"stops": tool_history[-1]["result"]["stops"]},
+                    },
+                ],
+            }
+        return {"type": "tool_call", "tool": "search_destination_chargers", "args": repeated_args}
+
+    def fake_record_trace_event(**kwargs):
+        trace_events.append(kwargs)
+
+    monkeypatch.setattr("routing.agent.execute_conversation_tool", fake_execute_conversation_tool)
+    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+    monkeypatch.setattr("routing.agent.record_trace_event", fake_record_trace_event)
+
+    response = client.post(
+        "/api/conversation/message",
+        data={"text": "Algo que tenga más potencia?"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    blocks = blocks_from_a2ui_response(response)
+    rendered_text = " ".join(str(block.get("props", {})) for block in blocks)
+    assert [count for count, _issues in calls] == [0, 1, 1]
+    assert calls[2][1]
+    assert "No he podido cerrar una respuesta fiable" not in rendered_text
+    assert "Parking Calle Sevilla Nº5" in rendered_text
+    guardrail_event = next(event for event in trace_events if event["event"] == "agent_guardrail")
+    assert guardrail_event["name"] == "repeated_tool_call"
+    assert guardrail_event["status"] == "warning"
+
+
+@pytest.mark.django_db
 def test_codex_conversation_agent_stops_at_tool_budget(client, settings, monkeypatch):
     settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
     settings.KALMIO_CODEX_MAX_TOOL_CALLS = 1
 
-    def fake_codex_decision(message, tool_history=None):
+    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
         tool_history = tool_history or []
         if not tool_history:
             return {"type": "tool_call", "tool": "resolve_location", "args": {"query": "Valencia"}}
