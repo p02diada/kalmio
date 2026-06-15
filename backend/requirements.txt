@@ -4,6 +4,7 @@ Django==5.2.15
 django-cors-headers==4.9.0
 django-ninja==1.6.2
 gunicorn==23.0.0
+openai==2.41.1
 packaging==26.2
 psycopg==3.3.4
 psycopg-binary==3.3.4

@@ -41,19 +41,30 @@ class ConversationRoutePlanRequest(RoutePlanRequest):
     preferences: RoutePlanPreferences = Field(default_factory=RoutePlanPreferences)
 
 
+class A2UIClientAction(Schema):
+    name: str = Field(..., min_length=1, max_length=120)
+    surfaceId: str = Field(..., min_length=1, max_length=160)
+    sourceComponentId: str | None = Field(None, min_length=1, max_length=160)
+    timestamp: str | None = Field(None, min_length=1, max_length=80)
+    context: dict = Field(default_factory=dict)
+
+
 class ConversationMessageRequest(Schema):
-    text: str = Field(..., min_length=1, max_length=1200)
+    text: str | None = Field(None, min_length=1, max_length=1200)
+    version: str | None = Field(None, min_length=1, max_length=24)
+    action: A2UIClientAction | None = None
 
 
-class A2UIBlock(Schema):
-    id: str = Field(..., min_length=1, max_length=120)
-    type: str = Field(..., min_length=1, max_length=80)
-    version: int = Field(1, ge=1)
-    props: dict
+class A2UIProtocolMessage(Schema):
+    version: str = Field(..., min_length=1, max_length=24)
+    createSurface: dict | None = None
+    updateComponents: dict | None = None
+    updateDataModel: dict | None = None
+    deleteSurface: dict | None = None
 
 
 class ConversationMessageResponse(Schema):
-    blocks: list[A2UIBlock]
+    messages: list[A2UIProtocolMessage]
 
 
 class RoutePlanStation(Schema):

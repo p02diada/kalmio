@@ -5,6 +5,7 @@ from ninja.security import SessionAuth
 from ninja.utils import check_csrf
 from django.conf import settings
 
+from routing.a2ui_protocol import A2UI_PROTOCOL_VERSION, action_payload_to_text, conversation_a2ui_response
 from routing.agent import AgentResponseError, conversation_failure_blocks, initial_blocks, run_conversation_agent, run_local_agent
 from routing.models import RoutePlan
 from routing.production_planner import PlanningDataError, ProductionPlanResult, plan_route_with_persisted_stations
@@ -37,12 +38,12 @@ def get_active_conversation_messages(request):
     if not blocks:
         blocks = initial_blocks()
         request.session[ACTIVE_CONVERSATION_BLOCKS_KEY] = blocks
-    return {"blocks": blocks}
+    return Response(conversation_a2ui_response(blocks), status=200)
 
 
 @router.post(
     "/conversation/message",
-    response={200: ConversationMessageResponse, 403: RoutePlanError, 429: RoutePlanError, 502: RoutePlanError},
+    response={200: ConversationMessageResponse, 403: RoutePlanError, 422: RoutePlanError, 429: RoutePlanError, 502: RoutePlanError},
 )
 def create_conversation_message(request, payload: ConversationMessageRequest):
     csrf_response = check_csrf(request)
@@ -64,22 +65,58 @@ def create_conversation_message(request, payload: ConversationMessageRequest):
         )
     record_conversation_attempt(request)
 
+    message_text, is_action = conversation_message_text(payload)
+    if not message_text:
+        return Response({"detail": "Envía texto o una acción A2UI válida."}, status=422)
+
     current_blocks = request.session.get(ACTIVE_CONVERSATION_BLOCKS_KEY) or initial_blocks()
     try:
-        new_blocks = run_conversation_agent(payload.text, history_blocks=current_blocks)
+        new_blocks = run_conversation_agent(message_text, history_blocks=current_blocks)
     except AgentResponseError:
         if getattr(settings, "KALMIO_CONVERSATION_AGENT_MODE", "local") == "local":
             try:
-                new_blocks = run_local_agent(payload.text, history_blocks=current_blocks)
+                new_blocks = run_local_agent(message_text, history_blocks=current_blocks)
             except (AgentResponseError, PlanningDataError, RoutingProviderError):
-                new_blocks = conversation_failure_blocks(payload.text)
+                new_blocks = conversation_failure_blocks(message_text)
         else:
-            new_blocks = conversation_failure_blocks(payload.text)
+            new_blocks = conversation_failure_blocks(message_text)
+
+    if is_action:
+        new_blocks = without_action_echo(new_blocks, message_text)
 
     blocks = [*current_blocks, *new_blocks]
     request.session[ACTIVE_CONVERSATION_BLOCKS_KEY] = blocks[-80:]
     request.session.modified = True
-    return {"blocks": request.session[ACTIVE_CONVERSATION_BLOCKS_KEY]}
+    return Response(conversation_a2ui_response(request.session[ACTIVE_CONVERSATION_BLOCKS_KEY]), status=200)
+
+
+def conversation_message_text(payload: ConversationMessageRequest) -> tuple[str, bool]:
+    if payload.action is not None:
+        if payload.version != A2UI_PROTOCOL_VERSION:
+            return "", True
+        action = schema_to_dict(payload.action)
+        return action_payload_to_text(action), True
+    return (payload.text or "").strip(), False
+
+
+def schema_to_dict(value) -> dict:
+    if hasattr(value, "model_dump"):
+        return value.model_dump()
+    if hasattr(value, "dict"):
+        return value.dict()
+    return dict(value)
+
+
+def without_action_echo(blocks: list[dict], message_text: str) -> list[dict]:
+    return [
+        block
+        for block in blocks
+        if not (
+            block.get("type") == "UserMessage"
+            and isinstance(block.get("props"), dict)
+            and str(block["props"].get("text") or "").strip() == message_text
+        )
+    ]
 
 
 @router.get("/conversation", response={200: RoutePlanResponse, 404: RoutePlanError})

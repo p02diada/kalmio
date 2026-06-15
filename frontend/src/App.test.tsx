@@ -1,7 +1,23 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { localBlocksToProtocolMessages } from '@/lib/a2ui/protocol'
+import type { A2UIBlock } from '@/lib/a2ui/types'
 import App from './App'
+
+function conversationBody(blocks: A2UIBlock[]) {
+  return {
+    messages: localBlocksToProtocolMessages(blocks, {
+      surfaceId: 'kalmio-chat',
+      dataModel: {
+        conversation: {
+          componentOrder: blocks.map((block) => ({ id: block.id, component: block.type })),
+        },
+      },
+      sendDataModel: true,
+    }),
+  }
+}
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -36,16 +52,14 @@ describe('App', () => {
       if (url.includes('/api/conversation/messages')) {
         return Promise.resolve(
           new Response(
-            JSON.stringify({
-              blocks: [
+            JSON.stringify(conversationBody([
                 {
                   id: 'assistant-initial',
                   type: 'AssistantMessage',
                   version: 1,
                   props: { text: 'Cuéntame qué necesitas.' },
                 },
-              ],
-            }),
+              ])),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
           ),
         )
@@ -61,8 +75,7 @@ describe('App', () => {
       if (url.includes('/api/conversation/message')) {
         return Promise.resolve(
           new Response(
-            JSON.stringify({
-              blocks: [
+            JSON.stringify(conversationBody([
                 {
                   id: 'user-1',
                   type: 'UserMessage',
@@ -75,8 +88,7 @@ describe('App', () => {
                   version: 1,
                   props: { destination: 'Valencia', needsConfirmation: true },
                 },
-              ],
-            }),
+              ])),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
           ),
         )
@@ -109,16 +121,14 @@ describe('App', () => {
       if (url.includes('/api/conversation/messages')) {
         return Promise.resolve(
           new Response(
-            JSON.stringify({
-              blocks: [
+            JSON.stringify(conversationBody([
                 {
                   id: 'unknown-1',
                   type: 'MadeUpComponent',
                   version: 1,
                   props: {},
                 },
-              ],
-            }),
+              ])),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
           ),
         )
@@ -140,16 +150,14 @@ describe('App', () => {
       if (url.includes('/api/conversation/messages')) {
         return Promise.resolve(
           new Response(
-            JSON.stringify({
-              blocks: [
+            JSON.stringify(conversationBody([
                 {
                   id: 'assistant-initial',
                   type: 'AssistantMessage',
                   version: 1,
                   props: { text: 'Cuéntame qué necesitas.' },
                 },
-              ],
-            }),
+              ])),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
           ),
         )
@@ -197,16 +205,14 @@ describe('App', () => {
       if (url.includes('/api/conversation/messages')) {
         return Promise.resolve(
           new Response(
-            JSON.stringify({
-              blocks: [
+            JSON.stringify(conversationBody([
                 {
                   id: 'assistant-initial',
                   type: 'AssistantMessage',
                   version: 1,
                   props: { text: 'Cuéntame qué necesitas.' },
                 },
-              ],
-            }),
+              ])),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
           ),
         )
@@ -236,8 +242,7 @@ describe('App', () => {
 
     resolveMessage(
       new Response(
-        JSON.stringify({
-          blocks: [
+        JSON.stringify(conversationBody([
             {
               id: 'user-1',
               type: 'UserMessage',
@@ -250,8 +255,7 @@ describe('App', () => {
               version: 1,
               props: { text: 'Necesito confirmar un dato antes de recomendar.' },
             },
-          ],
-        }),
+          ])),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     )

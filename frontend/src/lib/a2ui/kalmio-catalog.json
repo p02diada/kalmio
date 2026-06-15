@@ -1,0 +1,385 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
+  "catalogId": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
+  "version": "v1",
+  "description": "Kalmio EV assistant A2UI catalog. Agents may use only these domain components and registered functions.",
+  "components": {
+    "AssistantMessage": {
+      "type": "object",
+      "properties": {
+        "text": { "type": "string", "minLength": 1 }
+      },
+      "required": ["text"],
+      "additionalProperties": false
+    },
+    "UserMessage": {
+      "type": "object",
+      "properties": {
+        "text": { "type": "string", "minLength": 1 }
+      },
+      "required": ["text"],
+      "additionalProperties": false
+    },
+    "TripSummaryCard": {
+      "allOf": [
+        { "$ref": "#/$defs/decisionProps" },
+        {
+          "type": "object",
+          "properties": {
+            "origin": { "$ref": "#/$defs/displayValue" },
+            "destination": { "$ref": "#/$defs/displayValue" },
+            "battery": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+            "reserve": { "type": ["number", "null"], "minimum": 0, "maximum": 100 }
+          },
+          "additionalProperties": true
+        }
+      ]
+    },
+    "RouteSummaryCard": {
+      "allOf": [
+        { "$ref": "#/$defs/decisionProps" },
+        {
+          "type": "object",
+          "properties": {
+            "distanceKm": { "type": ["number", "null"], "minimum": 0 },
+            "durationMin": { "type": ["number", "null"], "minimum": 0 },
+            "energyKwh": { "type": ["number", "null"], "minimum": 0 },
+            "arrivalBattery": { "type": ["number", "null"], "minimum": 0, "maximum": 100 }
+          },
+          "additionalProperties": true
+        }
+      ]
+    },
+    "RecommendedStopCard": {
+      "allOf": [
+        { "$ref": "#/$defs/stationDecisionProps" },
+        { "$ref": "#/$defs/decisionProps" }
+      ]
+    },
+    "AlternativeRoutesList": {
+      "type": "object",
+      "properties": {
+        "routes": {
+          "type": "array",
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/listItem" }
+        },
+        "uncertainty": { "$ref": "#/$defs/uncertainty" }
+      },
+      "required": ["routes"],
+      "additionalProperties": false
+    },
+    "AlternativeStopsList": {
+      "type": "object",
+      "properties": {
+        "stops": {
+          "type": "array",
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/stationDecisionProps" }
+        },
+        "uncertainty": { "$ref": "#/$defs/uncertainty" }
+      },
+      "required": ["stops"],
+      "additionalProperties": false
+    },
+    "RiskExplanationCard": {
+      "type": "object",
+      "properties": {
+        "level": { "enum": ["info", "bajo", "baja", "medio", "media", "alto", "alta", "high", "medium"] },
+        "text": { "type": "string", "minLength": 1 },
+        "uncertainty": { "$ref": "#/$defs/uncertainty" },
+        "primaryAction": { "$ref": "#/$defs/action" }
+      },
+      "required": ["text"],
+      "additionalProperties": false
+    },
+    "CostComparisonCard": {
+      "allOf": [
+        { "$ref": "#/$defs/decisionProps" },
+        {
+          "type": "object",
+          "properties": {
+            "best": { "$ref": "#/$defs/displayValue" },
+            "estimatedCostEur": { "type": ["number", "null"], "minimum": 0 },
+            "savingEur": { "type": ["number", "null"] }
+          },
+          "additionalProperties": true
+        }
+      ]
+    },
+    "UrgentChargeCard": {
+      "allOf": [
+        { "$ref": "#/$defs/stationDecisionProps" },
+        { "$ref": "#/$defs/decisionProps" },
+        {
+          "type": "object",
+          "properties": {
+            "battery": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+            "nearest": { "$ref": "#/$defs/displayValue" }
+          },
+          "additionalProperties": true
+        }
+      ]
+    },
+    "DestinationChargingCard": {
+      "allOf": [
+        { "$ref": "#/$defs/decisionProps" },
+        {
+          "type": "object",
+          "properties": {
+            "destination": { "$ref": "#/$defs/displayValue" },
+            "needsConfirmation": { "type": "boolean" }
+          },
+          "additionalProperties": true
+        }
+      ]
+    },
+    "StayPlanningCard": {
+      "allOf": [
+        { "$ref": "#/$defs/decisionProps" },
+        {
+          "type": "object",
+          "properties": {
+            "nights": { "type": ["number", "null"], "minimum": 0 },
+            "city": { "$ref": "#/$defs/displayValue" },
+            "recommendation": { "$ref": "#/$defs/displayValue" }
+          },
+          "additionalProperties": true
+        }
+      ]
+    },
+    "MapPreviewCard": {
+      "type": "object",
+      "properties": {
+        "origin": { "$ref": "#/$defs/displayValue" },
+        "stop": { "$ref": "#/$defs/displayValue" },
+        "destination": { "$ref": "#/$defs/displayValue" },
+        "isSchematic": { "type": "boolean", "default": true },
+        "source": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "ActionButtons": {
+      "type": "object",
+      "properties": {
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": { "$ref": "#/$defs/action" }
+        }
+      },
+      "required": ["actions"],
+      "additionalProperties": false
+    },
+    "ClarifyingQuestionCard": {
+      "type": "object",
+      "properties": {
+        "question": { "type": "string", "minLength": 1 },
+        "fields": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "maxItems": 6
+        },
+        "primaryAction": { "$ref": "#/$defs/action" }
+      },
+      "required": ["question"],
+      "additionalProperties": false
+    },
+    "LocationRequestCard": {
+      "type": "object",
+      "properties": {
+        "reason": { "enum": ["urgent_charge", "nearby_chargers", "route_origin"] },
+        "title": { "type": "string", "minLength": 1 },
+        "body": { "type": "string", "minLength": 1 },
+        "precision": { "enum": ["exact", "approximate"] },
+        "manualFields": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "maxItems": 5
+        }
+      },
+      "required": ["title", "body"],
+      "additionalProperties": false
+    },
+    "LocationDetailCard": {
+      "type": "object",
+      "properties": {
+        "label": { "$ref": "#/$defs/displayValue" },
+        "lat": { "type": ["number", "null"], "minimum": -90, "maximum": 90 },
+        "lon": { "type": ["number", "null"], "minimum": -180, "maximum": 180 },
+        "precision": { "enum": ["exact", "approximate"] },
+        "context": { "type": "string" },
+        "needsConfirmation": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "PreferenceChips": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "chips": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "required": ["chips"],
+      "additionalProperties": false
+    },
+    "ErrorFallbackCard": {
+      "type": "object",
+      "properties": {
+        "originalType": { "type": "string" },
+        "message": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "functions": [
+    {
+      "name": "openUrl",
+      "description": "Open a safe http(s) URL in a new browser context.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string", "pattern": "^https?://" }
+        },
+        "required": ["url"],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "theme": {
+    "type": "object",
+    "description": "Renderer-owned Kalmio theme values. Agents should use semantic props rather than visual styling."
+  },
+  "$defs": {
+    "displayValue": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" },
+        {
+          "type": "object",
+          "properties": {
+            "label": { "type": "string" },
+            "name": { "type": "string" },
+            "title": { "type": "string" },
+            "text": { "type": "string" },
+            "value": {}
+          },
+          "additionalProperties": true
+        }
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "label": { "type": "string", "minLength": 1 },
+        "value": { "type": ["string", "number", "boolean", "null"] },
+        "unit": { "type": "string" },
+        "status": { "enum": ["known", "estimated", "unknown"] },
+        "sourcePath": { "type": "string" }
+      },
+      "required": ["label", "value"],
+      "additionalProperties": false
+    },
+    "uncertainty": {
+      "type": "object",
+      "properties": {
+        "level": { "enum": ["info", "medium", "high"] },
+        "text": { "type": "string", "minLength": 1 },
+        "source": { "type": "string" },
+        "freshness": { "type": "string" }
+      },
+      "required": ["level", "text"],
+      "additionalProperties": false
+    },
+    "event": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "context": { "type": "object", "additionalProperties": true }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "functionCall": {
+      "type": "object",
+      "properties": {
+        "call": { "const": "openUrl" },
+        "args": {
+          "type": "object",
+          "properties": {
+            "url": { "type": "string", "pattern": "^https?://" }
+          },
+          "required": ["url"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["call", "args"],
+      "additionalProperties": false
+    },
+    "action": {
+      "type": "object",
+      "properties": {
+        "label": { "type": "string", "minLength": 1 },
+        "priority": { "enum": ["primary", "secondary"] },
+        "disabled": { "type": "boolean" },
+        "reason": { "type": "string" },
+        "event": { "$ref": "#/$defs/event" },
+        "functionCall": { "$ref": "#/$defs/functionCall" }
+      },
+      "required": ["label"],
+      "oneOf": [
+        { "required": ["event"] },
+        { "required": ["functionCall"] },
+        { "required": ["disabled"] }
+      ],
+      "additionalProperties": false
+    },
+    "decisionProps": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "takeaway": { "type": "string" },
+        "why": { "type": "string" },
+        "evidence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidence" },
+          "maxItems": 6
+        },
+        "uncertainty": { "$ref": "#/$defs/uncertainty" },
+        "primaryAction": { "$ref": "#/$defs/action" }
+      },
+      "additionalProperties": true
+    },
+    "stationDecisionProps": {
+      "type": "object",
+      "properties": {
+        "name": { "$ref": "#/$defs/displayValue" },
+        "powerKw": { "type": ["number", "null"], "minimum": 0 },
+        "distanceKm": { "type": ["number", "null"], "minimum": 0 },
+        "detourMin": { "type": ["number", "null"] },
+        "confidence": { "$ref": "#/$defs/displayValue" },
+        "lat": { "type": ["number", "null"], "minimum": -90, "maximum": 90 },
+        "lon": { "type": ["number", "null"], "minimum": -180, "maximum": 180 }
+      },
+      "additionalProperties": true
+    },
+    "listItem": {
+      "type": "object",
+      "properties": {
+        "name": { "$ref": "#/$defs/displayValue" },
+        "deltaMin": { "type": ["number", "null"] },
+        "powerKw": { "type": ["number", "null"] },
+        "distanceKm": { "type": ["number", "null"] },
+        "takeaway": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  }
+}

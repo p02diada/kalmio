@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils'
 type RecordList = Array<Record<string, unknown>>
 type A2UIRendererActions = {
   onChipClick?: (value: string) => void
+  onActionEvent?: (name: string, context?: Record<string, unknown>, sourceComponentId?: string) => void
   onLocationSubmit?: (value: string) => void
   onManualLocationRequest?: () => void
 }
@@ -29,12 +30,13 @@ type A2UIRendererActions = {
 export function A2UIRenderer({
   blocks,
   onChipClick,
+  onActionEvent,
   onLocationSubmit,
   onManualLocationRequest,
 }: {
   blocks: A2UIBlock[]
 } & A2UIRendererActions) {
-  const actions = { onChipClick, onLocationSubmit, onManualLocationRequest }
+  const actions = { onChipClick, onActionEvent, onLocationSubmit, onManualLocationRequest }
 
   return (
     <div className="flex flex-col gap-3">
@@ -166,7 +168,13 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
     case 'MapPreviewCard':
       return <MapPreviewCard block={block} />
     case 'ActionButtons':
-      return <ActionButtons actions={list(block.props.actions)} />
+      return (
+        <ActionButtons
+          actions={list(block.props.actions)}
+          sourceComponentId={block.id}
+          onActionEvent={actions.onActionEvent ?? actions.onChipClick}
+        />
+      )
     case 'ClarifyingQuestionCard':
       return (
         <Card className="border-border bg-muted">
@@ -562,34 +570,91 @@ function MapPreviewCard({ block }: { block: A2UIBlock }) {
   )
 }
 
-function ActionButtons({ actions }: { actions: RecordList }) {
+function ActionButtons({
+  actions,
+  sourceComponentId,
+  onActionEvent,
+}: {
+  actions: RecordList
+  sourceComponentId: string
+  onActionEvent?: (name: string, context?: Record<string, unknown>, sourceComponentId?: string) => void
+}) {
   return (
     <div className="grid gap-2 sm:grid-cols-2">
-      {actions.map((action, index) => (
-        <div key={text(action.label)} className="flex flex-col gap-1">
-          <Button
-            type="button"
-            disabled={bool(action.disabled)}
-            variant={index === 0 && !bool(action.disabled) ? 'default' : 'outline'}
-            className={index === 0 ? 'h-11 w-full font-bold' : 'h-11 w-full'}
-            onClick={() => openAction(text(action.href, ''))}
-          >
-            {text(action.label)}
-          </Button>
-          {bool(action.disabled) && text(action.reason, '') ? (
-            <p className="max-w-48 text-xs leading-5 text-muted-foreground">{text(action.reason, '')}</p>
-          ) : null}
-        </div>
-      ))}
+      {actions.map((action, index) => {
+        const target = actionTarget(action)
+        const isDisabled = bool(action.disabled) || target === null
+        const isPrimary = text(action.priority, '') === 'primary' || (index === 0 && !isDisabled && !text(action.priority, ''))
+
+        return (
+          <div key={`${text(action.label)}-${index}`} className="flex flex-col gap-1">
+            <Button
+              type="button"
+              disabled={isDisabled}
+              variant={isPrimary ? 'default' : 'outline'}
+              className={isPrimary ? 'h-11 w-full font-bold' : 'h-11 w-full'}
+              onClick={() => handleAction(target, onActionEvent, sourceComponentId)}
+            >
+              {text(action.label)}
+            </Button>
+            {(isDisabled && text(action.reason, '')) || (!bool(action.disabled) && target === null) ? (
+              <p className="max-w-48 text-xs leading-5 text-muted-foreground">
+                {text(action.reason, '') || 'Esta acción no está disponible en este contexto.'}
+              </p>
+            ) : null}
+          </div>
+        )
+      })}
     </div>
   )
 }
 
-function openAction(href: string) {
-  if (!href) {
+type ActionTarget =
+  | { kind: 'functionCall'; url: string }
+  | { kind: 'event'; name: string; context?: Record<string, unknown> }
+
+function actionTarget(action: Record<string, unknown>): ActionTarget | null {
+  const functionCall = record(action.functionCall)
+  const functionArgs = record(functionCall?.args)
+  const functionUrl = text(functionArgs?.url, '').trim()
+  if (functionCall?.call === 'openUrl' && safeHttpUrl(functionUrl)) {
+    return { kind: 'functionCall', url: functionUrl }
+  }
+
+  const event = record(action.event)
+  const eventName = text(event?.name, '')
+  if (eventName) {
+    return { kind: 'event', name: eventName, context: record(event?.context) ?? undefined }
+  }
+
+  return null
+}
+
+function handleAction(
+  target: ActionTarget | null,
+  onActionEvent?: (name: string, context?: Record<string, unknown>, sourceComponentId?: string) => void,
+  sourceComponentId?: string,
+) {
+  if (!target) {
     return
   }
-  window.open(href, '_blank', 'noopener,noreferrer')
+  if (target.kind === 'functionCall') {
+    openAction(target.url)
+    return
+  }
+  onActionEvent?.(target.name, target.context, sourceComponentId)
+}
+
+function openAction(url: string) {
+  if (!url) {
+    return
+  }
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
+function safeHttpUrl(value: string) {
+  const normalized = value.trim().toLowerCase()
+  return normalized.startsWith('https://') || normalized.startsWith('http://')
 }
 
 function ErrorFallbackCard({ type, message }: { type: string; message: string }) {
@@ -641,6 +706,10 @@ function bool(value: unknown) {
 
 function list(value: unknown): RecordList {
   return Array.isArray(value) ? value.filter((item): item is Record<string, unknown> => Boolean(item)) : []
+}
+
+function record(value: unknown): Record<string, unknown> | null {
+  return isRecord(value) ? value : null
 }
 
 function strings(value: unknown): string[] {

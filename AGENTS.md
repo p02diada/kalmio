@@ -64,6 +64,12 @@ Backend: Django, Django Ninja, Django ORM, GeoDjango, Postgres/PostGIS, provider
 
 ## A2UI Rules
 
+- Official A2UI v0.9.1 is the canonical target for production-facing A2UI work unless a newer production version is explicitly adopted and documented.
+- Kalmio's current `{id, type, version, props}` block shape is an internal adapter only. Do not treat it as the official protocol, and do not expand it as a new public wire contract.
+- Production protocol work must be designed around A2UI envelopes: `createSurface`, `updateComponents`, `updateDataModel`, and `deleteSurface`.
+- Conversation endpoints expose A2UI only through a `messages` envelope list. Do not add or consume a public `blocks` response field.
+- Kalmio must maintain an application-specific, versioned A2UI catalog. Any new component, prop, action, function, theme value, or semantic hint must be added to the catalog/schema and documented before agent use.
+- Use stable catalog IDs, preferably URI-shaped, and bump or migrate catalog versions when component semantics or required props change.
 - Only allowlisted components can render as dynamic UI.
 - Validate every backend response.
 - Unknown frontend blocks render a fallback.
@@ -71,6 +77,11 @@ Backend: Django, Django Ninja, Django ORM, GeoDjango, Postgres/PostGIS, provider
 - The A2UI catalog is the UI security boundary: the agent chooses blocks, the backend validates them, and the frontend renders only registered components.
 - Describe components to the agent by purpose and data requirements, not as hardcoded intent mappings.
 - Repair A2UI only for catalog, structure, action-safety, or data-traceability violations.
+- Renderer styling is controlled by the renderer/design system. Agents may provide semantic component choices and supported semantic hints, but not arbitrary CSS, raw HTML, scripts, or visual styling.
+- User interactions must map to official A2UI actions: `event` for backend/agent handling, or registered `functionCall` for safe local renderer behavior such as opening a URL. Do not invent ad hoc action handlers or expose raw `href` as the action model.
+- Client-to-server A2UI events must be sent as `{version:"v0.9.1", action:{...}}`; do not convert UI events into visible user chat text in the frontend.
+- Prefer `updateDataModel` / data bindings for factual route, charger, location, uncertainty, and vehicle state. Component props may reference or summarize that data, but must not become an untraceable source of facts.
+- Client capabilities must advertise supported catalog IDs when A2UI is transported over A2A/AG-UI/SSE/WebSocket. If no compatible catalog exists, the agent should not send UI.
 
 ## AI Rules
 

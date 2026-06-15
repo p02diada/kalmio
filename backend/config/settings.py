@@ -237,8 +237,8 @@ if KALMIO_ROUTE_CONVERSATION_THROTTLE_WINDOW_SECONDS <= 0:
     )
 
 KALMIO_CONVERSATION_AGENT_MODE = os.getenv("KALMIO_CONVERSATION_AGENT_MODE", "local").strip().lower()
-if KALMIO_CONVERSATION_AGENT_MODE not in {"local", "codex"}:
-    raise ImproperlyConfigured("KALMIO_CONVERSATION_AGENT_MODE must be local or codex.")
+if KALMIO_CONVERSATION_AGENT_MODE not in {"local", "codex", "deepseek"}:
+    raise ImproperlyConfigured("KALMIO_CONVERSATION_AGENT_MODE must be local, codex, or deepseek.")
 KALMIO_CODEX_COMMAND = os.getenv("KALMIO_CODEX_COMMAND", "codex").strip() or "codex"
 KALMIO_CODEX_MODEL = os.getenv("KALMIO_CODEX_MODEL", "gpt-5.4-mini").strip() or "gpt-5.4-mini"
 try:
@@ -253,6 +253,81 @@ except ValueError as exc:
     raise ImproperlyConfigured("KALMIO_CODEX_MAX_TOOL_CALLS must be an integer.") from exc
 if KALMIO_CODEX_MAX_TOOL_CALLS < 0 or KALMIO_CODEX_MAX_TOOL_CALLS > 8:
     raise ImproperlyConfigured("KALMIO_CODEX_MAX_TOOL_CALLS must be between 0 and 8.")
+
+KALMIO_DEEPSEEK_API_KEY = (
+    os.getenv("KALMIO_DEEPSEEK_API_KEY") or os.getenv("DEEPSEEK_API_KEY") or ""
+).strip()
+if KALMIO_CONVERSATION_AGENT_MODE == "deepseek" and not KALMIO_DEEPSEEK_API_KEY:
+    raise ImproperlyConfigured(
+        "KALMIO_DEEPSEEK_API_KEY or DEEPSEEK_API_KEY is required when KALMIO_CONVERSATION_AGENT_MODE=deepseek."
+    )
+KALMIO_DEEPSEEK_BASE_URL = os.getenv("KALMIO_DEEPSEEK_BASE_URL", "https://api.deepseek.com").strip()
+require_http_url("KALMIO_DEEPSEEK_BASE_URL", KALMIO_DEEPSEEK_BASE_URL)
+KALMIO_DEEPSEEK_MODEL = os.getenv("KALMIO_DEEPSEEK_MODEL", "deepseek-v4-flash").strip() or "deepseek-v4-flash"
+try:
+    KALMIO_DEEPSEEK_TIMEOUT_SECONDS = float(os.getenv("KALMIO_DEEPSEEK_TIMEOUT_SECONDS", "30"))
+except ValueError as exc:
+    raise ImproperlyConfigured("KALMIO_DEEPSEEK_TIMEOUT_SECONDS must be a number.") from exc
+if KALMIO_DEEPSEEK_TIMEOUT_SECONDS <= 0:
+    raise ImproperlyConfigured("KALMIO_DEEPSEEK_TIMEOUT_SECONDS must be greater than zero.")
+try:
+    KALMIO_DEEPSEEK_MAX_TOOL_CALLS = int(os.getenv("KALMIO_DEEPSEEK_MAX_TOOL_CALLS", "3"))
+except ValueError as exc:
+    raise ImproperlyConfigured("KALMIO_DEEPSEEK_MAX_TOOL_CALLS must be an integer.") from exc
+if KALMIO_DEEPSEEK_MAX_TOOL_CALLS < 0 or KALMIO_DEEPSEEK_MAX_TOOL_CALLS > 8:
+    raise ImproperlyConfigured("KALMIO_DEEPSEEK_MAX_TOOL_CALLS must be between 0 and 8.")
+try:
+    KALMIO_DEEPSEEK_MAX_TOKENS = int(os.getenv("KALMIO_DEEPSEEK_MAX_TOKENS", "1800"))
+except ValueError as exc:
+    raise ImproperlyConfigured("KALMIO_DEEPSEEK_MAX_TOKENS must be an integer.") from exc
+if KALMIO_DEEPSEEK_MAX_TOKENS <= 0:
+    raise ImproperlyConfigured("KALMIO_DEEPSEEK_MAX_TOKENS must be greater than zero.")
+try:
+    KALMIO_DEEPSEEK_TEMPERATURE = float(os.getenv("KALMIO_DEEPSEEK_TEMPERATURE", "0"))
+except ValueError as exc:
+    raise ImproperlyConfigured("KALMIO_DEEPSEEK_TEMPERATURE must be a number.") from exc
+if KALMIO_DEEPSEEK_TEMPERATURE < 0 or KALMIO_DEEPSEEK_TEMPERATURE > 2:
+    raise ImproperlyConfigured("KALMIO_DEEPSEEK_TEMPERATURE must be between 0 and 2.")
+KALMIO_DEEPSEEK_USE_NATIVE_TOOLS = env_bool("KALMIO_DEEPSEEK_USE_NATIVE_TOOLS", default=True)
+KALMIO_DEEPSEEK_THINKING = env_bool("KALMIO_DEEPSEEK_THINKING", default=False)
+KALMIO_DEEPSEEK_REASONING_EFFORT = os.getenv("KALMIO_DEEPSEEK_REASONING_EFFORT", "high").strip().lower()
+if KALMIO_DEEPSEEK_REASONING_EFFORT not in {"high", "max"}:
+    raise ImproperlyConfigured("KALMIO_DEEPSEEK_REASONING_EFFORT must be high or max.")
+deepseek_default_prices = {
+    "deepseek-v4-flash": ("0.0028", "0.14", "0.28"),
+    "deepseek-v4-pro": ("0.003625", "0.435", "0.87"),
+}
+deepseek_price_defaults = deepseek_default_prices.get(KALMIO_DEEPSEEK_MODEL, deepseek_default_prices["deepseek-v4-flash"])
+try:
+    KALMIO_DEEPSEEK_PRICE_INPUT_CACHE_HIT_PER_MILLION_USD = float(
+        os.getenv("KALMIO_DEEPSEEK_PRICE_INPUT_CACHE_HIT_PER_MILLION_USD", deepseek_price_defaults[0])
+    )
+    KALMIO_DEEPSEEK_PRICE_INPUT_CACHE_MISS_PER_MILLION_USD = float(
+        os.getenv("KALMIO_DEEPSEEK_PRICE_INPUT_CACHE_MISS_PER_MILLION_USD", deepseek_price_defaults[1])
+    )
+    KALMIO_DEEPSEEK_PRICE_OUTPUT_PER_MILLION_USD = float(
+        os.getenv("KALMIO_DEEPSEEK_PRICE_OUTPUT_PER_MILLION_USD", deepseek_price_defaults[2])
+    )
+except ValueError as exc:
+    raise ImproperlyConfigured("KALMIO_DEEPSEEK_PRICE_* values must be numbers.") from exc
+if min(
+    KALMIO_DEEPSEEK_PRICE_INPUT_CACHE_HIT_PER_MILLION_USD,
+    KALMIO_DEEPSEEK_PRICE_INPUT_CACHE_MISS_PER_MILLION_USD,
+    KALMIO_DEEPSEEK_PRICE_OUTPUT_PER_MILLION_USD,
+) < 0:
+    raise ImproperlyConfigured("KALMIO_DEEPSEEK_PRICE_* values must be greater than or equal to zero.")
+
+KALMIO_AGENT_TRACE_ENABLED = env_bool("KALMIO_AGENT_TRACE_ENABLED", default=not IS_PRODUCTION)
+KALMIO_AGENT_TRACE_INCLUDE_PAYLOADS = env_bool("KALMIO_AGENT_TRACE_INCLUDE_PAYLOADS", default=False)
+if IS_PRODUCTION and KALMIO_AGENT_TRACE_INCLUDE_PAYLOADS:
+    raise ImproperlyConfigured("KALMIO_AGENT_TRACE_INCLUDE_PAYLOADS must be false in production.")
+KALMIO_AGENT_TRACE_FILE = os.getenv("KALMIO_AGENT_TRACE_FILE", ".tmp/agent-traces.jsonl").strip()
+try:
+    KALMIO_AGENT_TRACE_MAX_PAYLOAD_CHARS = int(os.getenv("KALMIO_AGENT_TRACE_MAX_PAYLOAD_CHARS", "12000"))
+except ValueError as exc:
+    raise ImproperlyConfigured("KALMIO_AGENT_TRACE_MAX_PAYLOAD_CHARS must be an integer.") from exc
+if KALMIO_AGENT_TRACE_MAX_PAYLOAD_CHARS < 0:
+    raise ImproperlyConfigured("KALMIO_AGENT_TRACE_MAX_PAYLOAD_CHARS must be greater than or equal to zero.")
 
 PUBLIC_OSRM_DEVELOPMENT_URL = "https://router.project-osrm.org"
 KALMIO_OSRM_BASE_URL = os.getenv(
@@ -326,6 +401,11 @@ LOGGING = {
         "django.security": {
             "handlers": ["console"],
             "level": "WARNING",
+            "propagate": False,
+        },
+        "kalmio.agent_trace": {
+            "handlers": ["console"],
+            "level": "INFO",
             "propagate": False,
         },
     },

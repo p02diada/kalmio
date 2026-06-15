@@ -134,18 +134,27 @@ El script valida:
 
 Es útil antes de habilitar el endpoint público para confirmar que la cadena de conversación está operativa.
 
-The chat screen uses `/api/conversation/message`. The backend stores A2UI blocks in the Django session, validates component types against the local catalog, and decides whether to clarify, search destination charging, or call route planning tools. Tune the local agent mode with:
+The chat screen uses `/api/conversation/message`. Kalmio targets official A2UI v0.9.1 with an application-specific catalog at `frontend/src/lib/a2ui/kalmio-catalog.json` (`https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json`). Conversation endpoints return `messages`: ordered A2UI envelopes containing `createSurface`, `updateComponents`, and `updateDataModel`. The backend may still store validated local adapter blocks in the Django session, but that shape is not the frontend transport contract. Backend envelope emission lives in `backend/routing/a2ui_protocol.py`; frontend message processing lives in `frontend/src/lib/a2ui/protocol.ts`. Tune the local agent mode with:
 
 - `KALMIO_CONVERSATION_AGENT_MODE=local` for deterministic local development.
 - `KALMIO_CONVERSATION_AGENT_MODE=codex` to use the local Codex CLI adapter.
+- `KALMIO_CONVERSATION_AGENT_MODE=deepseek` to use DeepSeek through the OpenAI-compatible SDK adapter.
 - `KALMIO_CODEX_COMMAND` (default `codex`)
 - `KALMIO_CODEX_MODEL` (default `gpt-5.4-mini`)
 - `KALMIO_CODEX_TIMEOUT_SECONDS` (default `60`)
 - `KALMIO_CODEX_MAX_TOOL_CALLS` (default `3`)
+- `KALMIO_DEEPSEEK_API_KEY` or `DEEPSEEK_API_KEY` (required only when `KALMIO_CONVERSATION_AGENT_MODE=deepseek`)
+- `KALMIO_DEEPSEEK_BASE_URL` (default `https://api.deepseek.com`)
+- `KALMIO_DEEPSEEK_MODEL` (default `deepseek-v4-flash`; use `deepseek-v4-pro` for stronger eval runs)
+- `KALMIO_DEEPSEEK_TIMEOUT_SECONDS` (default `30`)
+- `KALMIO_DEEPSEEK_MAX_TOOL_CALLS` (default `3`)
+- `KALMIO_DEEPSEEK_MAX_TOKENS` (default `1800`)
+- `KALMIO_DEEPSEEK_USE_NATIVE_TOOLS` (default `true`)
+- `KALMIO_DEEPSEEK_THINKING` (default `false` for cheaper, simpler dev JSON/tool-call behavior)
 
-In `codex` mode, Codex does not access the database or providers directly. It can request a bounded sequence of allowlisted Django tool calls (`resolve_location`, `search_destination_chargers`, or `plan_route`), Django executes them, and Codex receives only the validated tool results to compose final A2UI blocks. Codex chooses the UI blocks that best fit the user request and tool results; Django validates the catalog, factual constraints, and semantic obligations. If an allowlisted tool returns no usable data, Codex receives that failure and must answer honestly from the validated state. If the final A2UI is incomplete, Django asks Codex for one repair with the concrete contract issues. If Codex asks for an unknown tool, repeats the same tool call, exceeds `KALMIO_CODEX_MAX_TOOL_CALLS`, fails repair, or fails to return final A2UI, the backend returns safe fallback A2UI instead of executing arbitrary behavior.
+In `codex` and `deepseek` modes, the model does not access the database or providers directly. It can request a bounded sequence of allowlisted Django tool calls (`resolve_location`, `search_destination_chargers`, or `plan_route`), Django executes them, and the model receives only the validated tool results to compose final Kalmio A2UI components. The model chooses the UI components that best fit the user request and tool results; Django validates the catalog, factual constraints, action model, and semantic obligations. The DeepSeek adapter uses the OpenAI-compatible Chat Completions SDK with JSON output and optional native tool calls; it also accepts the existing JSON `type=tool_call` shape to keep provider behavior testable. Actions normalize to official A2UI semantics: `event` for backend/agent handling or registered `functionCall` for safe local renderer behavior such as opening a URL. Client-to-server events are posted as `{ "version": "v0.9.1", "action": { ... } }`, not as visible user messages. If an allowlisted tool returns no usable data, the model receives that failure and must answer honestly from the validated state. If the final A2UI is incomplete, Django asks the model for one repair with the concrete contract issues. If the model asks for an unknown tool, repeats the same tool call, exceeds the configured tool-call budget, fails repair, or fails to return final A2UI, the backend returns safe fallback A2UI instead of executing arbitrary behavior.
 
-Codex receives the available conversation context for each turn so it can resolve natural follow-ups; Django should validate the resulting structured tool arguments instead of parsing natural phrasing with feature-specific regexes.
+The configured agent receives the available conversation context for each turn so it can resolve natural follow-ups; Django should validate the resulting structured tool arguments instead of parsing natural phrasing with feature-specific regexes.
 
 Conversation endpoints are throttled by session/IP to reduce abuse. Tune in settings:
 
@@ -173,7 +182,43 @@ curl -b cookies.txt http://localhost:8000/api/conversation/messages
 The response shape is:
 
 ```json
-{"blocks":[{"id":"...","type":"AssistantMessage","version":1,"props":{"text":"..."}}]}
+{
+  "messages": [
+    {
+      "version": "v0.9.1",
+      "createSurface": {
+        "surfaceId": "kalmio-chat",
+        "catalogId": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
+        "sendDataModel": true
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateComponents": {
+        "surfaceId": "kalmio-chat",
+        "components": [
+          { "id": "...", "component": "AssistantMessage", "version": 1, "text": "..." }
+        ]
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateDataModel": {
+        "surfaceId": "kalmio-chat",
+        "path": "/",
+        "value": { "conversation": {}, "facts": {} }
+      }
+    }
+  ]
+}
+```
+
+Send a rendered UI event back through the A2UI action channel:
+
+```bash
+curl -b cookies.txt -H 'Content-Type: application/json' -H "X-CSRFToken: $CSRF_TOKEN" \
+  -d '{"version":"v0.9.1","action":{"name":"refine_search","surfaceId":"kalmio-chat","sourceComponentId":"actions-1","timestamp":"2026-06-15T20:00:00.000Z","context":{"radiusKm":80}}}' \
+  http://localhost:8000/api/conversation/message
 ```
 
 Create a typed route plan directly only when testing the backend route-planning tool outside the chat host. The PWA chat does not call this endpoint directly; it sends free-form text to `/api/conversation/message` and lets the backend agent decide when route planning is appropriate:
@@ -184,7 +229,7 @@ curl -b cookies.txt -H 'Content-Type: application/json' -H "X-CSRFToken: $CSRF_T
   http://localhost:8000/api/plans/route
 ```
 
-Anonymous A2UI chat blocks are stored only in the Django session and are not added to account history. Route calculations require CSRF, a reachable routing provider, and authorized charger records. Without vehicle characteristics, Kalmio only shows chargers near the route and does not calculate autonomy, arrival battery, or optimal charging stops.
+Anonymous A2UI chat state is stored only in the Django session and is not added to account history. Route calculations require CSRF, a reachable routing provider, and authorized charger records. Without vehicle characteristics, Kalmio only shows chargers near the route and does not calculate autonomy, arrival battery, or optimal charging stops.
 
 Create a local account when you want route-plan history and feedback:
 

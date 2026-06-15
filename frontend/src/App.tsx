@@ -64,6 +64,7 @@ import {
   clearConversation,
   conversationMessagesQueryKey,
   getConversationMessages,
+  sendConversationAction,
   sendConversationMessage,
 } from '@/lib/api/conversation'
 import type { A2UIBlock } from '@/lib/a2ui/types'
@@ -400,6 +401,12 @@ function ChatPage() {
       setPendingUserBlock(null)
     },
   })
+  const actionMutation = useMutation({
+    mutationFn: sendConversationAction,
+    onSuccess: (data) => {
+      queryClient.setQueryData(conversationMessagesQueryKey, data)
+    },
+  })
   const clearMutation = useMutation({
     mutationFn: clearConversation,
     onSuccess: () => {
@@ -436,6 +443,29 @@ function ChatPage() {
         setIsSending(false)
       })
   }, [isSending, sendMutation])
+
+  const sendA2UIEvent = useCallback((name: string, context: Record<string, unknown> = {}, sourceComponentId?: string) => {
+    const actionName = name.trim()
+    if (!actionName || isSending) {
+      return
+    }
+    setError(null)
+    setRetryText(null)
+    setIsSending(true)
+    setPhaseIndex(0)
+    actionMutation.mutateAsync({
+      name: actionName,
+      context,
+      sourceComponentId,
+      surfaceId: messagesQuery.data?.surfaceId,
+    })
+      .catch((mutationError) => {
+        setError(mutationError instanceof Error ? mutationError.message : 'No se pudo enviar la acción.')
+      })
+      .finally(() => {
+        setIsSending(false)
+      })
+  }, [actionMutation, isSending, messagesQuery.data?.surfaceId])
 
   useEffect(() => {
     if (sentInitialPrompt.current) {
@@ -491,7 +521,7 @@ function ChatPage() {
       <div ref={scrollRef} className="chat-scroll" aria-live="polite">
         {messagesQuery.isPending ? <ConversationSkeleton /> : null}
         {renderedBlocks.length > 0 ? (
-          <A2UIRenderer blocks={renderedBlocks} onChipClick={sendText} />
+          <A2UIRenderer blocks={renderedBlocks} onChipClick={sendText} onActionEvent={sendA2UIEvent} />
         ) : null}
         {isSending ? <ConversationProgress phaseIndex={phaseIndex} /> : null}
         {error ? <InlineError message={error} onRetry={retryText ? () => sendText(retryText) : undefined} /> : null}

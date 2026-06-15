@@ -147,6 +147,71 @@ describe('A2UIRenderer', () => {
     expect(screen.getByText('Faltan coordenadas u origen confirmado.')).toBeInTheDocument()
   })
 
+  it('opens registered local function actions', () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'actions',
+            type: 'ActionButtons',
+            version: 1,
+            props: {
+              actions: [
+                {
+                  label: 'Abrir en Maps',
+                  functionCall: {
+                    call: 'openUrl',
+                    args: { url: 'https://www.google.com/maps/search/?api=1&query=37.88,-4.78' },
+                  },
+                },
+              ],
+            },
+          },
+        ]}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir en Maps' }))
+
+    expect(open).toHaveBeenCalledWith(
+      'https://www.google.com/maps/search/?api=1&query=37.88,-4.78',
+      '_blank',
+      'noopener,noreferrer',
+    )
+    open.mockRestore()
+  })
+
+  it('dispatches event actions back through the host adapter', () => {
+    const onActionEvent = vi.fn()
+
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'actions',
+            type: 'ActionButtons',
+            version: 1,
+            props: {
+              actions: [
+                {
+                  label: 'Ajustar búsqueda',
+                  event: { name: 'refine_search', context: { radiusKm: 80 } },
+                },
+              ],
+            },
+          },
+        ]}
+        onActionEvent={onActionEvent}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ajustar búsqueda' }))
+
+    expect(onActionEvent).toHaveBeenCalledWith('refine_search', { radiusKm: 80 }, 'actions')
+  })
+
   it('requests browser location through an allowlisted location block', () => {
     const getCurrentPosition = vi.fn((success: PositionCallback) => {
       success({

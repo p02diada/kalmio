@@ -69,6 +69,23 @@ def csrf_request_headers(opener, csrf_token: str) -> dict[str, str]:
     return headers
 
 
+def components_from_payload(payload: dict) -> list[dict]:
+    messages = payload.get("messages")
+    require(isinstance(messages, list), "Respuesta sin lista de mensajes A2UI", payload)
+
+    components: list[dict] = []
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        update_components = message.get("updateComponents")
+        if not isinstance(update_components, dict):
+            continue
+        message_components = update_components.get("components")
+        if isinstance(message_components, list):
+            components.extend(component for component in message_components if isinstance(component, dict))
+    return components
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Smoke check for anonymous conversation flow.")
     parser.add_argument(
@@ -104,7 +121,7 @@ def main() -> None:
     require(isinstance(csrf_token, str) and csrf_token, "Token CSRF faltante")
     require(cookie_value(opener, "csrftoken") is not None, "Cookie CSRF faltante")
 
-    print("==> leyendo bloques iniciales A2UI")
+    print("==> leyendo mensajes iniciales A2UI")
     try:
         status, initial_payload = request_json(
             opener,
@@ -119,9 +136,13 @@ def main() -> None:
         raise SystemExit(f"No se pudieron leer mensajes iniciales: {exc}")
 
     require(status == 200, "Mensajes iniciales no válidos", status)
-    initial_blocks = initial_payload.get("blocks")
-    require(isinstance(initial_blocks, list) and initial_blocks, "Sin bloques A2UI iniciales")
-    require(initial_blocks[0].get("type") == "AssistantMessage", "Primer bloque A2UI inesperado", initial_blocks[0])
+    initial_components = components_from_payload(initial_payload)
+    require(initial_components, "Sin componentes A2UI iniciales")
+    require(
+        initial_components[0].get("component") == "AssistantMessage",
+        "Primer componente A2UI inesperado",
+        initial_components[0],
+    )
 
     print("==> enviando intención al agente A2UI")
     try:
@@ -139,22 +160,21 @@ def main() -> None:
         raise SystemExit(f"No se pudo crear conversación: {exc}")
 
     require(status == 200, "Conversación A2UI no válida", status)
-    blocks = message_payload.get("blocks")
-    require(isinstance(blocks, list), "Respuesta sin lista de bloques A2UI", message_payload)
-    block_types = {block.get("type") for block in blocks if isinstance(block, dict)}
-    require("UserMessage" in block_types, "La respuesta no incluye eco de usuario", block_types)
+    components = components_from_payload(message_payload)
+    component_types = {component.get("component") for component in components if isinstance(component, dict)}
+    require("UserMessage" in component_types, "La respuesta no incluye eco de usuario", component_types)
     require(
-        "DestinationChargingCard" in block_types or "ClarifyingQuestionCard" in block_types,
+        "DestinationChargingCard" in component_types or "ClarifyingQuestionCard" in component_types,
         "La respuesta no incluye bloque de destino ni aclaración",
-        block_types,
+        component_types,
     )
 
     print(
         "Conversación A2UI creada:",
-        ", ".join(sorted(str(block_type) for block_type in block_types)),
+        ", ".join(sorted(str(component_type) for component_type in component_types)),
     )
 
-    print("==> validando bloques guardados en sesión")
+    print("==> validando mensajes guardados en sesión")
     try:
         status, active_payload = request_json(
             opener,
@@ -164,14 +184,14 @@ def main() -> None:
         )
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8") if hasattr(exc, "read") else ""
-        raise SystemExit(f"No se pudieron leer bloques guardados (status {exc.code}): {detail}")
+        raise SystemExit(f"No se pudieron leer mensajes guardados (status {exc.code}): {detail}")
     except urllib.error.URLError as exc:
-        raise SystemExit(f"No se pudieron leer bloques guardados: {exc}")
+        raise SystemExit(f"No se pudieron leer mensajes guardados: {exc}")
 
     require(status == 200, "Lectura de conversación A2UI falla", status)
-    active_blocks = active_payload.get("blocks")
-    require(isinstance(active_blocks, list), "Conversación activa sin bloques A2UI", active_payload)
-    require(len(active_blocks) >= len(blocks), "La sesión no conservó los bloques A2UI")
+    active_components = components_from_payload(active_payload)
+    require(active_components, "Conversación activa sin componentes A2UI", active_payload)
+    require(len(active_components) >= len(components), "La sesión no conservó los componentes A2UI")
 
     print("==> borrando conversación")
     try:

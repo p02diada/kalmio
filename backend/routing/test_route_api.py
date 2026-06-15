@@ -8,8 +8,19 @@ from django.test import Client
 from django.utils import timezone
 
 from charging.models import AvailabilitySnapshot, Connector, DataSource, EVSE, Operator, ReliabilityScore, Station, Tariff
+from routing.a2ui_protocol import A2UI_PROTOCOL_VERSION, KALMIO_A2UI_CATALOG_ID, KALMIO_A2UI_SURFACE_ID
 from routing.api import ACTIVE_CONVERSATION_BLOCKS_KEY
-from routing.agent import AgentResponseError, blocks_from_tool_result, codex_prompt, contextualized_prompt, validate_blocks
+from routing.agent import (
+    AgentResponseError,
+    a2ui_contract_issues,
+    blocks_from_tool_result,
+    codex_prompt,
+    contextualized_prompt,
+    decode_codex_json,
+    parse_openai_compatible_decision,
+    run_deepseek_decision,
+    validate_blocks,
+)
 from routing.models import RoutePlan
 from routing.production_planner import score_exploration_station, station_to_score_payload
 from routing.providers import Coordinate, ProviderRoute, RoutingProviderError
@@ -71,6 +82,30 @@ def conversation_payload(**overrides):
     }
     payload.update(overrides)
     return payload
+
+
+def blocks_from_a2ui_response(response_or_payload):
+    payload = response_or_payload.json() if hasattr(response_or_payload, "json") else response_or_payload
+    blocks = []
+    for message in payload["messages"]:
+        update_components = message.get("updateComponents")
+        if not isinstance(update_components, dict):
+            continue
+        for component in update_components.get("components", []):
+            props = {
+                key: value
+                for key, value in component.items()
+                if key not in {"id", "component", "version"}
+            }
+            blocks.append(
+                {
+                    "id": component["id"],
+                    "type": component["component"],
+                    "version": component.get("version", 1),
+                    "props": props,
+                }
+            )
+    return blocks
 
 
 @pytest.fixture
@@ -137,8 +172,65 @@ def test_conversation_messages_initializes_a2ui_blocks(client):
 
     assert response.status_code == 200
     body = response.json()
-    assert body["blocks"][0]["type"] == "AssistantMessage"
-    assert body["blocks"][1]["type"] == "PreferenceChips"
+    assert body["messages"][0] == {
+        "version": A2UI_PROTOCOL_VERSION,
+        "createSurface": {
+            "surfaceId": KALMIO_A2UI_SURFACE_ID,
+            "catalogId": KALMIO_A2UI_CATALOG_ID,
+            "sendDataModel": True,
+        },
+    }
+    assert body["messages"][1]["updateComponents"]["surfaceId"] == KALMIO_A2UI_SURFACE_ID
+    assert body["messages"][1]["updateComponents"]["components"][0]["component"] == "AssistantMessage"
+    assert body["messages"][2]["updateDataModel"]["path"] == "/"
+    blocks = blocks_from_a2ui_response(body)
+    assert blocks[0]["type"] == "AssistantMessage"
+    assert blocks[1]["type"] == "PreferenceChips"
+    assert "blocks" not in body
+
+
+@pytest.mark.django_db
+def test_conversation_message_accepts_a2ui_action_transport_without_visible_action_echo(client, settings, monkeypatch):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+
+    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+        assert 'Acción A2UI: refine_search con contexto {"radiusKm": 80}' in message
+        return {
+            "type": "final",
+            "blocks": [
+                {
+                    "id": "assistant-action-result",
+                    "type": "AssistantMessage",
+                    "version": 1,
+                    "props": {"text": "Amplío la búsqueda a 80 km."},
+                }
+            ],
+        }
+
+    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+
+    response = client.post(
+        "/api/conversation/message",
+        data={
+            "version": A2UI_PROTOCOL_VERSION,
+            "action": {
+                "name": "refine_search",
+                "surfaceId": KALMIO_A2UI_SURFACE_ID,
+                "sourceComponentId": "actions-1",
+                "timestamp": "2026-06-15T20:00:00.000Z",
+                "context": {"radiusKm": 80},
+            },
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["messages"][1]["updateComponents"]["components"][-1]["component"] == "AssistantMessage"
+    assert not any(
+        block["type"] == "UserMessage" and "Acción A2UI" in block["props"].get("text", "")
+        for block in blocks_from_a2ui_response(body)
+    )
 
 
 @pytest.mark.django_db
@@ -151,7 +243,7 @@ def test_conversation_message_handles_destination_charging_without_route_planner
 
     assert response.status_code == 200
     body = response.json()
-    block_types = [block["type"] for block in body["blocks"]]
+    block_types = [block["type"] for block in blocks_from_a2ui_response(body)]
     assert "UserMessage" in block_types
     assert "DestinationChargingCard" in block_types
     assert "LocationDetailCard" in block_types
@@ -392,6 +484,70 @@ def test_codex_prompt_exposes_max_useful_power_tool_argument():
     assert "que el coche no aprovechará más de 100 kW" in prompt
 
 
+def test_decode_codex_json_accepts_stdout_when_output_file_is_empty():
+    payload = decode_codex_json("", '{"type":"tool_call","tool":"resolve_location","args":{"query":"Córdoba"}}')
+
+    assert payload["type"] == "tool_call"
+    assert payload["args"]["query"] == "Córdoba"
+
+
+def test_decode_codex_json_extracts_fenced_or_wrapped_json():
+    fenced = '```json\n{"type":"final","blocks":[]}\n```'
+    wrapped = 'Respuesta:\n{"type":"final","blocks":[]}\nFin.'
+
+    assert decode_codex_json(fenced)["type"] == "final"
+    assert decode_codex_json(wrapped)["blocks"] == []
+
+
+def test_deepseek_decision_parser_accepts_native_tool_call():
+    decision = parse_openai_compatible_decision(
+        {
+            "tool_calls": [
+                {
+                    "function": {
+                        "name": "resolve_location",
+                        "arguments": '{"query":"Córdoba"}',
+                    }
+                }
+            ]
+        }
+    )
+
+    assert decision == {"type": "tool_call", "tool": "resolve_location", "args": {"query": "Córdoba"}}
+
+
+def test_deepseek_decision_parser_accepts_json_final_content():
+    decision = parse_openai_compatible_decision(
+        {
+            "content": (
+                '{"type":"final","blocks":[{"id":"assistant","type":"AssistantMessage",'
+                '"version":1,"props":{"text":"Respuesta validable."}}]}'
+            )
+        }
+    )
+
+    assert decision["type"] == "final"
+    assert decision["blocks"][0]["type"] == "AssistantMessage"
+
+
+def test_deepseek_repair_decision_disables_native_tools(monkeypatch):
+    calls = []
+
+    def fake_deepseek_decision(prompt, allow_tools=True):
+        calls.append((prompt, allow_tools))
+        return {"type": "final", "blocks": []}
+
+    monkeypatch.setattr("routing.agent.call_deepseek_decision", fake_deepseek_decision)
+
+    decision = run_deepseek_decision(
+        "Busca cargadores cerca de Valencia",
+        repair_issues=["AlternativeStopsList necesita datos trazables."],
+        candidate_blocks=[],
+    )
+
+    assert decision["type"] == "final"
+    assert calls[0][1] is False
+
 
 def test_contextualized_prompt_summarizes_explicit_vehicle_facts_for_codex():
     prompt = contextualized_prompt(
@@ -409,6 +565,24 @@ def test_contextualized_prompt_summarizes_explicit_vehicle_facts_for_codex():
     assert "batería 18%" in prompt
     assert "conector CCS2" in prompt
     assert "Mensaje actual del usuario: Me equivoqué, estoy en Valencia centro" in prompt
+
+
+def test_contextualized_prompt_adds_known_location_hint_for_hotel_followup():
+    prompt = contextualized_prompt(
+        "Hotel Meliá cordoba",
+        [
+            {
+                "id": "clarify-hotel",
+                "type": "ClarifyingQuestionCard",
+                "version": 1,
+                "props": {"question": "¿Qué hotel o zona exacta?", "fields": ["hotel", "city_or_zone"]},
+            }
+        ],
+    )
+
+    assert "Pista de ubicación conocida detectada en el mensaje actual" in prompt
+    assert "Córdoba (37.8882, -4.7794)" in prompt
+    assert "no una decisión de intención" in prompt
 
 
 @pytest.mark.django_db
@@ -437,7 +611,7 @@ def test_conversation_message_preserves_urgent_charge_intent_for_location_follow
     )
 
     assert first_response.status_code == 200
-    assert first_response.json()["blocks"][-1]["type"] == "LocationRequestCard"
+    assert blocks_from_a2ui_response(first_response)[-1]["type"] == "LocationRequestCard"
 
     second_response = client.post(
         "/api/conversation/message",
@@ -446,7 +620,7 @@ def test_conversation_message_preserves_urgent_charge_intent_for_location_follow
     )
 
     assert second_response.status_code == 200
-    blocks = second_response.json()["blocks"]
+    blocks = blocks_from_a2ui_response(second_response)
     latest_user_index = max(
         index
         for index, item in enumerate(blocks)
@@ -460,6 +634,106 @@ def test_conversation_message_preserves_urgent_charge_intent_for_location_follow
     assert "LocationRequestCard" not in new_block_types
     urgent_block = next(block for block in new_blocks if block["type"] == "UrgentChargeCard")
     assert urgent_block["props"]["nearest"] == station.name
+
+
+@pytest.mark.django_db
+def test_codex_hotel_followup_with_known_city_can_search_from_location_hint(client, settings, monkeypatch):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+    source = DataSource.objects.create(name="Authorized provider Córdoba", kind="ocpi", is_authorized=True)
+    operator = Operator.objects.create(name="Córdoba Operator")
+    station = Station.objects.create(
+        external_id="real-cordoba-hotel-001",
+        operator=operator,
+        data_source=source,
+        name="Córdoba Centro Hotel HPC",
+        address="Córdoba",
+        latitude=Decimal("37.890000"),
+        longitude=Decimal("-4.780000"),
+        amenities=["hotel"],
+        is_sample_data=False,
+    )
+    evse = EVSE.objects.create(station=station, evse_uid="real-cordoba-hotel-001-1", max_power_kw=150, status="available")
+    Connector.objects.create(evse=evse, connector_type="CCS2", max_power_kw=150)
+    messages_seen = []
+
+    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+        tool_history = tool_history or []
+        messages_seen.append(message)
+        if "Hotel Meliá cordoba" not in message:
+            return {
+                "type": "final",
+                "blocks": [
+                    {
+                        "id": "clarify-hotel",
+                        "type": "ClarifyingQuestionCard",
+                        "version": 1,
+                        "props": {
+                            "question": "¿Qué hotel o qué ciudad/zona quieres usar?",
+                            "fields": ["Nombre del hotel", "Ciudad o zona"],
+                        },
+                    }
+                ],
+            }
+        if not tool_history:
+            assert "Pista de ubicación conocida detectada en el mensaje actual" in message
+            assert "Córdoba (37.8882, -4.7794)" in message
+            return {
+                "type": "tool_call",
+                "tool": "search_destination_chargers",
+                "args": {
+                    "location": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794},
+                    "radius_km": 80,
+                    "limit": 3,
+                },
+            }
+        tool_result = tool_history[-1]["result"]
+        return {
+            "type": "final",
+            "blocks": [
+                {
+                    "id": "destination-cordoba",
+                    "type": "DestinationChargingCard",
+                    "version": 1,
+                    "props": {"destination": "Córdoba", "needsConfirmation": True},
+                },
+                {
+                    "id": "stops-cordoba",
+                    "type": "AlternativeStopsList",
+                    "version": 1,
+                    "props": {"stops": tool_result["stops"]},
+                },
+                {
+                    "id": "risk-cordoba",
+                    "type": "RiskExplanationCard",
+                    "version": 1,
+                    "props": {
+                        "level": "medio",
+                        "text": "Confirma acceso final, tarifa y disponibilidad antes de depender de estos cargadores.",
+                    },
+                },
+            ],
+        }
+
+    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+
+    first_response = client.post(
+        "/api/conversation/message",
+        data={"text": "Cargadores cerca del hotel"},
+        content_type="application/json",
+    )
+    assert first_response.status_code == 200
+
+    second_response = client.post(
+        "/api/conversation/message",
+        data={"text": "Hotel Meliá cordoba"},
+        content_type="application/json",
+    )
+
+    assert second_response.status_code == 200
+    assert len(messages_seen) == 3
+    rendered_text = " ".join(str(block.get("props", {})) for block in blocks_from_a2ui_response(second_response))
+    assert "No he podido completar esta respuesta con fiabilidad" not in rendered_text
+    assert station.name in rendered_text
 
 
 @pytest.mark.django_db
@@ -492,7 +766,7 @@ def test_local_conversation_uses_history_for_followup_after_urgent_recommendatio
         content_type="application/json",
     )
     assert location_response.status_code == 200
-    assert any(block["type"] == "UrgentChargeCard" for block in location_response.json()["blocks"])
+    assert any(block["type"] == "UrgentChargeCard" for block in blocks_from_a2ui_response(location_response))
 
     battery_response = client.post(
         "/api/conversation/message",
@@ -501,7 +775,7 @@ def test_local_conversation_uses_history_for_followup_after_urgent_recommendatio
     )
 
     assert battery_response.status_code == 200
-    blocks = battery_response.json()["blocks"]
+    blocks = blocks_from_a2ui_response(battery_response)
     latest_user_index = max(
         index
         for index, item in enumerate(blocks)
@@ -596,8 +870,9 @@ def test_codex_conversation_agent_interprets_vehicle_followup_from_available_tra
     assert "Usuario: Estoy en 37.880729, -4.782446" in captured_messages[0]
     assert "Resultado previo de carga urgente" in captured_messages[0]
     assert "Mensaje actual del usuario: Tengo un 20%" in captured_messages[0]
-    body = response.json()
-    latest_urgent_block = next(block for block in reversed(body["blocks"]) if block["type"] == "UrgentChargeCard")
+    latest_urgent_block = next(
+        block for block in reversed(blocks_from_a2ui_response(response)) if block["type"] == "UrgentChargeCard"
+    )
     assert latest_urgent_block["props"]["battery"] == 20
 
 
@@ -645,8 +920,7 @@ def test_codex_conversation_agent_does_not_repair_component_choice_from_urgent_h
     )
 
     assert response.status_code == 200
-    body = response.json()
-    new_blocks = body["blocks"][len(session[ACTIVE_CONVERSATION_BLOCKS_KEY]) :]
+    new_blocks = blocks_from_a2ui_response(response)[len(session[ACTIVE_CONVERSATION_BLOCKS_KEY]) :]
     block_types = [block["type"] for block in new_blocks]
     assert repair_requests == []
     assert "DestinationChargingCard" in block_types
@@ -705,11 +979,64 @@ def test_codex_conversation_agent_executes_allowlisted_tool(client, settings, mo
     )
 
     assert response.status_code == 200
-    body = response.json()
-    block_types = [block["type"] for block in body["blocks"]]
+    blocks = blocks_from_a2ui_response(response)
+    block_types = [block["type"] for block in blocks]
     assert "UserMessage" in block_types
     assert "AlternativeStopsList" in block_types
-    stops_block = next(block for block in body["blocks"] if block["type"] == "AlternativeStopsList")
+    stops_block = next(block for block in blocks if block["type"] == "AlternativeStopsList")
+    assert stops_block["props"]["stops"][0]["name"] == real_station.name
+
+
+@pytest.mark.django_db
+def test_deepseek_conversation_agent_uses_same_tool_and_a2ui_validation_loop(
+    client, settings, monkeypatch, real_station
+):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
+    calls = []
+
+    def fake_deepseek_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+        tool_history = tool_history or []
+        calls.append((len(tool_history), repair_issues or []))
+        if not tool_history:
+            return {
+                "type": "tool_call",
+                "tool": "search_destination_chargers",
+                "args": {
+                    "location": {"label": "Almansa", "lat": 38.87, "lon": -1.09},
+                    "radius_km": 5,
+                    "limit": 1,
+                },
+            }
+        tool_result = tool_history[-1]["result"]
+        return {
+            "type": "final",
+            "blocks": [
+                {
+                    "id": "destination-deepseek",
+                    "type": "DestinationChargingCard",
+                    "version": 1,
+                    "props": {"destination": "Almansa", "needsConfirmation": True},
+                },
+                {
+                    "id": "stops-deepseek",
+                    "type": "AlternativeStopsList",
+                    "version": 1,
+                    "props": {"stops": tool_result["stops"]},
+                },
+            ],
+        }
+
+    monkeypatch.setattr("routing.agent.run_deepseek_decision", fake_deepseek_decision)
+
+    response = client.post(
+        "/api/conversation/message",
+        data={"text": "Busca cargadores cerca de mi hotel en Almansa"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert calls == [(0, []), (1, [])]
+    stops_block = next(block for block in blocks_from_a2ui_response(response) if block["type"] == "AlternativeStopsList")
     assert stops_block["props"]["stops"][0]["name"] == real_station.name
 
 
@@ -729,8 +1056,7 @@ def test_codex_conversation_agent_rejects_unknown_tool_with_a2ui_risk(client, se
     )
 
     assert response.status_code == 200
-    body = response.json()
-    risk_block = next(block for block in body["blocks"] if block["type"] == "RiskExplanationCard")
+    risk_block = next(block for block in blocks_from_a2ui_response(response) if block["type"] == "RiskExplanationCard")
     assert "No puedo hacer esa acción desde el chat" in risk_block["props"]["text"]
 
 
@@ -772,7 +1098,7 @@ def test_codex_allowed_tool_failure_returns_to_agent_for_contextual_final(client
 
     assert response.status_code == 200
     assert calls == [(0, []), (1, [])]
-    rendered_text = " ".join(str(block.get("props", {})) for block in response.json()["blocks"])
+    rendered_text = " ".join(str(block.get("props", {})) for block in blocks_from_a2ui_response(response))
     assert "No puedo ubicar esa calle exacta todavía" in rendered_text
     assert "No he podido cerrar una respuesta fiable" not in rendered_text
 
@@ -823,12 +1149,12 @@ def test_codex_destination_card_with_embedded_stops_requires_traced_station_data
     )
 
     assert response.status_code == 200
-    body = response.json()
-    rendered_text = " ".join(str(block.get("props", {})) for block in body["blocks"])
+    blocks = blocks_from_a2ui_response(response)
+    rendered_text = " ".join(str(block.get("props", {})) for block in blocks)
     assert repair_requests
     assert "sin resultado de herramienta trazable" in repair_requests[0][0]
     assert "Cargador real" not in rendered_text
-    assert any(block["type"] == "AssistantMessage" for block in body["blocks"])
+    assert any(block["type"] == "AssistantMessage" for block in blocks)
 
 
 @pytest.mark.django_db
@@ -903,9 +1229,9 @@ def test_codex_conversation_agent_allows_bounded_tool_chain(client, settings, mo
 
     assert response.status_code == 200
     assert calls == [0, 1, 2]
-    body = response.json()
-    assert any(block["type"] == "DestinationChargingCard" for block in body["blocks"])
-    stops_block = next(block for block in body["blocks"] if block["type"] == "AlternativeStopsList")
+    blocks = blocks_from_a2ui_response(response)
+    assert any(block["type"] == "DestinationChargingCard" for block in blocks)
+    stops_block = next(block for block in blocks if block["type"] == "AlternativeStopsList")
     assert stops_block["props"]["stops"][0]["name"] == valencia_station.name
 
 
@@ -950,11 +1276,11 @@ def test_codex_conversation_agent_allows_agent_chosen_text_final_after_tool(clie
     )
 
     assert response.status_code == 200
-    body = response.json()
-    block_types = [block["type"] for block in body["blocks"]]
+    blocks = blocks_from_a2ui_response(response)
+    block_types = [block["type"] for block in blocks]
     assert repair_requests == []
     assert "AssistantMessage" in block_types
-    assert real_station.name in " ".join(str(block.get("props", {})) for block in body["blocks"])
+    assert real_station.name in " ".join(str(block.get("props", {})) for block in blocks)
 
 
 @pytest.mark.django_db
@@ -1009,8 +1335,7 @@ def test_codex_conversation_agent_repairs_untraced_structured_station_data(clien
     )
 
     assert response.status_code == 200
-    body = response.json()
-    rendered_text = " ".join(str(block.get("props", {})) for block in body["blocks"])
+    rendered_text = " ".join(str(block.get("props", {})) for block in blocks_from_a2ui_response(response))
     assert repair_requests
     assert "Fake HPC" not in rendered_text
     assert real_station.name in rendered_text
@@ -1073,10 +1398,9 @@ def test_codex_conversation_agent_repairs_generic_urgent_nearest_when_tool_has_s
     )
 
     assert response.status_code == 200
-    body = response.json()
     assert repair_requests
     assert "debe usar una estación trazable" in repair_requests[0][0]
-    urgent_block = next(block for block in body["blocks"] if block["type"] == "UrgentChargeCard")
+    urgent_block = next(block for block in blocks_from_a2ui_response(response) if block["type"] == "UrgentChargeCard")
     assert urgent_block["props"]["nearest"] == real_station.name
 
 
@@ -1143,7 +1467,7 @@ def test_codex_conversation_agent_repairs_missing_urgent_battery_from_explicit_u
     assert response.status_code == 200
     assert repair_requests
     assert "debe conservar la batería explícita" in repair_requests[0][0]
-    urgent_block = next(block for block in response.json()["blocks"] if block["type"] == "UrgentChargeCard")
+    urgent_block = next(block for block in blocks_from_a2ui_response(response) if block["type"] == "UrgentChargeCard")
     assert urgent_block["props"]["battery"] == 12
 
 
@@ -1192,7 +1516,7 @@ def test_codex_conversation_agent_repairs_vague_risk_copy(client, settings, monk
     assert response.status_code == 200
     assert repair_requests
     assert "RiskExplanationCard.text debe explicar" in repair_requests[0][0]
-    risk_block = next(block for block in response.json()["blocks"] if block["type"] == "RiskExplanationCard")
+    risk_block = next(block for block in blocks_from_a2ui_response(response) if block["type"] == "RiskExplanationCard")
     assert "Confirma acceso final" in risk_block["props"]["text"]
 
 
@@ -1237,10 +1561,40 @@ def test_codex_conversation_agent_repairs_unsupported_action_buttons(client, set
 
     assert response.status_code == 200
     assert repair_requests
-    assert any("href soportado" in issue for issue in repair_requests[0])
-    block_types = [block["type"] for block in response.json()["blocks"]]
+    assert any("event, functionCall.openUrl" in issue for issue in repair_requests[0])
+    block_types = [block["type"] for block in blocks_from_a2ui_response(response)]
     assert "ActionButtons" not in block_types
     assert "AssistantMessage" in block_types
+
+
+def test_action_buttons_accept_protocol_event_and_function_call():
+    issues = a2ui_contract_issues(
+        [
+            {
+                "id": "actions",
+                "type": "ActionButtons",
+                "version": 1,
+                "props": {
+                    "actions": [
+                        {
+                            "label": "Abrir en Maps",
+                            "functionCall": {
+                                "call": "openUrl",
+                                "args": {"url": "https://www.google.com/maps/search/?api=1&query=37.88,-4.78"},
+                            },
+                        },
+                        {
+                            "label": "Ajustar búsqueda",
+                            "event": {"name": "refine_search", "context": {"radiusKm": 80}},
+                        },
+                    ]
+                },
+            }
+        ],
+        [],
+    )
+
+    assert issues == []
 
 
 @pytest.mark.django_db
@@ -1259,8 +1613,7 @@ def test_codex_conversation_agent_stops_repeated_tool_call(client, settings, mon
     )
 
     assert response.status_code == 200
-    body = response.json()
-    risk_block = next(block for block in body["blocks"] if block["type"] == "RiskExplanationCard")
+    risk_block = next(block for block in blocks_from_a2ui_response(response) if block["type"] == "RiskExplanationCard")
     assert "No he podido completar esta respuesta con fiabilidad" in risk_block["props"]["text"]
 
 
@@ -1284,8 +1637,7 @@ def test_codex_conversation_agent_stops_at_tool_budget(client, settings, monkeyp
     )
 
     assert response.status_code == 200
-    body = response.json()
-    risk_block = next(block for block in body["blocks"] if block["type"] == "RiskExplanationCard")
+    risk_block = next(block for block in blocks_from_a2ui_response(response) if block["type"] == "RiskExplanationCard")
     assert "No he podido completar esta respuesta con fiabilidad" in risk_block["props"]["text"]
 
 
@@ -1303,11 +1655,11 @@ def test_local_conversation_agent_failure_uses_dev_fallback_without_technical_de
     )
 
     assert response.status_code == 200
-    body = response.json()
-    rendered_text = " ".join(str(block.get("props", {})) for block in body["blocks"])
+    blocks = blocks_from_a2ui_response(response)
+    rendered_text = " ".join(str(block.get("props", {})) for block in blocks)
     assert "Codex" not in rendered_text
     assert "JSON" not in rendered_text
-    block_types = [block["type"] for block in body["blocks"]]
+    block_types = [block["type"] for block in blocks]
     assert "UserMessage" in block_types
     assert "LocationRequestCard" in block_types
     assert "RiskExplanationCard" not in block_types
@@ -1329,11 +1681,11 @@ def test_codex_conversation_agent_failure_uses_minimal_safe_fallback(client, set
     )
 
     assert response.status_code == 200
-    body = response.json()
-    rendered_text = " ".join(str(block.get("props", {})) for block in body["blocks"])
+    blocks = blocks_from_a2ui_response(response)
+    rendered_text = " ".join(str(block.get("props", {})) for block in blocks)
     assert "Codex" not in rendered_text
     assert "JSON" not in rendered_text
-    block_types = [block["type"] for block in body["blocks"]]
+    block_types = [block["type"] for block in blocks]
     assert "UserMessage" in block_types
     assert "AssistantMessage" in block_types
     assert "ClarifyingQuestionCard" in block_types
@@ -1371,8 +1723,7 @@ def test_codex_urgent_response_does_not_repair_component_choice_by_intent(client
     )
 
     assert response.status_code == 200
-    body = response.json()
-    block_types = [block["type"] for block in body["blocks"]]
+    block_types = [block["type"] for block in blocks_from_a2ui_response(response)]
     assert repair_requests == []
     assert "DestinationChargingCard" in block_types
     assert "UrgentChargeCard" not in block_types
