@@ -4,7 +4,7 @@ Manual runs used `KALMIO_CONVERSATION_AGENT_MODE=codex` with the local Codex CLI
 
 ## Initial Findings
 
-- A initially asked for location correctly, but sometimes rendered `UrgentChargeCard.nearest` as a generic placeholder while text mentioned a real station.
+- A initially asked for location correctly, but sometimes rendered a generic `StationDetailCard` station name while text mentioned a real station.
 - B initially failed the correction turn with a generic fallback instead of searching Valencia.
 - C could answer the follow-up when prior Córdoba results were valid, but became unstable when the prior turn fell back.
 - D initially fell into generic fallback for `Paseo de la Victoria de Córdoba`.
@@ -15,7 +15,7 @@ Probable causes:
 - Prompt lacked concrete correction/follow-up examples.
 - Allowed tool failures were cut off by backend fallback before Codex could explain them.
 - Location resolution did not normalize accents.
-- Codex emitted safe prop variants such as `name` and `stationName` for `UrgentChargeCard`, but the normalizer did not map them to `nearest`.
+- Codex emitted station-name prop variants for `StationDetailCard`, but the normalizer did not consistently map them to the station identity expected by validation.
 - Useful vehicle facts from earlier user text were not summarized compactly for Codex.
 
 ## Changes Made
@@ -25,8 +25,8 @@ Probable causes:
 - Added compact history summary for explicit battery and connector facts.
 - Let failed allowlisted tools return to Codex for a contextual final answer; unknown tools still use safe backend fallback.
 - Normalized accented location queries in `resolve_location`.
-- Normalized `UrgentChargeCard` variants: `name`, `stationName`, and `chargerName`.
-- Added repair issue when `UrgentChargeCard.nearest` stays generic despite traced station results.
+- Normalized `StationDetailCard` variants: `name`, `stationName`, and `chargerName`.
+- Added repair issue when `StationDetailCard.name`/`stationName` stays generic despite traced station results.
 
 ## Final Manual Transcripts
 
@@ -38,7 +38,7 @@ Respuesta: pide solo ubicación actual, ciudad, zona o coordenadas. No pide dest
 
 Usuario: `En Córdoba`
 
-Respuesta final: usa Córdoba como ubicación aproximada, muestra `UrgentChargeCard` con `BALLENOIL-ES336090-COLON` a 0.3 km y `RiskExplanationCard` sobre datos autorizados, acceso, tarifa y disponibilidad.
+Respuesta final: usa Córdoba como ubicación aproximada, muestra `StationDetailCard` con `BALLENOIL-ES336090-COLON` a 0.3 km y `RiskExplanationCard` sobre datos autorizados, acceso, tarifa y disponibilidad.
 
 Evaluation: passes. Context and follow-up are understood; no destination requested; charger facts are tool-backed.
 
@@ -116,12 +116,12 @@ Manual runs were continued in Codex mode after the first commit. The goal of thi
 - Added known development locations for the expanded matrix; this is still a bounded resolver, not arbitrary geocoding.
 - Exposed traced charger facts from tools: amenities, address, reliability, connector/EVSE counts and scoring reasons.
 - Added `preferences.max_useful_power_kw` to route planning. The agent can pass it when the driver states a maximum useful charge rate; backend scoring then avoids over-weighting power above that cap.
-- Normalized safe A2UI prop variants for destination/stay blocks and extracted embedded stay stops into `RecommendedStopCard` / `AlternativeStopsList`.
-- Added repair checks for missing explicit battery on `UrgentChargeCard` and vague `RiskExplanationCard` copy.
+- Normalized safe A2UI prop variants for destination/stay blocks and extracted embedded stay stops into `StationDetailCard` / `StationList`.
+- Added repair checks for missing explicit battery on `StationDetailCard` and vague `RiskExplanationCard` copy.
 
 ### Final A-F Rerun
 
-- A: `Necesito cargar ya` -> asks only for current location. `En Córdoba` -> `UrgentChargeCard` for `BALLENOIL-ES336090-COLON`, alternatives and risk. Pass.
+- A: `Necesito cargar ya` -> asks only for current location. `En Córdoba` -> `StationDetailCard` for `BALLENOIL-ES336090-COLON`, alternatives and risk. Pass.
 - B: `Necesito cargar ya. Estoy en Córdoba con un 18% y CCS2` -> Córdoba result with battery 18. `Me equivoqué, estoy en Valencia centro` -> switches to `E-V-Valencia-091`, keeps 18%/CCS2 and shows navigation actions. Pass.
 - C: After Córdoba chargers, `Por qué no encuentras nada en Córdoba?` -> says there are chargers and explains authorized/imported coverage plus unconfirmed access/tariff/availability. Pass.
 - D: `Y en el Paseo de la Victoria de Córdoba?` -> says it cannot locate the exact street and uses Córdoba as approximation with traced chargers. Pass.
@@ -169,4 +169,4 @@ Usuario: `Mi coche carga máximo a 100 kW, no necesito ultrarrápidos. Voy de Ma
 
 Respuesta final: `Con 60% y un máximo útil de 100 kW, la parada recomendada es Moya Hub Honrubia. La elijo por estar en el corredor, tener 9 EVSEs y 12 conectores; sus 240 kW superan lo que tu coche aprovechará, así que no la recomiendo por esa potencia extra. No puedo validar la autonomía exacta ni la batería de llegada con los datos disponibles.`
 
-Structured blocks: `TripSummaryCard`, `RouteSummaryCard(planningLevel=chargers_only)`, `RecommendedStopCard`, `AlternativeStopsList`, `RiskExplanationCard`.
+Structured blocks: `TripSummaryCard`, `RouteSummaryCard(planningLevel=chargers_only)`, `StationDetailCard`, `StationList`, `RiskExplanationCard`.

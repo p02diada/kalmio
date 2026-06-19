@@ -20,6 +20,7 @@ from routing.agent import (
     decode_codex_json,
     parse_openai_compatible_decision,
     run_deepseek_decision,
+    tool_call_argument_grounding_issues,
     validate_blocks,
 )
 from routing.instrumentation import estimate_deepseek_cost, record_trace_event
@@ -31,6 +32,8 @@ from routing.tools import (
     ConversationToolError,
     parse_location_arg,
     parse_preferences_arg,
+    parse_vehicle_arg,
+    plan_route_tool,
     resolve_location_tool,
     search_destination_chargers_tool,
 )
@@ -286,7 +289,7 @@ def test_urgent_charge_card_normalizes_nested_recommended_stop():
         [
             {
                 "id": "urgent",
-                "type": "UrgentChargeCard",
+                "type": "StationDetailCard",
                 "version": 1,
                 "props": {
                     "batteryPercent": 18,
@@ -300,8 +303,7 @@ def test_urgent_charge_card_normalizes_nested_recommended_stop():
     )
 
     assert blocks[0]["props"] == {
-        "battery": 18,
-        "nearest": "BALLENOIL-ES336090-COLON",
+        "name": "BALLENOIL-ES336090-COLON",
         "stationName": "BALLENOIL-ES336090-COLON",
         "distanceKm": 0.3,
     }
@@ -312,7 +314,7 @@ def test_urgent_charge_card_normalizes_name_variant_from_codex():
         [
             {
                 "id": "urgent",
-                "type": "UrgentChargeCard",
+                "type": "StationDetailCard",
                 "version": 1,
                 "props": {
                     "name": "BALLENOIL-ES336090-COLON",
@@ -322,7 +324,8 @@ def test_urgent_charge_card_normalizes_name_variant_from_codex():
         ]
     )
 
-    assert blocks[0]["props"]["nearest"] == "BALLENOIL-ES336090-COLON"
+    assert blocks[0]["props"]["name"] == "BALLENOIL-ES336090-COLON"
+    assert blocks[0]["props"]["stationName"] == "BALLENOIL-ES336090-COLON"
     assert blocks[0]["props"]["distanceKm"] == 0.3
 
 
@@ -331,7 +334,7 @@ def test_urgent_charge_card_normalizes_station_name_variant_from_codex():
         [
             {
                 "id": "urgent",
-                "type": "UrgentChargeCard",
+                "type": "StationDetailCard",
                 "version": 1,
                 "props": {
                     "stationName": "BALLENOIL-ES336090-COLON",
@@ -341,7 +344,168 @@ def test_urgent_charge_card_normalizes_station_name_variant_from_codex():
         ]
     )
 
-    assert blocks[0]["props"]["nearest"] == "BALLENOIL-ES336090-COLON"
+    assert blocks[0]["props"]["name"] == "BALLENOIL-ES336090-COLON"
+    assert blocks[0]["props"]["stationName"] == "BALLENOIL-ES336090-COLON"
+
+
+def test_urgent_charge_card_normalizes_nested_station_variant_without_adding_ui():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "urgent",
+                "type": "StationDetailCard",
+                "version": 1,
+                "props": {
+                    "battery": 12,
+                    "station": {
+                        "name": "BALLENOIL-ES336090-COLON",
+                        "distanceKm": 0.3,
+                    },
+                    "risk": "Batería muy baja.",
+                    "alternatives": [
+                        {
+                            "name": "Parking Calle Sevilla Nº5 - Córdoba",
+                            "distanceKm": 0.5,
+                        }
+                    ],
+                },
+            }
+        ]
+    )
+
+    assert len(blocks) == 1
+    assert blocks[0]["props"] == {
+        "name": "BALLENOIL-ES336090-COLON",
+        "stationName": "BALLENOIL-ES336090-COLON",
+        "distanceKm": 0.3,
+        "risk": "Batería muy baja.",
+    }
+
+
+def test_urgent_charge_card_normalizes_nested_nearest_station_name():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "urgent",
+                "type": "StationDetailCard",
+                "version": 1,
+                "props": {
+                    "battery": 12,
+                    "nearest": {
+                        "stationName": "BALLENOIL-ES336090-COLON",
+                        "distanceKm": 0.3,
+                    },
+                },
+            }
+        ]
+    )
+
+    assert blocks[0]["props"] == {
+        "name": "BALLENOIL-ES336090-COLON",
+        "stationName": "BALLENOIL-ES336090-COLON",
+        "distanceKm": 0.3,
+    }
+
+
+def test_urgent_charge_card_ignores_boolean_nearest_when_station_name_exists():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "urgent",
+                "type": "StationDetailCard",
+                "version": 1,
+                "props": {
+                    "battery": 8,
+                    "nearest": True,
+                    "stationName": "Parking Calle Sevilla Nº5 - Córdoba",
+                    "distanceKm": 0.5,
+                },
+            }
+        ]
+    )
+
+    assert blocks[0]["props"]["name"] == "Parking Calle Sevilla Nº5 - Córdoba"
+    assert blocks[0]["props"]["stationName"] == "Parking Calle Sevilla Nº5 - Córdoba"
+
+
+def test_urgent_charge_card_normalizes_non_numeric_battery_to_null():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "urgent",
+                "type": "StationDetailCard",
+                "version": 1,
+                "props": {
+                    "battery": "baja",
+                    "nearest": "BALLENOIL-ES336090-COLON",
+                    "distanceKm": 0.3,
+                    "risk": "Batería baja indicada sin porcentaje.",
+                },
+            }
+        ]
+    )
+
+    assert "battery" not in blocks[0]["props"]
+    assert blocks[0]["props"]["name"] == "BALLENOIL-ES336090-COLON"
+
+
+def test_alternative_stops_list_normalizes_station_name_variant():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "alternatives",
+                "type": "StationList",
+                "version": 1,
+                "props": {
+                    "stops": [
+                        {
+                            "stationName": "Parking Calle Sevilla Nº5 - Córdoba",
+                            "distance_km": 0.5,
+                            "power_kw": 22,
+                            "connector_types": ["TYPE2"],
+                            "location": {"lat": 37.883857, "lon": -4.780831},
+                        }
+                    ]
+                },
+            }
+        ]
+    )
+
+    assert blocks[0]["props"]["stations"][0] == {
+        "stationName": "Parking Calle Sevilla Nº5 - Córdoba",
+        "name": "Parking Calle Sevilla Nº5 - Córdoba",
+        "distanceKm": 0.5,
+        "powerKw": 22,
+        "connectorTypes": ["TYPE2"],
+        "lat": 37.883857,
+        "lon": -4.780831,
+    }
+
+
+def test_action_buttons_adds_label_for_open_url_function_call():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "actions",
+                "type": "ActionButtons",
+                "version": 1,
+                "props": {
+                    "actions": [
+                        {
+                            "functionCall": {
+                                "call": "openUrl",
+                                "args": {
+                                    "url": "https://www.google.com/maps/dir/?api=1&destination=37.883857,-4.780831"
+                                },
+                            }
+                        }
+                    ]
+                },
+            }
+        ]
+    )
+
+    assert blocks[0]["props"]["actions"][0]["label"] == "Abrir en Google Maps"
 
 
 def test_destination_charging_card_normalizes_hotel_location_label():
@@ -380,7 +544,7 @@ def test_stay_planning_card_normalizes_stay_variants_and_extracts_primary_stop()
     )
 
     assert blocks[0]["props"] == {"nights": 7, "city": "Cádiz", "recommendation": "ONCE DZ Cádiz"}
-    assert blocks[1]["type"] == "RecommendedStopCard"
+    assert blocks[1]["type"] == "StationDetailCard"
     assert blocks[1]["props"]["name"] == "ONCE DZ Cádiz"
 
 
@@ -407,11 +571,49 @@ def test_stay_planning_card_extracts_chargers_variant_as_alternative_stops():
     )
 
     assert blocks[0]["props"] == {"nights": 7, "city": "Cádiz", "recommendation": "ONCE DZ Cádiz"}
-    assert blocks[1]["type"] == "AlternativeStopsList"
-    assert blocks[1]["props"]["stops"][0]["name"] == "ONCE DZ Cádiz"
+    assert blocks[1]["type"] == "StationList"
+    assert blocks[1]["props"]["stations"][0]["name"] == "ONCE DZ Cádiz"
 
 
-def test_urgent_tool_fallback_preserves_user_battery():
+def test_stay_planning_card_normalizes_context_and_suggestion():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "stay",
+                "type": "StayPlanningCard",
+                "version": 1,
+                "props": {
+                    "duration": "finde",
+                    "context": "Estancia en Granada",
+                    "suggestion": "Pregunta al alojamiento si tiene parking con carga.",
+                },
+            }
+        ]
+    )
+
+    assert blocks[0]["props"] == {
+        "nights": 2,
+        "city": "Granada",
+        "recommendation": "Pregunta al alojamiento si tiene parking con carga.",
+    }
+
+
+def test_risk_explanation_card_normalizes_singular_risk_text():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "risk",
+                "type": "RiskExplanationCard",
+                "version": 1,
+                "props": {"risk": "Disponibilidad, acceso y tarifas pueden cambiar antes del viaje."},
+            }
+        ]
+    )
+
+    assert blocks[0]["props"]["text"] == "Disponibilidad, acceso y tarifas pueden cambiar antes del viaje."
+
+
+def test_urgent_tool_fallback_renders_station_without_repeating_user_battery():
     blocks = blocks_from_tool_result(
         {
             "ok": True,
@@ -422,8 +624,12 @@ def test_urgent_tool_fallback_preserves_user_battery():
         message="Necesito cargar ya. Estoy en Córdoba con un 18%",
     )
 
-    urgent_block = next(block for block in blocks if block["type"] == "UrgentChargeCard")
-    assert urgent_block["props"]["battery"] == 18
+    urgent_block = next(block for block in blocks if block["type"] == "StationDetailCard")
+    assert urgent_block["props"]["name"] == "Córdoba Centro HPC"
+    assert urgent_block["props"]["stationName"] == "Córdoba Centro HPC"
+    assert urgent_block["props"]["distanceKm"] == 1.4
+    assert urgent_block["props"]["powerKw"] == 150
+    assert "battery" not in urgent_block["props"]
 
 
 def test_resolve_location_tool_accepts_accented_city_inside_zone_text():
@@ -511,7 +717,7 @@ def test_codex_prompt_guides_followups_without_backend_intent_mapping():
     assert "no puedes ubicar esa calle exacta" in prompt
     assert "sin perfil de vehículo" in prompt
     assert "planningLevel=chargers_only" in prompt
-    assert "DestinationChargingCard + AlternativeStopsList" in prompt
+    assert "DestinationChargingCard + StationDetailCard + StationList" in prompt
     assert "preferences.max_useful_power_kw" in prompt
     assert "no presentes la potencia superior como ventaja" in prompt
     assert "llama search_destination_chargers directamente" in prompt
@@ -519,7 +725,10 @@ def test_codex_prompt_guides_followups_without_backend_intent_mapping():
     assert "pregunta por el origen" in prompt
     assert "Una ciudad conocida ya es ubicación suficiente" in prompt
     assert "no esperes hotel/zona exacta" in prompt
+    assert "no presentes el hotel exacto como ubicación validada" in prompt
     assert "no ActionButtons" in prompt
+    assert "tool_call no es un componente A2UI" in prompt
+    assert "nunca debe aparecer dentro de blocks" in prompt
     assert "No llames plan_route con coordenadas vacías o 0,0" in prompt
     assert "incluye StayPlanningCard" in prompt
 
@@ -530,6 +739,559 @@ def test_codex_prompt_exposes_max_useful_power_tool_argument():
     assert '"max_useful_power_kw":null' in prompt
     assert "pasa X como preferences.max_useful_power_kw" in prompt
     assert "que el coche no aprovechará más de 100 kW" in prompt
+    assert "No digas que has filtrado" in prompt
+
+
+def test_a2ui_contract_rejects_hard_power_filter_copy_when_rendering_over_cap_station():
+    tool_history = [
+        {
+            "call": {
+                "tool": "plan_route",
+                "args": {
+                    "preferences": {"max_useful_power_kw": 100},
+                    "origin": {"label": "Madrid", "lat": 40.4168, "lon": -3.7038},
+                    "destination": {"label": "Valencia", "lat": 39.4699, "lon": -0.3763},
+                },
+            },
+            "result": {
+                "ok": True,
+                "tool": "plan_route",
+                "planningLevel": "chargers_only",
+                "recommendation": {"name": "Moya Hub Honrubia", "powerKw": 240, "distanceKm": 1.23},
+                "alternatives": [],
+            },
+        }
+    ]
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": (
+                        "Tu coche carga hasta 100 kW, así que he filtrado paradas que no aprovecharías "
+                        "más allá de esa potencia."
+                    )
+                },
+            },
+            {
+                "id": "recommended",
+                "type": "StationDetailCard",
+                "version": 1,
+                "props": {"name": "Moya Hub Honrubia", "powerKw": 240, "distanceKm": 1.23},
+            },
+            {
+                "id": "risk",
+                "type": "RiskExplanationCard",
+                "version": 1,
+                "props": {
+                    "text": "Tu coche no aprovechará los 240 kW; la potencia por encima de 100 kW no se premia."
+                },
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(blocks, tool_history)
+
+    assert any("filtró o excluyó" in issue for issue in issues)
+
+
+def test_a2ui_contract_allows_max_useful_power_copy_without_hard_filter_claim():
+    tool_history = [
+        {
+            "call": {
+                "tool": "plan_route",
+                "args": {
+                    "preferences": {"max_useful_power_kw": 100},
+                    "origin": {"label": "Madrid", "lat": 40.4168, "lon": -3.7038},
+                    "destination": {"label": "Valencia", "lat": 39.4699, "lon": -0.3763},
+                },
+            },
+            "result": {
+                "ok": True,
+                "tool": "plan_route",
+                "planningLevel": "chargers_only",
+                "recommendation": {"name": "Moya Hub Honrubia", "powerKw": 240, "distanceKm": 1.23},
+                "alternatives": [],
+            },
+        }
+    ]
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": (
+                        "Tu coche carga hasta 100 kW. La potencia superior no se premia en esta elección; "
+                        "muestro esta parada por ubicación y servicios trazados."
+                    )
+                },
+            },
+            {
+                "id": "recommended",
+                "type": "StationDetailCard",
+                "version": 1,
+                "props": {"name": "Moya Hub Honrubia", "powerKw": 240, "distanceKm": 1.23},
+            },
+            {
+                "id": "risk",
+                "type": "RiskExplanationCard",
+                "version": 1,
+                "props": {
+                    "text": "Tu coche no aprovechará los 240 kW; faltan autonomía y consumo para validar llegada."
+                },
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(blocks, tool_history)
+
+    assert issues == []
+
+
+def test_codex_prompt_prioritizes_low_margin_urgent_order():
+    prompt = codex_prompt("Estoy al 8% y no conozco la zona")
+
+    assert "Con batería <=10%" in prompt
+    assert "margen muy bajo" in prompt
+    assert "ActionButtons con functionCall.openUrl es obligatorio" in prompt
+    assert "antes de cualquier StationList" in prompt
+    assert "no lo sustituyas por texto" in prompt
+    assert "explica la batería baja en RiskExplanationCard" in prompt
+    assert "metadata son opcionales y no se muestran al usuario" in prompt
+    assert "StationDetailCard, RiskExplanationCard si hace falta, ActionButtons, y solo después StationList" in prompt
+
+
+def test_codex_prompt_handles_qualitative_low_battery_and_children_amenities():
+    prompt = codex_prompt("Tengo poca batería y voy con niños")
+
+    assert "sin porcentaje explícito" in prompt
+    assert "no inventes un número" in prompt
+    assert "Orden exacto recomendado" in prompt
+    assert "nunca pongas StationList antes de ActionButtons" in prompt
+    assert "si la herramienta trae amenities en la parada primaria" in prompt
+    assert "debes mencionarlos brevemente por nombre" in prompt
+    assert "no digas que están cerca, disponibles, son seguros, ideales, perfectos o aptos para niños" in prompt
+    assert "No uses superlativos globales" in prompt
+    assert "de los resultados trazados" in prompt
+
+
+def test_codex_prompt_keeps_service_preference_when_location_follows():
+    prompt = codex_prompt("Busca una parada con baños y cafetería")
+
+    assert "Preferencias de servicios como baños, cafetería, restaurante o comer" in prompt
+    assert "Si el siguiente turno aporta ciudad, zona o coordenadas, conserva esa preferencia" in prompt
+    assert "baños/cafetería/restaurante no están verificados" in prompt
+    assert "'Estoy cerca de Almansa' después -> llama search_destination_chargers con Almansa" in prompt
+
+
+def test_codex_prompt_limits_night_safety_claims():
+    prompt = codex_prompt("No quiero cargar en sitios solitarios de noche")
+
+    assert "Preferencias de seguridad nocturna o evitar sitios solitarios" in prompt
+    assert "llama search_destination_chargers con esa ubicación" in prompt
+    assert "no respondas solo con LocationDetailCard" in prompt
+    assert "no afirmes seguridad, vigilancia, iluminación, afluencia" in prompt
+    assert "Kalmio no valida seguridad ni entorno en vivo" in prompt
+    assert "RiskExplanationCard antes de StationList" in prompt
+
+
+def test_codex_prompt_warns_after_tool_when_requested_services_are_unverified():
+    prompt = codex_prompt(
+        "Historial reciente:\nUsuario: Busca una parada con baños y cafetería\nMensaje actual del usuario: Estoy cerca de Almansa",
+        tool_history=[
+            {
+                "call": {
+                    "tool": "search_destination_chargers",
+                    "args": {"location": {"label": "Almansa", "lat": 38.869, "lon": -1.0971}},
+                },
+                "result": {
+                    "ok": True,
+                    "tool": "search_destination_chargers",
+                    "stops": [{"name": "Consum Almansa", "distanceKm": 0.49, "amenities": []}],
+                },
+            }
+        ],
+    )
+
+    assert "Ya tienes resultados trazados de search_destination_chargers" in prompt
+    assert "No repitas la misma búsqueda" in prompt
+    assert "Dato crítico de servicios" in prompt
+    assert "no están verificados en esos resultados" in prompt
+
+
+def test_codex_prompt_keeps_plan_b_on_previous_traced_alternatives():
+    prompt = codex_prompt("El cargador al que iba está ocupado, dame un plan B")
+
+    assert "no la repitas como plan B" in prompt
+    assert "nombra la parada descartada" in prompt
+    assert "no debe seguir siendo el plan principal" in prompt
+    assert "Reutiliza exactamente alternativas trazadas previas" in prompt
+    assert "no cambies métricas ni inventes coordenadas" in prompt
+    assert "usa su lat/lon exactos" in prompt
+    assert "disponibilidad en vivo puede cambiar" in prompt
+
+
+def test_codex_prompt_asks_structured_road_context_before_low_detour_search():
+    prompt = codex_prompt("Estoy en carretera con 18%, no quiero desviarme mucho")
+
+    assert "En carretera y poco desvío" in prompt
+    assert "pide carretera, zona actual/coordenadas y destino" in prompt
+    assert "no lo reduzcas a búsqueda urbana arbitraria" in prompt
+    assert "prefiere ClarifyingQuestionCard" in prompt
+    assert "carretera_o_zona_actual, destino y coordenadas" in prompt
+    assert "no muestres campos genéricos de ciudad" in prompt
+
+
+def test_codex_prompt_guides_chargers_only_route_without_claiming_default_reserve():
+    prompt = codex_prompt("Voy de Córdoba a Valencia con 58%. No quiero llegar justo")
+
+    assert "planningLevel=chargers_only" in prompt
+    assert "Usa RouteSummaryCard para distancia/duración trazadas" in prompt
+    assert "no puedes validar batería de llegada ni reserva sin consumo/perfil" in prompt
+    assert "AssistantMessage inicial en una frase corta" in prompt
+    assert "muestra la parada principal antes del aviso largo" in prompt
+    assert "RouteSummaryCard, StationDetailCard, RiskExplanationCard y después StationList" in prompt
+    assert "no digas que indicó 20%" in prompt
+    assert "margen conservador por defecto" in prompt
+    assert "No digas asegurar/garantizar margen en chargers_only" in prompt
+    assert "ni 'te ayudará a recuperar margen'" in prompt
+    assert "evita frases como '4 horas'" in prompt
+    assert "arrivalBattery:null" in prompt
+    assert "ese X% es batería de salida" in prompt
+    assert "no escribas 'llegas con X%'" in prompt
+    assert "Si el viaje es futuro" in prompt
+    assert "antes de cualquier StationDetailCard o StationList" in prompt
+    assert "disponibilidad, acceso y tarifas pueden cambiar" in prompt
+
+
+def test_codex_prompt_guides_controlled_detour_comfort_preference():
+    prompt = codex_prompt("Prefiero desviarme 10 minutos si el sitio es más cómodo. Voy de Madrid a Valencia con 60%")
+
+    assert "Preferencias de desvío controlado por comodidad" in prompt
+    assert "menciona servicios trazados como comodidad potencial" in prompt
+    assert "no digas 'buenos servicios'" in prompt
+    assert "No introduzcas preferencias de pocas paradas" in prompt
+
+
+def test_codex_prompt_guides_can_i_arrive_without_charging_question():
+    prompt = codex_prompt("Voy de Sevilla a Granada, ¿me da para llegar sin cargar?")
+
+    assert "puedes llamar plan_route para mostrar distancia/duración" in prompt
+    assert "no respondas sí/no" in prompt
+    assert "no afirmes que llega" in prompt
+    assert "pide esos datos críticos" in prompt
+    assert "no muestres StationDetailCard/StationList como recomendación principal" in prompt
+    assert "Sevilla a Granada, me da para llegar sin cargar?" in prompt
+
+
+def test_codex_prompt_guides_few_stops_without_vehicle_profile():
+    prompt = codex_prompt("Tengo que ir de Alicante a Bilbao y prefiero parar pocas veces")
+
+    assert "8 h 37 min" in prompt
+    assert "no como cientos de minutos" in prompt
+    assert "prefiere parar pocas veces" in prompt
+    assert "no puedes garantizar ni optimizar pocas paradas" in prompt
+    assert "antes de las paradas" in prompt
+    assert "punto de carga trazado en el corredor" in prompt
+    assert "Alicante a Bilbao, prefiero parar pocas veces" in prompt
+
+
+def test_codex_prompt_guides_hard_arrival_reserve_without_vehicle_profile():
+    prompt = codex_prompt("Voy de Zaragoza a Barcelona y quiero llegar con al menos 25%")
+
+    assert "pasa X como reserve_min_percent" in prompt
+    assert "ese X% no se puede validar en chargers_only" in prompt
+    assert "antes de cualquier StationDetailCard/StationList" in prompt
+    assert "Zaragoza a Barcelona con 25%" in prompt
+
+
+def test_codex_prompt_guides_granada_alhambra_weekend_destination_warning():
+    prompt = codex_prompt("Voy el finde a Granada y duermo cerca de la Alhambra")
+
+    assert "Alhambra/Granada aproximado" in prompt
+    assert "si es finde" in prompt
+    assert "disponibilidad, acceso y tarifas pueden cambiar" in prompt
+    assert "pide hotel/zona/direccion exacta" in prompt
+
+
+def test_codex_prompt_guides_round_trip_missing_origin_as_clarifying_card():
+    prompt = codex_prompt("Voy a Córdoba el viernes y vuelvo el domingo, dónde cargo?")
+
+    assert "ida y vuelta" in prompt
+    assert "no llames plan_route ni search_destination_chargers" in prompt
+    assert "Usa ClarifyingQuestionCard" in prompt
+    assert "origen/salida" in prompt
+    assert "No uses la ciudad destino como origen" in prompt
+
+
+def test_codex_prompt_guides_hotel_without_charger_primary_destination_stop():
+    prompt = codex_prompt(
+        "Voy a un hotel sin cargador, necesito cargar durante la estancia. En Valencia centro"
+    )
+
+    assert "hotel no tiene cargador" in prompt
+    assert "StationDetailCard" in prompt
+    assert "StationList" in prompt
+    assert "distancia, potencia, conectores y EVSEs trazados" in prompt
+    assert "no la presentes como disponibilidad en vivo ni como reserva" in prompt
+    assert "Valencia centro" in prompt
+    assert "parada primaria trazada" in prompt
+
+
+def test_tool_call_grounding_rejects_location_from_prompt_example():
+    issues = tool_call_argument_grounding_issues(
+        {
+            "type": "tool_call",
+            "tool": "search_destination_chargers",
+            "args": {"location": {"label": "Valencia", "lat": 39.4699, "lon": -0.3763}},
+        },
+        current_message="Voy a un hotel sin cargador, necesito cargar durante la estancia",
+        history_blocks=[],
+        tool_history=[],
+    )
+
+    assert issues
+    assert "Valencia" in issues[0]
+    assert "sin que aparezca" in issues[0]
+    assert "no uses ejemplos del prompt como datos" in issues[0]
+
+
+def test_tool_call_grounding_allows_location_from_followup_history():
+    issues = tool_call_argument_grounding_issues(
+        {
+            "type": "tool_call",
+            "tool": "search_destination_chargers",
+            "args": {"location": {"label": "Valencia", "lat": 39.4699, "lon": -0.3763}},
+        },
+        current_message="En Valencia centro",
+        history_blocks=[
+            {
+                "id": "previous-user",
+                "type": "UserMessage",
+                "version": 1,
+                "props": {"text": "Voy a un hotel sin cargador, necesito cargar durante la estancia"},
+            }
+        ],
+        tool_history=[],
+    )
+
+    assert issues == []
+
+
+def test_tool_call_grounding_rejects_same_origin_destination_route():
+    issues = tool_call_argument_grounding_issues(
+        {
+            "type": "tool_call",
+            "tool": "plan_route",
+            "args": {
+                "origin": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794},
+                "destination": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794},
+            },
+        },
+        current_message="Voy a Córdoba el viernes y vuelvo el domingo, dónde cargo?",
+        history_blocks=[],
+        tool_history=[],
+    )
+
+    assert issues
+    assert "misma ubicación" in issues[0]
+    assert "Falta el origen real" in issues[0]
+
+
+def test_codex_prompt_guides_cheap_route_with_reserve_missing_context():
+    prompt = codex_prompt("Quiero la ruta más barata, pero sin bajar del 20%")
+
+    assert "Rutas baratas, reservas duras" in prompt
+    assert "pregunta en el mismo turno por origen, destino, batería actual y modelo/consumo/autonomía" in prompt
+    assert "No inventes tarifas, kWh, llegada ni comparativas de precio" in prompt
+    assert "si no hay datos de tarifas de proveedor, dilo" in prompt
+
+
+def test_codex_prompt_guides_price_preference_without_route_context():
+    prompt = codex_prompt("Evita cargadores caros si hay alternativas razonables")
+
+    assert "Preferencias de precio" in prompt
+    assert "pide origen/destino o ubicación" in prompt
+    assert "No inventes tarifas/precios" in prompt
+    assert "no inventas tarifas" in prompt
+
+
+def test_codex_prompt_guides_large_hub_preference_without_location_context():
+    prompt = codex_prompt("Prefiero hubs grandes aunque sean un poco más caros")
+
+    assert "Preferencias de precio, hubs grandes o tamaño de parada" in prompt
+    assert "no llames herramientas sin ruta/ubicación" in prompt
+    assert "no validas tarifas si el proveedor no las da" in prompt
+
+
+def test_codex_prompt_guides_model_and_departure_battery_without_vehicle_profile():
+    prompt = codex_prompt("Tengo un Tesla Model Y y salgo con 45%... Madrid a Valencia")
+
+    assert "un modelo comercial como Tesla Model Y y una batería de salida no son un perfil autorizado" in prompt
+    assert "usa vehicle:null u omite vehicle" in prompt
+    assert "No rellenes campos desconocidos con null, ceros o defaults" in prompt
+    assert "no calcular energía, autonomía ni llegada" in prompt
+
+
+def test_codex_prompt_guides_charge_before_or_after_without_context():
+    prompt = codex_prompt("¿Me conviene cargar antes de salir o al llegar?")
+
+    assert "Cargar antes de salir vs al llegar" in prompt
+    assert "Da una comparación conceptual breve" in prompt
+    assert "cargar antes reduce riesgo" in prompt
+    assert "cargar al llegar puede tener sentido" in prompt
+    assert "pide origen, destino, batería actual y modelo/consumo/autonomía" in prompt
+
+
+def test_a2ui_contract_rejects_cheap_route_reserve_without_vehicle_context():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": "Para calcular la ruta más barata necesito saber el origen y el destino.",
+                },
+            }
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history=[],
+        message="Quiero la ruta más barata, pero sin bajar del 20%",
+    )
+
+    assert any("batería actual" in issue and "modelo/consumo/autonomía" in issue for issue in issues)
+
+
+def test_a2ui_contract_allows_cheap_route_reserve_with_vehicle_context_request():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": (
+                        "Para calcular una ruta barata sin bajar del 20%, necesito origen, destino, "
+                        "batería actual y modelo, consumo o autonomía. Sin tarifas de proveedor no inventaré precios."
+                    ),
+                },
+            }
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history=[],
+        message="Quiero la ruta más barata, pero sin bajar del 20%",
+    )
+
+    assert issues == []
+
+
+def test_a2ui_contract_rejects_price_preference_without_route_or_tariff_context():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": "Lo tendré en cuenta para las próximas búsquedas y rutas.",
+                },
+            }
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history=[],
+        message="Evita cargadores caros si hay alternativas razonables",
+    )
+
+    assert any("ruta/ubicación" in issue and "tarifas" in issue for issue in issues)
+
+
+def test_a2ui_contract_allows_price_preference_with_route_and_tariff_context_request():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": (
+                        "Lo tendré como preferencia. Dime origen y destino o tu ubicación. "
+                        "No inventaré tarifas o precios si el proveedor no los da."
+                    ),
+                },
+            }
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history=[],
+        message="Evita cargadores caros si hay alternativas razonables",
+    )
+
+    assert issues == []
+
+
+def test_a2ui_contract_rejects_minimum_charge_without_vehicle_context():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": "Para cargar lo justo necesito saber tu origen y destino.",
+                },
+            }
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history=[],
+        message="Quiero cargar lo justo para llegar, sin pagar de más",
+    )
+
+    assert any("batería actual" in issue and "modelo/consumo/autonomía" in issue for issue in issues)
+
+
+def test_a2ui_contract_allows_minimum_charge_with_vehicle_context_request():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": (
+                        "Para calcular cuánto cargar necesito origen, destino, batería actual y modelo, "
+                        "consumo o autonomía. Sin eso no calcularé kWh ni coste."
+                    ),
+                },
+            }
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history=[],
+        message="Quiero cargar lo justo para llegar, sin pagar de más",
+    )
+
+    assert issues == []
 
 
 def test_conversation_tool_rejects_placeholder_coordinates():
@@ -544,14 +1306,14 @@ def test_a2ui_contract_rejects_empty_stops_without_station_tool_result():
                 "id": "destination",
                 "type": "DestinationChargingCard",
                 "version": 1,
-                "props": {"destination": "Cádiz", "stops": []},
+                "props": {"destination": "Cádiz", "stations": []},
             }
         ]
     )
 
     issues = a2ui_contract_issues(blocks, tool_history=[], message="Voy una semana a Cádiz")
 
-    assert any("AlternativeStopsList.stops está vacío" in issue for issue in issues)
+    assert any("StationList.stations está vacío" in issue for issue in issues)
 
 
 def test_a2ui_contract_allows_empty_stops_after_station_tool_result():
@@ -561,7 +1323,7 @@ def test_a2ui_contract_allows_empty_stops_after_station_tool_result():
                 "id": "destination",
                 "type": "DestinationChargingCard",
                 "version": 1,
-                "props": {"destination": "Cádiz", "stops": []},
+                "props": {"destination": "Cádiz", "stations": []},
             }
         ]
     )
@@ -582,7 +1344,7 @@ def test_a2ui_contract_allows_empty_stops_after_station_tool_result():
 
     issues = a2ui_contract_issues(blocks, tool_history=tool_history, message="Voy una semana a Cádiz")
 
-    assert not any("AlternativeStopsList.stops está vacío" in issue for issue in issues)
+    assert not any("StationList.stations está vacío" in issue for issue in issues)
 
 
 def test_a2ui_contract_rejects_found_chargers_copy_without_station_tool_result():
@@ -600,6 +1362,711 @@ def test_a2ui_contract_rejects_found_chargers_copy_without_station_tool_result()
     issues = a2ui_contract_issues(blocks, tool_history=[], message="Voy una semana a Cádiz")
 
     assert any("sin resultado de herramienta trazable" in issue for issue in issues)
+
+
+def test_a2ui_contract_accepts_chargers_only_route_blocks_with_structured_metadata():
+    tool_history = [
+        {
+            "call": {
+                "tool": "plan_route",
+                "args": {
+                    "origin": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794},
+                    "destination": {"label": "Valencia", "lat": 39.4699, "lon": -0.3763},
+                    "vehicle": None,
+                    "preferences": {"reserve_min_percent": 20},
+                },
+            },
+            "result": {
+                "ok": True,
+                "tool": "plan_route",
+                "planningLevel": "chargers_only",
+                "origin": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794},
+                "destination": {"label": "Valencia", "lat": 39.4699, "lon": -0.3763},
+                "distanceKm": 520.3,
+                "durationMin": 343,
+                "energyKwh": None,
+                "arrivalBattery": None,
+                "recommendation": {
+                    "name": "V-VALENCIA-022-2",
+                    "stationName": "V-VALENCIA-022-2",
+                    "powerKw": 22,
+                    "distanceKm": 1.58,
+                    "detourMin": 4,
+                    "confidence": "media",
+                    "availableEvses": 4,
+                    "amenities": ["CAFE", "RESTAURANT"],
+                    "scoreReasons": ["Servicios cercanos"],
+                    "lat": 39.48123,
+                    "lon": -0.389118,
+                },
+                "alternatives": [
+                    {
+                        "name": "V-VALENCIA-023",
+                        "stationName": "V-VALENCIA-023",
+                        "powerKw": 22,
+                        "distanceKm": 2.9,
+                        "detourMin": 7,
+                        "confidence": "media",
+                        "availableEvses": 4,
+                        "amenities": ["CAFE"],
+                        "scoreReasons": ["Servicios cercanos"],
+                        "lat": 39.49549,
+                        "lon": -0.401537,
+                    }
+                ],
+            },
+        }
+    ]
+    blocks = validate_blocks(
+        [
+            {
+                "id": "route",
+                "type": "RouteSummaryCard",
+                "version": 1,
+                "props": {"distanceKm": 520.3, "durationMin": 343, "energyKwh": None, "arrivalBattery": None},
+            },
+            {
+                "id": "recommended",
+                "type": "StationDetailCard",
+                "version": 1,
+                "props": {
+                    "name": "V-VALENCIA-022-2",
+                    "stationName": "V-VALENCIA-022-2",
+                    "powerKw": 22,
+                    "distanceKm": 1.58,
+                    "detourMin": 4,
+                    "confidence": "media",
+                    "availableEvses": 4,
+                    "amenities": ["CAFE", "RESTAURANT"],
+                    "scoreReasons": ["Servicios cercanos"],
+                    "lat": 39.48123,
+                    "lon": -0.389118,
+                },
+            },
+            {
+                "id": "risk",
+                "type": "RiskExplanationCard",
+                "version": 1,
+                "props": {
+                    "level": "medio",
+                    "text": "Sin consumo ni perfil del vehículo, no puedo validar batería de llegada ni reserva.",
+                },
+            },
+            {
+                "id": "alternatives",
+                "type": "StationList",
+                "version": 1,
+                "props": {
+                    "stops": [
+                        {
+                            "name": "V-VALENCIA-023",
+                            "stationName": "V-VALENCIA-023",
+                            "powerKw": 22,
+                            "distanceKm": 2.9,
+                            "detourMin": 7,
+                            "confidence": "media",
+                            "availableEvses": 4,
+                            "amenities": ["CAFE"],
+                            "scoreReasons": ["Servicios cercanos"],
+                            "lat": 39.49549,
+                            "lon": -0.401537,
+                        }
+                    ]
+                },
+            },
+            {
+                "id": "margin",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": "Puedo buscar paradas con un margen conservador por defecto, pero no puedo asegurar que se cumpla sin datos del coche.",
+                },
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history,
+        message="Voy de Córdoba a Valencia con 58%. No quiero llegar justo",
+    )
+
+    assert issues == []
+
+
+def test_a2ui_contract_rejects_chargers_only_risk_after_alternatives():
+    tool_history = [
+        {
+            "call": {
+                "tool": "plan_route",
+                "args": {
+                    "origin": {"label": "Madrid", "lat": 40.4168, "lon": -3.7038},
+                    "destination": {"label": "Valencia", "lat": 39.4699, "lon": -0.3763},
+                    "vehicle": None,
+                },
+            },
+            "result": {
+                "ok": True,
+                "tool": "plan_route",
+                "planningLevel": "chargers_only",
+                "distanceKm": 356.7,
+                "durationMin": 240,
+                "energyKwh": None,
+                "arrivalBattery": None,
+                "recommendation": {"name": "Moya Hub Honrubia", "powerKw": 240, "distanceKm": 1.23},
+                "alternatives": [{"name": "Aparcamiento CTM", "powerKw": 400, "distanceKm": 4.77}],
+            },
+        }
+    ]
+    blocks = validate_blocks(
+        [
+            {
+                "id": "route",
+                "type": "RouteSummaryCard",
+                "version": 1,
+                "props": {"distanceKm": 356.7, "durationMin": 240, "energyKwh": None, "arrivalBattery": None},
+            },
+            {
+                "id": "recommended",
+                "type": "StationDetailCard",
+                "version": 1,
+                "props": {"name": "Moya Hub Honrubia", "powerKw": 240, "distanceKm": 1.23},
+            },
+            {
+                "id": "alternatives",
+                "type": "StationList",
+                "version": 1,
+                "props": {"stations": [{"name": "Aparcamiento CTM", "powerKw": 400, "distanceKm": 4.77}]},
+            },
+            {
+                "id": "risk",
+                "type": "RiskExplanationCard",
+                "version": 1,
+                "props": {
+                    "level": "medio",
+                    "text": "Sin consumo ni perfil del vehículo, no puedo validar batería de llegada ni reserva.",
+                },
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(blocks, tool_history, message="Voy de Madrid a Valencia")
+
+    assert any("RiskExplanationCard debe aparecer antes de StationList" in issue for issue in issues)
+
+
+def test_a2ui_contract_rejects_available_evses_as_connector_count_copy():
+    tool_history = [
+        {
+            "call": {
+                "tool": "search_destination_chargers",
+                "args": {"location": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794}},
+            },
+            "result": {
+                "ok": True,
+                "tool": "search_destination_chargers",
+                "location": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794},
+                "stops": [
+                    {"name": "BALLENOIL-ES336090-COLON", "availableEvses": 2, "powerKw": 150, "distanceKm": 0.3},
+                    {"name": "Hotel Córdoba Center", "availableEvses": 3, "powerKw": 22, "distanceKm": 0.59},
+                ],
+            },
+        }
+    ]
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": "En Córdoba he encontrado puntos de carga con al menos 2 conectores; ninguno tiene un solo conector."
+                },
+            },
+            {
+                "id": "recommended",
+                "type": "StationDetailCard",
+                "version": 1,
+                "props": {"name": "BALLENOIL-ES336090-COLON", "availableEvses": 2, "powerKw": 150, "distanceKm": 0.3},
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history,
+        message="Evita cargadores con un solo conector. Estoy en Córdoba...",
+    )
+
+    assert any("availableEvses como conteo de conectores" in issue for issue in issues)
+
+
+def test_a2ui_contract_rejects_single_evse_primary_when_user_avoids_single_connector():
+    tool_history = [
+        {
+            "call": {
+                "tool": "search_destination_chargers",
+                "args": {"location": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794}},
+            },
+            "result": {
+                "ok": True,
+                "tool": "search_destination_chargers",
+                "location": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794},
+                "stops": [
+                    {"name": "Single EVSE", "availableEvses": 1, "powerKw": 150, "distanceKm": 0.2},
+                    {"name": "Multi EVSE", "availableEvses": 3, "powerKw": 50, "distanceKm": 0.5},
+                ],
+            },
+        }
+    ]
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {"text": "Uso EVSEs trazados para evitar puntos de carga de un solo EVSE."},
+            },
+            {
+                "id": "recommended",
+                "type": "StationDetailCard",
+                "version": 1,
+                "props": {"name": "Single EVSE", "availableEvses": 1, "powerKw": 150, "distanceKm": 0.2},
+            },
+            {
+                "id": "alternatives",
+                "type": "StationList",
+                "version": 1,
+                "props": {"stations": [{"name": "Multi EVSE", "availableEvses": 3, "powerKw": 50, "distanceKm": 0.5}]},
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history,
+        message="Evita cargadores con un solo conector. Estoy en Córdoba...",
+    )
+
+    assert any("parada primaria tiene solo 1 EVSE" in issue for issue in issues)
+
+
+def test_a2ui_contract_allows_available_evses_copy_for_single_connector_preference():
+    tool_history = [
+        {
+            "call": {
+                "tool": "search_destination_chargers",
+                "args": {"location": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794}},
+            },
+            "result": {
+                "ok": True,
+                "tool": "search_destination_chargers",
+                "location": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794},
+                "stops": [
+                    {"name": "BALLENOIL-ES336090-COLON", "availableEvses": 2, "powerKw": 150, "distanceKm": 0.3},
+                    {"name": "Hotel Córdoba Center", "availableEvses": 3, "powerKw": 22, "distanceKm": 0.59},
+                ],
+            },
+        }
+    ]
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": "Priorizo puntos con mas de 1 EVSE trazado; no afirmo ocupacion ni conectores libres en vivo."
+                },
+            },
+            {
+                "id": "recommended",
+                "type": "StationDetailCard",
+                "version": 1,
+                "props": {"name": "BALLENOIL-ES336090-COLON", "availableEvses": 2, "powerKw": 150, "distanceKm": 0.3},
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history,
+        message="Evita cargadores con un solo conector. Estoy en Córdoba...",
+    )
+
+    assert issues == []
+
+
+def test_a2ui_contract_rejects_untraced_default_reserve_attribution():
+    tool_history = [
+        {
+            "call": {
+                "tool": "plan_route",
+                "args": {
+                    "origin": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794},
+                    "destination": {"label": "Valencia", "lat": 39.4699, "lon": -0.3763},
+                    "preferences": {"reserve_min_percent": 20},
+                },
+            },
+            "result": {
+                "ok": True,
+                "tool": "plan_route",
+                "planningLevel": "chargers_only",
+                "distanceKm": 520.3,
+                "durationMin": 343,
+                "energyKwh": None,
+                "arrivalBattery": None,
+                "recommendation": {"name": "V-VALENCIA-022-2"},
+            },
+        }
+    ]
+    blocks = validate_blocks(
+        [
+            {
+                "id": "risk",
+                "type": "RiskExplanationCard",
+                "version": 1,
+                "props": {
+                    "level": "medio",
+                    "text": "No puedo asegurar que llegues con el 20% de reserva que pides sin datos del coche.",
+                },
+            }
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history,
+        message="Voy de Córdoba a Valencia con 58%. No quiero llegar justo",
+    )
+
+    assert any("reserva porcentual que no dijo" in issue for issue in issues)
+
+
+def test_a2ui_contract_rejects_unvalidated_margin_guarantee_in_chargers_only_route():
+    tool_history = [
+        {
+            "call": {
+                "tool": "plan_route",
+                "args": {
+                    "origin": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794},
+                    "destination": {"label": "Valencia", "lat": 39.4699, "lon": -0.3763},
+                    "preferences": {"reserve_min_percent": 20},
+                },
+            },
+            "result": {
+                "ok": True,
+                "tool": "plan_route",
+                "planningLevel": "chargers_only",
+                "distanceKm": 520.3,
+                "durationMin": 343,
+                "energyKwh": None,
+                "arrivalBattery": None,
+                "recommendation": {"name": "V-VALENCIA-022-2"},
+            },
+        }
+    ]
+    blocks = validate_blocks(
+        [
+            {
+                "id": "risk",
+                "type": "RiskExplanationCard",
+                "version": 1,
+                "props": {
+                    "level": "medio",
+                    "text": "Te recomiendo cargar en esta parada antes de entrar a Valencia para asegurar margen.",
+                },
+            }
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history,
+        message="Voy de Córdoba a Valencia con 58%. No quiero llegar justo",
+    )
+
+    assert any("da certeza sobre recuperar margen" in issue for issue in issues)
+
+
+def test_a2ui_contract_rejects_certain_margin_recovery_in_chargers_only():
+    tool_history = [
+        {
+            "call": {
+                "tool": "plan_route",
+                "args": {
+                    "origin": {"label": "Madrid", "lat": 40.4168, "lon": -3.7038},
+                    "destination": {"label": "Valencia", "lat": 39.4699, "lon": -0.3763},
+                },
+            },
+            "result": {
+                "ok": True,
+                "tool": "plan_route",
+                "planningLevel": "chargers_only",
+                "distanceKm": 356.7,
+                "durationMin": 240,
+                "energyKwh": None,
+                "arrivalBattery": None,
+                "recommendation": {"name": "Moya Hub Honrubia"},
+            },
+        }
+    ]
+    blocks = validate_blocks(
+        [
+            {
+                "id": "risk",
+                "type": "RiskExplanationCard",
+                "version": 1,
+                "props": {
+                    "level": "medio",
+                    "text": "Cargar en esta parada te ayudará a recuperar margen operativo, pero no está garantizado.",
+                },
+            }
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history,
+        message="Prefiero desviarme 10 minutos si el sitio es más cómodo. Voy de Madrid a Valencia con 60%",
+    )
+
+    assert any("da certeza sobre recuperar margen" in issue for issue in issues)
+
+
+def test_a2ui_contract_rejects_unasked_few_stops_copy():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "risk",
+                "type": "RiskExplanationCard",
+                "version": 1,
+                "props": {
+                    "text": (
+                        "Sin datos de autonomía ni consumo, no puedo validar la batería de llegada. "
+                        "Si prefieres parar pocas veces, necesito el modelo o consumo."
+                    )
+                },
+            }
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        [],
+        message="Prefiero desviarme 10 minutos si el sitio es más cómodo. Voy de Madrid a Valencia con 60%",
+    )
+
+    assert any("preferencia de pocas paradas" in issue for issue in issues)
+
+
+def test_a2ui_contract_rejects_future_route_without_volatility_warning():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": "Te muestro paradas de carga en el corredor. No puedo validar la batería de llegada.",
+                },
+            },
+            {
+                "id": "risk",
+                "type": "RiskExplanationCard",
+                "version": 1,
+                "props": {
+                    "level": "medio",
+                    "text": "Sin consumo ni batería usable, el margen no está validado.",
+                },
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history=[],
+        message="Voy de Madrid a Málaga mañana y salgo con 80%",
+    )
+
+    assert any("disponibilidad, acceso y tarifas pueden cambiar" in issue for issue in issues)
+
+
+def test_a2ui_contract_rejects_departure_battery_as_arrival_battery():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": "No puedo validar si llegas con el 80% sin datos de consumo.",
+                },
+            }
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history=[],
+        message="Voy de Madrid a Málaga mañana y salgo con 80%",
+    )
+
+    assert any("80% de salida" in issue for issue in issues)
+
+
+def test_a2ui_contract_rejects_future_warning_after_alternatives():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {"text": "He preparado la ruta con paradas de carga recomendadas."},
+            },
+            {
+                "id": "alternatives",
+                "type": "StationList",
+                "version": 1,
+                "props": {"stations": [{"name": "Manzanares - El Cruce", "powerKw": 180, "distanceKm": 2.23}]},
+            },
+            {
+                "id": "risk",
+                "type": "RiskExplanationCard",
+                "version": 1,
+                "props": {
+                    "level": "medio",
+                    "text": (
+                        "Al ser un viaje futuro, la disponibilidad, acceso y tarifas pueden cambiar antes del viaje."
+                    ),
+                },
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history=[
+            {
+                "call": {"tool": "plan_route", "args": {}},
+                "result": {
+                    "ok": True,
+                    "tool": "plan_route",
+                    "recommendation": {"name": "Manzanares - El Cruce"},
+                },
+            }
+        ],
+        message="Voy de Madrid a Málaga mañana y salgo con 80%",
+    )
+
+    assert any("antes de StationDetailCard/StationList" in issue for issue in issues)
+
+
+def test_a2ui_contract_rejects_future_warning_after_recommended_stop():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {"text": "Te muestro paradas de carga en el corredor."},
+            },
+            {
+                "id": "stop",
+                "type": "StationDetailCard",
+                "version": 1,
+                "props": {"name": "Aparcamiento CTM", "powerKw": 400, "distanceKm": 2.29},
+            },
+            {
+                "id": "warning",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": "Mañana la disponibilidad, acceso y tarifas pueden cambiar antes del viaje.",
+                },
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history=[
+            {
+                "call": {"tool": "plan_route", "args": {}},
+                "result": {
+                    "ok": True,
+                    "tool": "plan_route",
+                    "recommendation": {"name": "Aparcamiento CTM"},
+                },
+            }
+        ],
+        message="Voy de Madrid a Málaga mañana y salgo con 80%",
+    )
+
+    assert any("antes de StationDetailCard/StationList" in issue for issue in issues)
+
+
+def test_a2ui_contract_allows_future_route_with_volatility_warning():
+    tool_history = [
+        {
+            "call": {
+                "tool": "plan_route",
+                "args": {
+                    "origin": {"label": "Madrid", "lat": 40.4168, "lon": -3.7038},
+                    "destination": {"label": "Málaga", "lat": 36.7213, "lon": -4.4214},
+                },
+            },
+            "result": {
+                "ok": True,
+                "tool": "plan_route",
+                "planningLevel": "chargers_only",
+                "recommendation": {"name": "Aparcamiento CTM"},
+            },
+        }
+    ]
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": (
+                        "Te muestro paradas trazadas en el corredor. Para mañana, confirma disponibilidad, "
+                        "acceso y tarifas porque pueden cambiar antes del viaje."
+                    ),
+                },
+            }
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history=tool_history,
+        message="Voy de Madrid a Málaga mañana y salgo con 80%",
+    )
+
+    assert issues == []
+
+
+def test_a2ui_contract_rejects_visible_amenity_proximity_copy():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "risk",
+                "type": "RiskExplanationCard",
+                "version": 1,
+                "props": {
+                    "level": "medio",
+                    "text": "La parada tiene cafetería cerca para esperar con comodidad.",
+                },
+            }
+        ]
+    )
+
+    issues = a2ui_contract_issues(blocks, tool_history=[], message="Voy con niños")
+
+    assert any("servicio está cerca" in issue for issue in issues)
 
 
 def test_decode_codex_json_accepts_stdout_when_output_file_is_empty():
@@ -648,6 +2115,49 @@ def test_deepseek_decision_parser_accepts_json_final_content():
     assert decision["blocks"][0]["type"] == "AssistantMessage"
 
 
+def test_deepseek_decision_parser_normalizes_misplaced_tool_call_block():
+    decision = parse_openai_compatible_decision(
+        {
+            "content": json.dumps(
+                {
+                    "type": "final",
+                    "blocks": [
+                        {
+                            "id": "intro",
+                            "type": "AssistantMessage",
+                            "version": 1,
+                            "props": {"text": "Voy a buscar puntos de carga cerca de Córdoba."},
+                        },
+                        {
+                            "id": "search",
+                            "type": "tool_call",
+                            "tool": "search_destination_chargers",
+                            "args": {
+                                "location": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794},
+                                "connector": None,
+                                "radius_km": 80,
+                                "limit": 3,
+                            },
+                        },
+                    ],
+                },
+                ensure_ascii=False,
+            )
+        }
+    )
+
+    assert decision == {
+        "type": "tool_call",
+        "tool": "search_destination_chargers",
+        "args": {
+            "location": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794},
+            "connector": None,
+            "radius_km": 80,
+            "limit": 3,
+        },
+    }
+
+
 def test_deepseek_repair_decision_disables_native_tools(monkeypatch):
     calls = []
 
@@ -659,7 +2169,7 @@ def test_deepseek_repair_decision_disables_native_tools(monkeypatch):
 
     decision = run_deepseek_decision(
         "Busca cargadores cerca de Valencia",
-        repair_issues=["AlternativeStopsList necesita datos trazables."],
+        repair_issues=["StationList necesita datos trazables."],
         candidate_blocks=[],
     )
 
@@ -743,6 +2253,63 @@ def test_contextualized_prompt_adds_known_location_hint_for_hotel_followup():
     assert "no una decisión de intención" in prompt
 
 
+def test_contextualized_prompt_includes_previous_alternative_stop_details_for_plan_b():
+    prompt = contextualized_prompt(
+        "El cargador al que iba está ocupado, dame un plan B",
+        [
+            {
+                "id": "user-1",
+                "type": "UserMessage",
+                "version": 1,
+                "props": {"text": "Estoy al 8% y no conozco la zona"},
+            },
+            {
+                "id": "urgent-1",
+                "type": "StationDetailCard",
+                "version": 1,
+                "props": {
+                    "name": "BALLENOIL-ES336090-COLON",
+                    "stationName": "BALLENOIL-ES336090-COLON",
+                    "distanceKm": 0.3,
+                },
+            },
+            {
+                "id": "alternatives-1",
+                "type": "StationList",
+                "version": 1,
+                "props": {
+                    "stations": [
+                        {
+                            "name": "Parking Calle Sevilla Nº5 - Córdoba",
+                            "distanceKm": 0.5,
+                            "powerKw": 22,
+                            "connectorTypes": ["TYPE2"],
+                            "lat": 37.883857,
+                            "lon": -4.780831,
+                        },
+                        {
+                            "name": "Hotel Córdoba Center",
+                            "distanceKm": 0.59,
+                            "powerKw": 22,
+                            "connectorTypes": ["TYPE2"],
+                            "lat": 37.892339,
+                            "lon": -4.783527,
+                        },
+                    ]
+                },
+            },
+        ],
+    )
+
+    assert "batería 8%" in prompt
+    assert "Estación mostrada previamente: BALLENOIL-ES336090-COLON" in prompt
+    assert "Estaciones mostradas con datos trazables:" in prompt
+    assert "Parking Calle Sevilla Nº5 - Córdoba (distancia 0.5 km, potencia 22 kW" in prompt
+    assert "coordenadas 37.883857,-4.780831" in prompt
+    assert "Hotel Córdoba Center (distancia 0.59 km, potencia 22 kW" in prompt
+    assert "Mensaje actual del usuario: El cargador al que iba está ocupado, dame un plan B" in prompt
+
+
 @pytest.mark.django_db
 def test_conversation_message_preserves_urgent_charge_intent_for_location_followup(client):
     source = DataSource.objects.create(name="Authorized provider Córdoba", kind="ocpi", is_authorized=True)
@@ -786,12 +2353,13 @@ def test_conversation_message_preserves_urgent_charge_intent_for_location_follow
     )
     new_blocks = blocks[latest_user_index + 1 :]
     new_block_types = [block["type"] for block in new_blocks]
-    assert "UrgentChargeCard" in new_block_types
-    assert "AlternativeStopsList" in new_block_types
+    assert "StationDetailCard" in new_block_types
+    assert "StationList" in new_block_types
     assert "ClarifyingQuestionCard" not in new_block_types
     assert "LocationRequestCard" not in new_block_types
-    urgent_block = next(block for block in new_blocks if block["type"] == "UrgentChargeCard")
-    assert urgent_block["props"]["nearest"] == station.name
+    urgent_block = next(block for block in new_blocks if block["type"] == "StationDetailCard")
+    assert urgent_block["props"]["name"] == station.name
+    assert urgent_block["props"]["stationName"] == station.name
 
 
 @pytest.mark.django_db
@@ -849,16 +2417,27 @@ def test_codex_hotel_followup_with_known_city_can_search_from_location_hint(clie
             "type": "final",
             "blocks": [
                 {
+                    "id": "assistant-cordoba",
+                    "type": "AssistantMessage",
+                    "version": 1,
+                    "props": {
+                        "text": (
+                            "No tengo la ubicación exacta del hotel Meliá; uso Córdoba como aproximación. "
+                            "Si me das la dirección o zona exacta puedo refinar la búsqueda."
+                        )
+                    },
+                },
+                {
                     "id": "destination-cordoba",
                     "type": "DestinationChargingCard",
                     "version": 1,
-                    "props": {"destination": "Córdoba", "needsConfirmation": True},
+                    "props": {"destination": "Córdoba (aproximación)", "needsConfirmation": True},
                 },
                 {
                     "id": "stops-cordoba",
-                    "type": "AlternativeStopsList",
+                    "type": "StationList",
                     "version": 1,
-                    "props": {"stops": tool_result["stops"]},
+                    "props": {"stations": tool_result["stops"]},
                 },
                 {
                     "id": "risk-cordoba",
@@ -924,7 +2503,7 @@ def test_local_conversation_uses_history_for_followup_after_urgent_recommendatio
         content_type="application/json",
     )
     assert location_response.status_code == 200
-    assert any(block["type"] == "UrgentChargeCard" for block in blocks_from_a2ui_response(location_response))
+    assert any(block["type"] == "StationDetailCard" for block in blocks_from_a2ui_response(location_response))
 
     battery_response = client.post(
         "/api/conversation/message",
@@ -941,12 +2520,13 @@ def test_local_conversation_uses_history_for_followup_after_urgent_recommendatio
     )
     new_blocks = blocks[latest_user_index + 1 :]
     new_block_types = [block["type"] for block in new_blocks]
-    assert "UrgentChargeCard" in new_block_types
-    assert "AlternativeStopsList" in new_block_types
+    assert "StationDetailCard" in new_block_types
+    assert "StationList" in new_block_types
     assert "ClarifyingQuestionCard" not in new_block_types
 
-    urgent_block = next(block for block in new_blocks if block["type"] == "UrgentChargeCard")
-    assert urgent_block["props"]["nearest"] == station.name
+    urgent_block = next(block for block in new_blocks if block["type"] == "StationDetailCard")
+    assert urgent_block["props"]["name"] == station.name
+    assert urgent_block["props"]["stationName"] == station.name
 
 
 @pytest.mark.django_db
@@ -976,9 +2556,13 @@ def test_codex_conversation_agent_interprets_vehicle_followup_from_available_tra
         },
         {
             "id": "urgent-result",
-            "type": "UrgentChargeCard",
+            "type": "StationDetailCard",
             "version": 1,
-            "props": {"battery": None, "nearest": "Eurostars Maimonides - 135", "distanceKm": 0.16},
+            "props": {
+                "name": "Eurostars Maimonides - 135",
+                "stationName": "Eurostars Maimonides - 135",
+                "distanceKm": 0.16,
+            },
         },
     ]
     session.save()
@@ -987,15 +2571,15 @@ def test_codex_conversation_agent_interprets_vehicle_followup_from_available_tra
         captured_messages.append(message)
         blocks = [
             {
-                "id": "urgent-with-battery",
-                "type": "UrgentChargeCard",
-                "version": 1,
-                "props": {
-                    "battery": 20,
-                    "nearest": "Eurostars Maimonides - 135",
-                    "distanceKm": 0.16,
-                },
-            }
+                    "id": "urgent-with-battery",
+                    "type": "StationDetailCard",
+                    "version": 1,
+                    "props": {
+                        "name": "Eurostars Maimonides - 135",
+                        "stationName": "Eurostars Maimonides - 135",
+                        "distanceKm": 0.16,
+                    },
+                }
         ]
         if repair_issues:
             blocks.append(
@@ -1026,12 +2610,13 @@ def test_codex_conversation_agent_interprets_vehicle_followup_from_available_tra
     assert captured_messages
     assert "Usuario: Necesito cargar ya" in captured_messages[0]
     assert "Usuario: Estoy en 37.880729, -4.782446" in captured_messages[0]
-    assert "Resultado previo de carga urgente" in captured_messages[0]
+    assert "Estación mostrada previamente: Eurostars Maimonides - 135" in captured_messages[0]
     assert "Mensaje actual del usuario: Tengo un 20%" in captured_messages[0]
     latest_urgent_block = next(
-        block for block in reversed(blocks_from_a2ui_response(response)) if block["type"] == "UrgentChargeCard"
+        block for block in reversed(blocks_from_a2ui_response(response)) if block["type"] == "StationDetailCard"
     )
-    assert latest_urgent_block["props"]["battery"] == 20
+    assert latest_urgent_block["props"]["name"] == "Eurostars Maimonides - 135"
+    assert "battery" not in latest_urgent_block["props"]
 
 
 @pytest.mark.django_db
@@ -1082,7 +2667,7 @@ def test_codex_conversation_agent_does_not_repair_component_choice_from_urgent_h
     block_types = [block["type"] for block in new_blocks]
     assert repair_requests == []
     assert "DestinationChargingCard" in block_types
-    assert "UrgentChargeCard" not in block_types
+    assert "StationDetailCard" not in block_types
 
 
 @pytest.mark.django_db
@@ -1108,6 +2693,17 @@ def test_codex_conversation_agent_executes_allowlisted_tool(client, settings, mo
             "type": "final",
             "blocks": [
                 {
+                    "id": "assistant-from-tool",
+                    "type": "AssistantMessage",
+                    "version": 1,
+                    "props": {
+                        "text": (
+                            "Uso Almansa como aproximación porque no tengo la dirección exacta del hotel. "
+                            "Dime dirección o zona exacta para refinar la búsqueda."
+                        )
+                    },
+                },
+                {
                     "id": "destination-from-tool",
                     "type": "DestinationChargingCard",
                     "version": 1,
@@ -1115,15 +2711,21 @@ def test_codex_conversation_agent_executes_allowlisted_tool(client, settings, mo
                 },
                 {
                     "id": "stops-from-tool",
-                    "type": "AlternativeStopsList",
+                    "type": "StationList",
                     "version": 1,
-                    "props": {"stops": tool_result["stops"]},
+                    "props": {"stations": tool_result["stops"]},
                 },
                 {
                     "id": "risk-from-tool",
                     "type": "RiskExplanationCard",
                     "version": 1,
-                    "props": {"level": "medio", "text": "Confirma disponibilidad antes de depender de estos cargadores."},
+                    "props": {
+                        "level": "medio",
+                        "text": (
+                            "Confirma disponibilidad antes de depender de estos cargadores. "
+                            "Si me das la dirección exacta del hotel, puedo afinar."
+                        ),
+                    },
                 },
             ],
         }
@@ -1140,9 +2742,9 @@ def test_codex_conversation_agent_executes_allowlisted_tool(client, settings, mo
     blocks = blocks_from_a2ui_response(response)
     block_types = [block["type"] for block in blocks]
     assert "UserMessage" in block_types
-    assert "AlternativeStopsList" in block_types
-    stops_block = next(block for block in blocks if block["type"] == "AlternativeStopsList")
-    assert stops_block["props"]["stops"][0]["name"] == real_station.name
+    assert "StationList" in block_types
+    stops_block = next(block for block in blocks if block["type"] == "StationList")
+    assert stops_block["props"]["stations"][0]["name"] == real_station.name
 
 
 @pytest.mark.django_db
@@ -1173,6 +2775,17 @@ def test_deepseek_conversation_agent_uses_same_tool_and_a2ui_validation_loop(
             "type": "final",
             "blocks": [
                 {
+                    "id": "assistant-deepseek",
+                    "type": "AssistantMessage",
+                    "version": 1,
+                    "props": {
+                        "text": (
+                            "Uso Almansa como aproximación porque no tengo la dirección exacta del hotel. "
+                            "Dime dirección o zona exacta para refinar la búsqueda."
+                        )
+                    },
+                },
+                {
                     "id": "destination-deepseek",
                     "type": "DestinationChargingCard",
                     "version": 1,
@@ -1180,9 +2793,9 @@ def test_deepseek_conversation_agent_uses_same_tool_and_a2ui_validation_loop(
                 },
                 {
                     "id": "stops-deepseek",
-                    "type": "AlternativeStopsList",
+                    "type": "StationList",
                     "version": 1,
-                    "props": {"stops": tool_result["stops"]},
+                    "props": {"stations": tool_result["stops"]},
                 },
             ],
         }
@@ -1197,8 +2810,8 @@ def test_deepseek_conversation_agent_uses_same_tool_and_a2ui_validation_loop(
 
     assert response.status_code == 200
     assert calls == [(0, []), (1, [])]
-    stops_block = next(block for block in blocks_from_a2ui_response(response) if block["type"] == "AlternativeStopsList")
-    assert stops_block["props"]["stops"][0]["name"] == real_station.name
+    stops_block = next(block for block in blocks_from_a2ui_response(response) if block["type"] == "StationList")
+    assert stops_block["props"]["stations"][0]["name"] == real_station.name
     trace_events = [
         json.loads(line)
         for line in (tmp_path / "agent-traces.jsonl").read_text(encoding="utf-8").splitlines()
@@ -1376,9 +2989,9 @@ def test_codex_conversation_agent_allows_bounded_tool_chain(client, settings, mo
                 },
                 {
                     "id": "stops-from-chain",
-                    "type": "AlternativeStopsList",
+                    "type": "StationList",
                     "version": 1,
-                    "props": {"stops": tool_history[-1]["result"]["stops"]},
+                    "props": {"stations": tool_history[-1]["result"]["stops"]},
                 },
                 {
                     "id": "risk-from-chain",
@@ -1401,8 +3014,8 @@ def test_codex_conversation_agent_allows_bounded_tool_chain(client, settings, mo
     assert calls == [0, 1, 2]
     blocks = blocks_from_a2ui_response(response)
     assert any(block["type"] == "DestinationChargingCard" for block in blocks)
-    stops_block = next(block for block in blocks if block["type"] == "AlternativeStopsList")
-    assert stops_block["props"]["stops"][0]["name"] == valencia_station.name
+    stops_block = next(block for block in blocks if block["type"] == "StationList")
+    assert stops_block["props"]["stations"][0]["name"] == valencia_station.name
 
 
 @pytest.mark.django_db
@@ -1428,14 +3041,19 @@ def test_codex_conversation_agent_allows_agent_chosen_text_final_after_tool(clie
         return {
             "type": "final",
             "blocks": [
-                {
-                    "id": "text-only",
-                    "type": "AssistantMessage",
-                    "version": 1,
-                    "props": {"text": f"He encontrado {real_station.name}."},
-                }
-            ],
-        }
+                    {
+                        "id": "text-only",
+                        "type": "AssistantMessage",
+                        "version": 1,
+                        "props": {
+                            "text": (
+                                f"He encontrado {real_station.name} usando Almansa como aproximación, "
+                                "porque no tengo la dirección exacta del hotel. Dime dirección o zona exacta para refinar."
+                            )
+                        },
+                    }
+                ],
+            }
 
     monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
 
@@ -1477,10 +3095,21 @@ def test_codex_conversation_agent_repairs_untraced_structured_station_data(clien
                 "type": "final",
                 "blocks": [
                     {
-                        "id": "stops-repaired",
-                        "type": "AlternativeStopsList",
+                        "id": "assistant-repaired",
+                        "type": "AssistantMessage",
                         "version": 1,
-                        "props": {"stops": tool_result["stops"]},
+                        "props": {
+                            "text": (
+                                "Uso Almansa como aproximación porque no tengo la dirección exacta del hotel. "
+                                "Dime dirección o zona exacta para refinar la búsqueda."
+                            )
+                        },
+                    },
+                    {
+                        "id": "stops-repaired",
+                        "type": "StationList",
+                        "version": 1,
+                        "props": {"stations": tool_result["stops"]},
                     }
                 ],
             }
@@ -1489,9 +3118,9 @@ def test_codex_conversation_agent_repairs_untraced_structured_station_data(clien
             "blocks": [
                 {
                     "id": "invented-stop",
-                    "type": "AlternativeStopsList",
+                    "type": "StationList",
                     "version": 1,
-                    "props": {"stops": [{"name": "Fake HPC", "powerKw": 350, "distanceKm": 0.1}]},
+                    "props": {"stations": [{"name": "Fake HPC", "powerKw": 350, "distanceKm": 0.1}]},
                 }
             ],
         }
@@ -1512,7 +3141,7 @@ def test_codex_conversation_agent_repairs_untraced_structured_station_data(clien
 
 
 @pytest.mark.django_db
-def test_codex_conversation_agent_repairs_generic_urgent_nearest_when_tool_has_station(
+def test_codex_conversation_agent_repairs_generic_station_name_when_tool_has_station(
     client, settings, monkeypatch, real_station
 ):
     settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
@@ -1538,10 +3167,11 @@ def test_codex_conversation_agent_repairs_generic_urgent_nearest_when_tool_has_s
                 "blocks": [
                     {
                         "id": "urgent-repaired",
-                        "type": "UrgentChargeCard",
+                        "type": "StationDetailCard",
                         "version": 1,
                         "props": {
-                            "nearest": tool_result["stops"][0]["name"],
+                            "name": tool_result["stops"][0]["name"],
+                            "stationName": tool_result["stops"][0]["name"],
                             "distanceKm": tool_result["stops"][0]["distanceKm"],
                         },
                     }
@@ -1552,9 +3182,9 @@ def test_codex_conversation_agent_repairs_generic_urgent_nearest_when_tool_has_s
             "blocks": [
                 {
                     "id": "urgent-generic",
-                    "type": "UrgentChargeCard",
+                    "type": "StationDetailCard",
                     "version": 1,
-                    "props": {"nearest": "Cargador cercano por confirmar", "distanceKm": 0.1},
+                    "props": {"name": "Cargador cercano por confirmar", "distanceKm": 0.1},
                 }
             ],
         }
@@ -1570,12 +3200,13 @@ def test_codex_conversation_agent_repairs_generic_urgent_nearest_when_tool_has_s
     assert response.status_code == 200
     assert repair_requests
     assert "debe usar una estación trazable" in repair_requests[0][0]
-    urgent_block = next(block for block in blocks_from_a2ui_response(response) if block["type"] == "UrgentChargeCard")
-    assert urgent_block["props"]["nearest"] == real_station.name
+    urgent_block = next(block for block in blocks_from_a2ui_response(response) if block["type"] == "StationDetailCard")
+    assert urgent_block["props"]["name"] == real_station.name
+    assert urgent_block["props"]["stationName"] == real_station.name
 
 
 @pytest.mark.django_db
-def test_codex_conversation_agent_repairs_missing_urgent_battery_from_explicit_user_context(
+def test_codex_conversation_agent_does_not_force_user_battery_into_station_detail(
     client, settings, monkeypatch, real_station
 ):
     settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
@@ -1601,11 +3232,11 @@ def test_codex_conversation_agent_repairs_missing_urgent_battery_from_explicit_u
                 "blocks": [
                     {
                         "id": "urgent-with-battery",
-                        "type": "UrgentChargeCard",
+                        "type": "StationDetailCard",
                         "version": 1,
                         "props": {
-                            "battery": 12,
-                            "nearest": tool_result["stops"][0]["name"],
+                            "name": tool_result["stops"][0]["name"],
+                            "stationName": tool_result["stops"][0]["name"],
                             "distanceKm": tool_result["stops"][0]["distanceKm"],
                         },
                     }
@@ -1616,10 +3247,11 @@ def test_codex_conversation_agent_repairs_missing_urgent_battery_from_explicit_u
             "blocks": [
                 {
                     "id": "urgent-without-battery",
-                    "type": "UrgentChargeCard",
+                    "type": "StationDetailCard",
                     "version": 1,
                     "props": {
-                        "nearest": tool_result["stops"][0]["name"],
+                        "name": tool_result["stops"][0]["name"],
+                        "stationName": tool_result["stops"][0]["name"],
                         "distanceKm": tool_result["stops"][0]["distanceKm"],
                     },
                 }
@@ -1635,10 +3267,10 @@ def test_codex_conversation_agent_repairs_missing_urgent_battery_from_explicit_u
     )
 
     assert response.status_code == 200
-    assert repair_requests
-    assert "debe conservar la batería explícita" in repair_requests[0][0]
-    urgent_block = next(block for block in blocks_from_a2ui_response(response) if block["type"] == "UrgentChargeCard")
-    assert urgent_block["props"]["battery"] == 12
+    assert repair_requests == []
+    urgent_block = next(block for block in blocks_from_a2ui_response(response) if block["type"] == "StationDetailCard")
+    assert urgent_block["props"]["name"] == real_station.name
+    assert "battery" not in urgent_block["props"]
 
 
 @pytest.mark.django_db
@@ -1797,9 +3429,9 @@ def test_action_buttons_reject_station_navigation_with_wrong_coordinates_from_ci
         history_blocks=[
             {
                 "id": "previous-stops",
-                "type": "AlternativeStopsList",
+                "type": "StationList",
                 "version": 1,
-                "props": {"stops": [station]},
+                "props": {"stations": [station]},
             }
         ],
     )
@@ -1837,9 +3469,9 @@ def test_action_buttons_accept_station_navigation_with_variant_station_coordinat
         history_blocks=[
             {
                 "id": "previous-stops",
-                "type": "AlternativeStopsList",
+                "type": "StationList",
                 "version": 1,
-                "props": {"stops": [station]},
+                "props": {"stations": [station]},
             }
         ],
     )
@@ -1859,10 +3491,10 @@ def test_variant_station_coordinates_are_validated_against_traced_history():
         [
             {
                 "id": "stops",
-                "type": "AlternativeStopsList",
+                "type": "StationList",
                 "version": 1,
                 "props": {
-                    "stops": [
+                    "stations": [
                         {
                             "name": "E-V-Valencia-076",
                             "distance_km": 0.3,
@@ -1877,15 +3509,15 @@ def test_variant_station_coordinates_are_validated_against_traced_history():
         history_blocks=[
             {
                 "id": "previous-stops",
-                "type": "AlternativeStopsList",
+                "type": "StationList",
                 "version": 1,
-                "props": {"stops": [traced_station]},
+                "props": {"stations": [traced_station]},
             }
         ],
     )
 
-    assert any("AlternativeStopsList.stops[0].lat no coincide" in issue for issue in issues)
-    assert any("AlternativeStopsList.stops[0].lon no coincide" in issue for issue in issues)
+    assert any("StationList.stations[0].lat no coincide" in issue for issue in issues)
+    assert any("StationList.stations[0].lon no coincide" in issue for issue in issues)
 
 
 def test_resolve_location_marks_poi_query_as_city_approximation():
@@ -1938,11 +3570,11 @@ def test_structured_blocks_require_visible_copy_when_location_is_approximate():
         [
             {
                 "id": "urgent",
-                "type": "UrgentChargeCard",
+                "type": "StationDetailCard",
                 "version": 1,
                 "props": {
-                    "battery": 8,
-                    "nearest": "Telpark - Plaza del Carmen",
+                    "name": "Telpark - Plaza del Carmen",
+                    "stationName": "Telpark - Plaza del Carmen",
                     "distanceKm": 0.23,
                     "risk": "Batería crítica. Ve al cargador cercano.",
                 },
@@ -2002,11 +3634,11 @@ def test_structured_blocks_allow_visible_copy_when_location_is_approximate():
             },
             {
                 "id": "urgent",
-                "type": "UrgentChargeCard",
+                "type": "StationDetailCard",
                 "version": 1,
                 "props": {
-                    "battery": 8,
-                    "nearest": "Telpark - Plaza del Carmen",
+                    "name": "Telpark - Plaza del Carmen",
+                    "stationName": "Telpark - Plaza del Carmen",
                     "distanceKm": 0.23,
                     "risk": "Batería crítica. Ve al cargador cercano.",
                 },
@@ -2014,6 +3646,431 @@ def test_structured_blocks_allow_visible_copy_when_location_is_approximate():
         ],
         tool_history,
         "Estoy cerca de Atocha, Madrid",
+    )
+
+    assert issues == []
+
+
+def test_comfort_copy_rejects_untraced_children_claims():
+    issues = a2ui_contract_issues(
+        [
+            {
+                "id": "urgent",
+                "type": "StationDetailCard",
+                "version": 1,
+                "props": {
+                    "name": "BALLENOIL-ES336090-COLON",
+                    "stationName": "BALLENOIL-ES336090-COLON",
+                    "distanceKm": 0.3,
+                    "risk": "Dispone de cafetería y supermercado cerca, útil para entretener a los niños.",
+                },
+            }
+        ],
+        [
+            {
+                "call": {"tool": "search_destination_chargers", "args": {"location": {"label": "Córdoba"}}},
+                "result": {
+                    "ok": True,
+                    "tool": "search_destination_chargers",
+                    "stops": [
+                        {
+                            "name": "BALLENOIL-ES336090-COLON",
+                            "distanceKm": 0.3,
+                            "amenities": ["CAFE", "SUPERMARKET"],
+                        }
+                    ],
+                },
+            }
+        ],
+    )
+
+    assert any("claim de seguridad/comodidad para niños no trazado" in issue for issue in issues)
+
+
+def test_comfort_copy_allows_service_location_clarifying_question():
+    issues = a2ui_contract_issues(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": (
+                        "Para buscar una parada con baños y cafetería, necesito saber la ubicación "
+                        "(ciudad, zona o coordenadas) donde quieres cargar. ¿Dónde estás o cerca de qué lugar buscas?"
+                    )
+                },
+            }
+        ],
+        [],
+        message="Busca una parada con baños y cafetería",
+    )
+
+    assert issues == []
+
+
+def test_comfort_copy_allows_traced_amenities_as_potential_convenience():
+    issues = a2ui_contract_issues(
+        [
+            {
+                "id": "risk",
+                "type": "RiskExplanationCard",
+                "version": 1,
+                "props": {
+                    "text": "Servicios trazados en el punto: CAFE y SUPERMARKET. Pueden ayudar como comodidad potencial; confirma antes de depender de ellos."
+                },
+            }
+        ],
+        [],
+    )
+
+    assert issues == []
+
+
+def test_comfort_copy_allows_perfecto_as_conversational_acknowledgement():
+    issues = a2ui_contract_issues(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": (
+                        "Perfecto, tienes ruta de Madrid a Valencia con 60% de batería. "
+                        "Prefieres desviarte hasta 10 minutos por más comodidad."
+                    )
+                },
+            },
+            {
+                "id": "risk",
+                "type": "RiskExplanationCard",
+                "version": 1,
+                "props": {
+                    "text": "La parada tiene servicios trazados; confirma disponibilidad y acceso antes de depender de ellos."
+                },
+            },
+        ],
+        [],
+    )
+
+    assert issues == []
+
+
+def test_comfort_copy_rejects_subjective_good_services_claim():
+    issues = a2ui_contract_issues(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {"text": "Te muestro una parada de carga en el corredor con buenos servicios."},
+            }
+        ],
+        [],
+    )
+
+    assert any("claim de seguridad/comodidad" in issue for issue in issues)
+
+
+def test_requested_service_contract_rejects_missing_unverified_copy_when_tool_has_no_amenities():
+    tool_history = [
+        {
+            "call": {
+                "tool": "search_destination_chargers",
+                "args": {"location": {"label": "Almansa", "lat": 38.869, "lon": -1.0971}},
+            },
+            "result": {
+                "ok": True,
+                "tool": "search_destination_chargers",
+                "location": {"label": "Almansa", "lat": 38.869, "lon": -1.0971},
+                "stops": [
+                    {"name": "Consum Almansa", "powerKw": 100, "distanceKm": 0.49, "amenities": []},
+                    {"name": "Repsol ES, CRED Almansa", "powerKw": 50, "distanceKm": 0.68, "amenities": []},
+                ],
+            },
+        }
+    ]
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {"text": "He encontrado cargadores en Almansa."},
+            },
+            {
+                "id": "recommended",
+                "type": "StationDetailCard",
+                "version": 1,
+                "props": {"name": "Consum Almansa", "powerKw": 100, "distanceKm": 0.49},
+            },
+            {
+                "id": "alternatives",
+                "type": "StationList",
+                "version": 1,
+                "props": {"stations": [{"name": "Repsol ES, CRED Almansa", "powerKw": 50, "distanceKm": 0.68}]},
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history,
+        message="Busca una parada con baños y cafetería Estoy cerca de Almansa",
+    )
+
+    assert any("no los trazó" in issue for issue in issues)
+
+
+def test_requested_service_contract_allows_unverified_copy_when_tool_has_no_amenities():
+    tool_history = [
+        {
+            "call": {
+                "tool": "search_destination_chargers",
+                "args": {"location": {"label": "Almansa", "lat": 38.869, "lon": -1.0971}},
+            },
+            "result": {
+                "ok": True,
+                "tool": "search_destination_chargers",
+                "location": {"label": "Almansa", "lat": 38.869, "lon": -1.0971},
+                "stops": [{"name": "Consum Almansa", "powerKw": 100, "distanceKm": 0.49, "amenities": []}],
+            },
+        }
+    ]
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": (
+                        "He encontrado cargadores autorizados en Almansa, pero baños y cafetería "
+                        "no están verificados en estos resultados."
+                    )
+                },
+            },
+            {
+                "id": "recommended",
+                "type": "StationDetailCard",
+                "version": 1,
+                "props": {"name": "Consum Almansa", "powerKw": 100, "distanceKm": 0.49},
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history,
+        message="Busca una parada con baños y cafetería Estoy cerca de Almansa",
+    )
+
+    assert issues == []
+
+
+def test_comfort_copy_allows_charger_proximity_with_unverified_service_disclaimer():
+    tool_history = [
+        {
+            "call": {
+                "tool": "search_destination_chargers",
+                "args": {"location": {"label": "Almansa", "lat": 38.869, "lon": -1.0971}},
+            },
+            "result": {
+                "ok": True,
+                "tool": "search_destination_chargers",
+                "location": {"label": "Almansa", "lat": 38.869, "lon": -1.0971},
+                "stops": [{"name": "Consum Almansa", "powerKw": 100, "distanceKm": 0.49, "amenities": []}],
+            },
+        }
+    ]
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": (
+                        "Estos son puntos de carga trazados cerca de Almansa. "
+                        "Los servicios como baños o cafetería no están verificados en estos resultados."
+                    )
+                },
+            },
+            {
+                "id": "recommended",
+                "type": "StationDetailCard",
+                "version": 1,
+                "props": {"name": "Consum Almansa", "powerKw": 100, "distanceKm": 0.49},
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history,
+        message="Busca una parada con baños y cafetería Estoy cerca de Almansa",
+    )
+
+    assert issues == []
+
+
+def test_night_safety_contract_rejects_untraced_affluence_claims():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {"text": "He priorizado opciones céntricas con más afluencia."},
+            },
+            {
+                "id": "risk",
+                "type": "RiskExplanationCard",
+                "version": 1,
+                "props": {
+                    "text": "Al estar en zona céntrica, es menos probable que sean solitarios; verifica el entorno."
+                },
+            },
+            {
+                "id": "recommended",
+                "type": "StationDetailCard",
+                "version": 1,
+                "props": {"name": "E-V-Valencia-091", "powerKw": 100, "distanceKm": 0.17},
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        [
+            {
+                "call": {"tool": "search_destination_chargers", "args": {"location": {"label": "Valencia centro"}}},
+                "result": {
+                    "ok": True,
+                    "tool": "search_destination_chargers",
+                    "stops": [{"name": "E-V-Valencia-091", "powerKw": 100, "distanceKm": 0.17}],
+                },
+            }
+        ],
+        message="No quiero cargar en sitios solitarios de noche Estoy en Valencia centro",
+    )
+
+    assert any("inferencia de seguridad nocturna no trazada" in issue for issue in issues)
+
+
+def test_night_safety_contract_rejects_risk_after_alternatives():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": "He priorizado puntos autorizados cerca de Valencia centro usando datos trazados."
+                },
+            },
+            {
+                "id": "recommended",
+                "type": "StationDetailCard",
+                "version": 1,
+                "props": {"name": "E-V-Valencia-091", "powerKw": 100, "distanceKm": 0.17},
+            },
+            {
+                "id": "alternatives",
+                "type": "StationList",
+                "version": 1,
+                "props": {"stations": [{"name": "E-V-Valencia-076", "powerKw": 22, "distanceKm": 0.18}]},
+            },
+            {
+                "id": "risk",
+                "type": "RiskExplanationCard",
+                "version": 1,
+                "props": {
+                    "text": (
+                        "No puedo validar seguridad, iluminación ni afluencia en vivo. "
+                        "Verifica el entorno si llegas de noche."
+                    )
+                },
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        [
+            {
+                "call": {"tool": "search_destination_chargers", "args": {"location": {"label": "Valencia centro"}}},
+                "result": {
+                    "ok": True,
+                    "tool": "search_destination_chargers",
+                    "stops": [
+                        {"name": "E-V-Valencia-091", "powerKw": 100, "distanceKm": 0.17},
+                        {"name": "E-V-Valencia-076", "powerKw": 22, "distanceKm": 0.18},
+                    ],
+                },
+            }
+        ],
+        message="No quiero cargar en sitios solitarios de noche Estoy en Valencia centro",
+    )
+
+    assert any("RiskExplanationCard debe aparecer antes" in issue for issue in issues)
+
+
+def test_night_safety_contract_allows_traced_central_copy_with_early_risk():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": (
+                        "He priorizado puntos autorizados cerca de Valencia centro usando dirección, potencia y EVSEs trazados."
+                    )
+                },
+            },
+            {
+                "id": "recommended",
+                "type": "StationDetailCard",
+                "version": 1,
+                "props": {"name": "E-V-Valencia-091", "powerKw": 100, "distanceKm": 0.17},
+            },
+            {
+                "id": "risk",
+                "type": "RiskExplanationCard",
+                "version": 1,
+                "props": {
+                    "text": (
+                        "No puedo validar seguridad, iluminación, afluencia ni vigilancia en vivo. "
+                        "Confirma acceso, disponibilidad y verifica el entorno si llegas de noche."
+                    )
+                },
+            },
+            {
+                "id": "alternatives",
+                "type": "StationList",
+                "version": 1,
+                "props": {"stations": [{"name": "E-V-Valencia-076", "powerKw": 22, "distanceKm": 0.18}]},
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        [
+            {
+                "call": {"tool": "search_destination_chargers", "args": {"location": {"label": "Valencia centro"}}},
+                "result": {
+                    "ok": True,
+                    "tool": "search_destination_chargers",
+                    "stops": [
+                        {"name": "E-V-Valencia-091", "powerKw": 100, "distanceKm": 0.17},
+                        {"name": "E-V-Valencia-076", "powerKw": 22, "distanceKm": 0.18},
+                    ],
+                },
+            }
+        ],
+        message="No quiero cargar en sitios solitarios de noche Estoy en Valencia centro",
     )
 
     assert issues == []
@@ -2063,6 +4120,246 @@ def test_assistant_message_allows_explicit_approximation_for_hotel_city_resoluti
     )
 
     assert issues == []
+
+
+def test_a2ui_contract_rejects_hotel_exact_destination_from_city_search():
+    tool_history = [
+        {
+            "call": {
+                "tool": "search_destination_chargers",
+                "args": {"location": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794}},
+            },
+            "result": {
+                "ok": True,
+                "tool": "search_destination_chargers",
+                "location": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794},
+                "stops": [{"name": "BALLENOIL-ES336090-COLON", "distanceKm": 0.3, "powerKw": 150}],
+            },
+        }
+    ]
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": "He buscado puntos de carga cerca de Córdoba para tu estancia en el hotel Meliá."
+                },
+            },
+            {
+                "id": "destination",
+                "type": "DestinationChargingCard",
+                "version": 1,
+                "props": {"destination": "Meliá Córdoba", "needsConfirmation": True},
+            },
+            {
+                "id": "stops",
+                "type": "StationList",
+                "version": 1,
+                "props": {"stations": [{"name": "BALLENOIL-ES336090-COLON", "distanceKm": 0.3, "powerKw": 150}]},
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history,
+        message="Me voy 3 días a Córdoba y me quedo en el hotel Meliá",
+    )
+
+    assert any("presenta el hotel/POI como destino exacto" in issue for issue in issues)
+    assert any("debe decir visiblemente que es una aproximación" in issue for issue in issues)
+    assert any("para refinar la búsqueda" in issue for issue in issues)
+
+
+def test_a2ui_contract_allows_hotel_city_approximation_with_refinement_request():
+    tool_history = [
+        {
+            "call": {
+                "tool": "search_destination_chargers",
+                "args": {"location": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794}},
+            },
+            "result": {
+                "ok": True,
+                "tool": "search_destination_chargers",
+                "location": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794},
+                "stops": [{"name": "BALLENOIL-ES336090-COLON", "distanceKm": 0.3, "powerKw": 150}],
+            },
+        }
+    ]
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": (
+                        "No tengo la ubicación exacta del hotel Meliá; uso Córdoba como aproximación. "
+                        "Si me das la dirección o zona exacta puedo refinar la búsqueda."
+                    )
+                },
+            },
+            {
+                "id": "destination",
+                "type": "DestinationChargingCard",
+                "version": 1,
+                "props": {"destination": "Córdoba (aproximación)", "needsConfirmation": True},
+            },
+            {
+                "id": "stops",
+                "type": "StationList",
+                "version": 1,
+                "props": {"stations": [{"name": "BALLENOIL-ES336090-COLON", "distanceKm": 0.3, "powerKw": 150}]},
+            },
+            {
+                "id": "risk",
+                "type": "RiskExplanationCard",
+                "version": 1,
+                "props": {"text": "Confirma acceso final, tarifa y disponibilidad antes de depender de estos puntos."},
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history,
+        message="Me voy 3 días a Córdoba y me quedo en el hotel Meliá",
+    )
+
+    assert issues == []
+
+
+def test_a2ui_contract_allows_weekend_alhambra_destination_with_early_warning():
+    tool_history = [
+        {
+            "call": {
+                "tool": "search_destination_chargers",
+                "args": {"location": {"label": "Alhambra, Granada", "lat": 37.1761, "lon": -3.5881}},
+            },
+            "result": {
+                "ok": True,
+                "tool": "search_destination_chargers",
+                "location": {"label": "Alhambra, Granada", "lat": 37.1761, "lon": -3.5881},
+                "stops": [{"name": "Parking Ave María Vistillas", "distanceKm": 0.51, "powerKw": 22}],
+            },
+        }
+    ]
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": (
+                        "Uso Alhambra, Granada como aproximación para tu alojamiento. Para el finde, "
+                        "disponibilidad, acceso y tarifas pueden cambiar antes del viaje. Si me das "
+                        "hotel exacto, dirección o zona exacta puedo refinar la búsqueda."
+                    )
+                },
+            },
+            {
+                "id": "destination",
+                "type": "DestinationChargingCard",
+                "version": 1,
+                "props": {"destination": "Alhambra, Granada (aproximación)", "needsConfirmation": True},
+            },
+            {
+                "id": "stops",
+                "type": "StationList",
+                "version": 1,
+                "props": {"stations": [{"name": "Parking Ave María Vistillas", "distanceKm": 0.51, "powerKw": 22}]},
+            },
+            {
+                "id": "stay",
+                "type": "StayPlanningCard",
+                "version": 1,
+                "props": {
+                    "duration": "finde",
+                    "city": "Granada",
+                    "advice": "Confirma con el alojamiento si tiene parking con carga o si puedes usar estos puntos.",
+                },
+            },
+            {
+                "id": "risk",
+                "type": "RiskExplanationCard",
+                "version": 1,
+                "props": {"text": "Datos procedentes solo de puntos de carga autorizados importados."},
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history,
+        message=(
+            "Pista de ubicación conocida detectada en el mensaje actual: Alhambra, Granada (37.1761,-3.5881).\n"
+            "Mensaje actual del usuario: Voy el finde a Granada y duermo cerca de la Alhambra"
+        ),
+    )
+
+    assert issues == []
+
+
+def test_a2ui_contract_allows_future_round_trip_clarifying_origin_without_volatility_warning():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": (
+                        "Veo que es un viaje de ida y vuelta a Córdoba. "
+                        "¿Desde qué ciudad sales el viernes?"
+                    )
+                },
+            }
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        [],
+        message="Voy a Córdoba el viernes y vuelvo el domingo, dónde cargo?",
+    )
+
+    assert issues == []
+
+
+def test_a2ui_contract_rejects_weekend_stay_without_city_or_nights():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": (
+                        "Uso Alhambra como aproximación. Para el finde, disponibilidad, acceso y tarifas "
+                        "pueden cambiar antes del viaje. Dame dirección exacta para refinar."
+                    )
+                },
+            },
+            {
+                "id": "stay",
+                "type": "StayPlanningCard",
+                "version": 1,
+                "props": {"context": "Estancia cerca del alojamiento"},
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history=[],
+        message="Voy el finde a Granada y duermo cerca de la Alhambra",
+    )
+
+    assert any("nights=2" in issue for issue in issues)
+    assert any("debe conservar Granada" in issue for issue in issues)
 
 
 @pytest.mark.django_db
@@ -2136,9 +4433,9 @@ def test_codex_conversation_agent_recovers_repeated_tool_call_with_final_retry(c
                     },
                     {
                         "id": "more-power-stops",
-                        "type": "AlternativeStopsList",
+                        "type": "StationList",
                         "version": 1,
-                        "props": {"stops": tool_history[-1]["result"]["stops"]},
+                        "props": {"stations": tool_history[-1]["result"]["stops"]},
                     },
                 ],
             }
@@ -2153,7 +4450,7 @@ def test_codex_conversation_agent_recovers_repeated_tool_call_with_final_retry(c
 
     response = client.post(
         "/api/conversation/message",
-        data={"text": "Algo que tenga más potencia?"},
+        data={"text": "Córdoba cerca de la Mezquita: algo que tenga más potencia?"},
         content_type="application/json",
     )
 
@@ -2242,7 +4539,7 @@ def test_codex_conversation_agent_failure_uses_minimal_safe_fallback(client, set
     assert "AssistantMessage" in block_types
     assert "ClarifyingQuestionCard" in block_types
     assert "LocationRequestCard" not in block_types
-    assert "UrgentChargeCard" not in block_types
+    assert "StationDetailCard" not in block_types
 
 
 @pytest.mark.django_db
@@ -2278,7 +4575,7 @@ def test_codex_urgent_response_does_not_repair_component_choice_by_intent(client
     block_types = [block["type"] for block in blocks_from_a2ui_response(response)]
     assert repair_requests == []
     assert "DestinationChargingCard" in block_types
-    assert "UrgentChargeCard" not in block_types
+    assert "StationDetailCard" not in block_types
 
 
 @pytest.mark.django_db
@@ -2301,6 +4598,37 @@ def test_anonymous_conversation_without_vehicle_returns_chargers_only(client, mo
     assert body["recommendation"]["connector"] == "CCS2"
     assert "Sin datos de autonomía" in body["warnings"][0]
     assert RoutePlan.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_plan_route_tool_treats_partial_vehicle_profile_as_chargers_only(monkeypatch, real_station):
+    monkeypatch.setattr("routing.tools.get_route_provider", lambda: StaticRouteProvider())
+    partial_vehicle = {
+        "model": "Tesla Model Y",
+        "battery": 45,
+        "usable_battery_kwh": None,
+        "consumption_kwh_per_100km": None,
+        "connector": None,
+        "max_charge_kw": None,
+    }
+
+    assert parse_vehicle_arg(partial_vehicle) is None
+
+    result = plan_route_tool(
+        {
+            "origin": {"label": "Madrid", "lat": 40.4168, "lon": -3.7038},
+            "destination": {"label": "Valencia", "lat": 39.4699, "lon": -0.3763},
+            "vehicle": partial_vehicle,
+            "preferences": {"reserve_min_percent": 20},
+            "corridor_radius_km": 25,
+        }
+    )
+
+    assert result["ok"] is True
+    assert result["planningLevel"] == "chargers_only"
+    assert result["energyKwh"] is None
+    assert result["arrivalBattery"] is None
+    assert result["recommendation"]["stationName"] == real_station.name
 
 
 @pytest.mark.django_db

@@ -90,33 +90,18 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
           tone="route"
           rows={[
             ['Distancia', metric(block.props.distanceKm, 'km')],
-            ['Duración', metric(block.props.durationMin, 'min')],
+            ['Duración', duration(block.props.durationText, block.props.durationMin)],
             ['Energía', metric(block.props.energyKwh, 'kWh', { zeroUnknown: true })],
             ['Llegada', percent(block.props.arrivalBattery, { zeroUnknown: true })],
           ]}
         />
       )
-    case 'RecommendedStopCard': {
-      const title = stopTitle(block.props)
-      const station = stationLabel(block.props)
-      return (
-        <RecommendationCard
-          icon={BatteryCharging}
-          title={title}
-          station={station !== title ? station : ''}
-          rows={[
-            ['Potencia', metric(block.props.powerKw, 'kW')],
-            ['Distancia', metric(block.props.distanceKm, 'km')],
-            ['Desvío', metric(block.props.detourMin, 'min')],
-            ['Confianza', text(block.props.confidence)],
-          ]}
-        />
-      )
-    }
+    case 'StationDetailCard':
+      return <StationDetailCard block={block} />
     case 'AlternativeRoutesList':
       return <ListCard title="Rutas alternativas" items={list(block.props.routes)} />
-    case 'AlternativeStopsList':
-      return <ListCard title="Otras paradas viables" items={list(block.props.stops)} itemKind="stop" />
+    case 'StationList':
+      return <ListCard title={text(block.props.title, 'Estaciones cercanas')} items={list(block.props.stations)} itemKind="station" />
     case 'RiskExplanationCard':
       return <RiskBand level={text(block.props.level, 'medio')} body={text(block.props.text)} />
     case 'CostComparisonCard':
@@ -131,23 +116,6 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
           ]}
         />
       )
-    case 'UrgentChargeCard': {
-      const title = stopTitle(block.props, text(block.props.nearest, 'Parada por confirmar'))
-      const station = stationLabel(block.props)
-      return (
-        <MetricCard
-          icon={BatteryCharging}
-          title="Dónde ir ahora"
-          tone="warning"
-          rows={compactRows([
-            ['Batería', percentOrUnknown(block.props.battery)],
-            ['Parada', title],
-            station && station !== title ? ['Punto', station] : null,
-            ['Distancia', metric(block.props.distanceKm, 'km')],
-          ])}
-        />
-      )
-    }
     case 'DestinationChargingCard':
       return (
         <MetricCard
@@ -217,18 +185,18 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
     case 'PreferenceChips':
       return (
         <div className="flex min-w-0 max-w-full flex-wrap gap-2">
-              {strings(block.props.chips).map((chip) => (
-                <Button
-                  key={chip}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-auto min-h-9 max-w-full min-w-0 whitespace-normal break-words text-left leading-5"
-                  onClick={() => actions.onChipClick?.(chip)}
-                >
-                  {chip}
-                </Button>
-              ))}
+          {strings(block.props.chips).map((chip) => (
+            <Button
+              key={chip}
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-auto min-h-10 max-w-full min-w-0 whitespace-normal break-words px-3 py-2 text-left leading-5"
+              onClick={() => actions.onChipClick?.(chip)}
+            >
+              {chip}
+            </Button>
+          ))}
         </div>
       )
     case 'ErrorFallbackCard':
@@ -434,11 +402,13 @@ function MetricCard({
   title,
   rows,
   tone,
+  note,
 }: {
   icon: typeof Route
   title: string
   rows: Array<[string, string]>
   tone: 'primary' | 'warning' | 'route' | 'assistant'
+  note?: string
 }) {
   const toneClass = {
     primary: 'text-primary',
@@ -457,44 +427,88 @@ function MetricCard({
           {title}
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-3">
         <MetricGrid rows={rows} />
+        {note ? (
+          <p className="border-t border-border pt-3 text-sm leading-6 text-body">
+            {note}
+          </p>
+        ) : null}
       </CardContent>
     </Card>
   )
 }
 
-function RecommendationCard({
-  icon: Icon,
-  title,
-  station,
-  rows,
-}: {
-  icon: typeof Route
-  title: string
-  station?: string
-  rows: Array<[string, string]>
-}) {
+function StationDetailCard({ block }: { block: A2UIBlock }) {
+  const station = stationLabel(block.props) || stationTitle(block.props)
+  const address = text(block.props.address, '')
+  const capacity = stationCapacity(block.props)
+  const connectors = connectorLabels(block.props.connectorTypes)
+  const amenities = amenityLabels(block.props.amenities)
+  const title = text(block.props.title, 'Estación de carga')
+
   return (
     <Card className="border-primary bg-primary text-primary-foreground">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-start gap-3 text-base font-semibold tracking-tight">
           <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-md bg-primary-foreground text-primary">
-            <Icon className="size-4" aria-hidden="true" />
+            <BatteryCharging className="size-4" aria-hidden="true" />
           </span>
           <span className="flex min-w-0 flex-col gap-1">
-            <span className="text-caption font-medium text-primary-foreground/70">Parada recomendada</span>
-            <span className="truncate">{title || 'Parada recomendada'}</span>
-            {station ? (
+            <span className="text-caption font-medium text-primary-foreground/70">{title}</span>
+            <span className="break-words">{station || 'Estación por confirmar'}</span>
+            {address ? (
               <span className="truncate text-caption font-medium text-primary-foreground/70">
-                Punto de carga: {station}
+                {address}
               </span>
             ) : null}
           </span>
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <MetricGridRows rows={rows} inverted />
+      <CardContent className="space-y-3">
+        <MetricGridRows
+          rows={compactRows([
+            ['Distancia', metric(block.props.distanceKm, 'km')],
+            ['Potencia', metric(block.props.powerKw, 'kW')],
+            capacity ? ['Capacidad', capacity] : ['Confianza', text(block.props.confidence)],
+            ['Desvío', metric(block.props.detourMin, 'min')],
+          ])}
+          inverted
+        />
+        {connectors.length > 0 ? (
+          <div className="border-t border-primary-foreground/20 pt-3">
+            <span className="block text-caption font-medium text-primary-foreground/70">
+              Conectores trazados
+            </span>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {connectors.map((connector) => (
+                <span
+                  key={connector}
+                  className="rounded-full bg-primary-foreground/10 px-2 py-1 text-caption font-semibold leading-none text-primary-foreground"
+                >
+                  {connector}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {amenities && amenities.length > 0 ? (
+          <div className="border-t border-primary-foreground/20 pt-3">
+            <span className="block text-caption font-medium text-primary-foreground/70">
+              Servicios trazados
+            </span>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {amenities.map((amenity) => (
+                <span
+                  key={amenity}
+                  className="rounded-full bg-primary-foreground/10 px-2 py-1 text-caption font-semibold leading-none text-primary-foreground"
+                >
+                  {amenity}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   )
@@ -510,7 +524,7 @@ function MetricGridRows({ rows, inverted = false }: { rows: Array<[string, strin
       {rows.map(([label, value]) => (
         <div key={label} className="min-w-0">
           <span className={cn('block truncate text-caption font-medium', inverted ? 'text-primary-foreground/70' : 'text-muted-foreground')}>{label}</span>
-          <span className={cn('block truncate text-compact font-semibold tracking-tight', inverted ? 'text-primary-foreground' : 'text-foreground')}>{value}</span>
+          <span className={cn('block break-words text-compact font-semibold tracking-tight', inverted ? 'text-primary-foreground' : 'text-foreground')}>{value}</span>
         </div>
       ))}
     </div>
@@ -524,7 +538,7 @@ function ListCard({
 }: {
   title: string
   items: RecordList
-  itemKind?: 'default' | 'stop'
+  itemKind?: 'default' | 'station'
 }) {
   return (
     <Card>
@@ -534,16 +548,16 @@ function ListCard({
       <CardContent>
         <div className="flex flex-col divide-y divide-border">
         {items.map((item, index) => (
-          <div key={`${itemKind === 'stop' ? stopTitle(item, 'Parada') : text(item.name)}-${index}`} className="flex items-center gap-3 py-2.5 text-sm first:pt-0 last:pb-0">
+          <div key={`${itemKind === 'station' ? stationTitle(item, 'Estación') : text(item.name)}-${index}`} className="flex items-center gap-3 py-2.5 text-sm first:pt-0 last:pb-0">
             <span className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
               {index + 1}
             </span>
             <div className="min-w-0 flex-1">
               <div className="truncate font-semibold tracking-tight">
-                {itemKind === 'stop' ? stopTitle(item, 'Parada') : text(item.name)}
+                {itemKind === 'station' ? stationTitle(item, 'Estación') : text(item.name)}
               </div>
               <div className="text-muted-foreground">
-                {itemKind === 'stop' ? stopDetails(item) : routeDetails(item)}
+                {itemKind === 'station' ? stationDetails(item) : routeDetails(item)}
               </div>
             </div>
           </div>
@@ -728,26 +742,52 @@ function text(value: unknown, fallback = 'No disponible') {
   return fallback
 }
 
-function stopTitle(value: Record<string, unknown>, fallback = 'Parada recomendada') {
+function stationTitle(value: Record<string, unknown>, fallback = 'Estación de carga') {
   return text(
-    value.placeName ?? value.locationName ?? value.stopName ?? value.name ?? value.stationName ?? value.nearest,
+    value.stationName ?? value.name,
     fallback,
   )
 }
 
 function stationLabel(value: Record<string, unknown>) {
-  return text(value.stationName ?? value.name ?? value.nearest ?? value.chargerName, '')
+  return text(value.stationName ?? value.name, '')
 }
 
-function stopDetails(item: Record<string, unknown>) {
-  const title = stopTitle(item, 'Parada')
+function stationDetails(item: Record<string, unknown>) {
+  const title = stationTitle(item, 'Estación')
   const station = stationLabel(item)
-  const stationDetail = station && station !== title ? `Punto de carga: ${station}` : ''
+  const stationDetail = station && station !== title ? `Estación: ${station}` : ''
+  const amenities = amenitySummary(item.amenities)
+  const capacity = stationCapacity(item)
+  const connectors = connectorLabels(item.connectorTypes)
+  const metricParts = [
+    isKnownNumber(item.powerKw) ? metric(item.powerKw, 'kW') : '',
+    isKnownNumber(item.distanceKm) ? metric(item.distanceKm, 'km') : '',
+    isKnownNumber(item.detourMin) ? `Desvío ${metric(item.detourMin, 'min')}` : '',
+    capacity ? `Capacidad trazada: ${capacity}` : '',
+    connectors.length > 0 ? `Conectores trazados: ${connectors.join(', ')}` : '',
+  ].filter(Boolean)
   const metrics = isKnownNumber(item.powerKw)
-    ? `${metric(item.powerKw, 'kW')}${isKnownNumber(item.distanceKm) ? ` · ${metric(item.distanceKm, 'km')}` : ''}`
+    ? metricParts.join(' · ')
     : metric(item.deltaMin, 'min de diferencia')
 
-  return compactParts([stationDetail, metrics]).join(' · ')
+  return compactParts([stationDetail, metrics, amenities]).join(' · ')
+}
+
+function stationCapacity(item: Record<string, unknown>) {
+  const evses = knownNumber(item.availableEvses)
+  if (evses !== null) {
+    return `${formatNumber(evses)} EVSEs`
+  }
+  const connectors = knownNumber(item.connectorCount)
+  if (connectors !== null) {
+    return `${formatNumber(connectors)} conectores`
+  }
+  return ''
+}
+
+function connectorLabels(value: unknown) {
+  return strings(value).map((item) => item.toUpperCase())
 }
 
 function routeDetails(item: Record<string, unknown>) {
@@ -787,6 +827,71 @@ function strings(value: unknown): string[] {
     : []
 }
 
+const AMENITY_LABELS: Record<string, string> = {
+  BATHROOM: 'Baños',
+  BUS_STOP: 'Bus',
+  CAFE: 'Cafetería',
+  CARPOOL_PARKING: 'Parking compartido',
+  FUEL_STATION: 'Gasolinera',
+  HOTEL: 'Hotel',
+  MALL: 'Centro comercial',
+  NATURE: 'Zona verde',
+  PARKING_LOT: 'Parking',
+  RECREATION_AREA: 'Zona de descanso',
+  RESTAURANT: 'Restaurante',
+  SPORT: 'Zona deportiva',
+  SUPERMARKET: 'Supermercado',
+  TAXI_STAND: 'Taxi',
+  TOILETS: 'Baños',
+  WIFI: 'Wifi',
+}
+
+const AMENITY_PRIORITY = [
+  'RESTAURANT',
+  'CAFE',
+  'BATHROOM',
+  'TOILETS',
+  'SUPERMARKET',
+  'MALL',
+  'RECREATION_AREA',
+  'HOTEL',
+  'PARKING_LOT',
+  'FUEL_STATION',
+  'WIFI',
+  'NATURE',
+]
+
+function amenityLabels(value: unknown, limit = 4) {
+  const unique = Array.from(new Set(strings(value).map(normalizeAmenityCode).filter(Boolean)))
+  unique.sort((left, right) => amenityPriority(left) - amenityPriority(right))
+  const labels = unique.slice(0, limit).map((code) => AMENITY_LABELS[code] ?? humanizeAmenity(code))
+  const hidden = unique.length - labels.length
+  return hidden > 0 ? [...labels, `+${hidden} más`] : labels
+}
+
+function amenitySummary(value: unknown) {
+  const labels = amenityLabels(value, 3)
+  return labels.length > 0 ? `Servicios trazados: ${labels.join(', ')}` : ''
+}
+
+function normalizeAmenityCode(value: string) {
+  return value.trim().toUpperCase().replace(/[\s-]+/g, '_')
+}
+
+function amenityPriority(code: string) {
+  const index = AMENITY_PRIORITY.indexOf(code)
+  return index === -1 ? AMENITY_PRIORITY.length : index
+}
+
+function humanizeAmenity(code: string) {
+  return code
+    .toLowerCase()
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
 function metric(value: unknown, unit: string, options: { zeroUnknown?: boolean } = {}) {
   const number = knownNumber(value, options)
   if (number === null) {
@@ -801,6 +906,24 @@ function percent(value: unknown, options: { zeroUnknown?: boolean } = {}) {
     return 'No calculado'
   }
   return `${formatNumber(number)}%`
+}
+
+function duration(durationText: unknown, durationMin: unknown) {
+  const provided = text(durationText, '')
+  if (provided) {
+    return provided
+  }
+  const minutes = knownNumber(durationMin)
+  if (minutes === null) {
+    return 'No calculado'
+  }
+  if (minutes < 60) {
+    return `${formatNumber(minutes)} min`
+  }
+  const rounded = Math.round(minutes)
+  const hours = Math.floor(rounded / 60)
+  const remaining = rounded % 60
+  return remaining > 0 ? `${hours} h ${remaining} min` : `${hours} h`
 }
 
 function coordinatePair(lat: unknown, lon: unknown) {

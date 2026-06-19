@@ -199,16 +199,30 @@ def parse_location_arg(value: Any) -> dict[str, Any]:
 def parse_vehicle_arg(value: Any) -> VehicleContext | None:
     if not isinstance(value, dict):
         return None
-    required = ["battery", "usable_battery_kwh", "consumption_kwh_per_100km", "connector", "max_charge_kw"]
-    if not all(key in value for key in required):
+    battery = bounded_float(value.get("battery"), default=None, minimum=0, maximum=100)
+    usable_battery_kwh = bounded_float(value.get("usable_battery_kwh"), default=None, minimum=0.1, maximum=300)
+    consumption_kwh_per_100km = bounded_float(
+        value.get("consumption_kwh_per_100km"),
+        default=None,
+        minimum=1,
+        maximum=80,
+    )
+    connector = str(value.get("connector") or "").strip()[:40]
+    max_charge_kw = bounded_float(value.get("max_charge_kw"), default=None, minimum=1, maximum=500)
+    if (
+        battery is None
+        or usable_battery_kwh is None
+        or consumption_kwh_per_100km is None
+        or not connector
+        or max_charge_kw is None
+    ):
         return None
     return VehicleContext(
-        battery_percent=bounded_float(value.get("battery"), default=0, minimum=0, maximum=100) or 0,
-        usable_battery_kwh=bounded_float(value.get("usable_battery_kwh"), default=0.1, minimum=0.1, maximum=300) or 0.1,
-        consumption_kwh_per_100km=bounded_float(value.get("consumption_kwh_per_100km"), default=1, minimum=1, maximum=80)
-        or 1,
-        connector=str(value.get("connector") or "").strip()[:40],
-        max_charge_kw=bounded_float(value.get("max_charge_kw"), default=1, minimum=1, maximum=500) or 1,
+        battery_percent=battery,
+        usable_battery_kwh=usable_battery_kwh,
+        consumption_kwh_per_100km=consumption_kwh_per_100km,
+        connector=connector,
+        max_charge_kw=max_charge_kw,
     )
 
 

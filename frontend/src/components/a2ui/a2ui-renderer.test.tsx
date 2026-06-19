@@ -81,55 +81,129 @@ describe('A2UIRenderer', () => {
     expect(screen.getAllByText('No calculado')).toHaveLength(2)
   })
 
-  it('marks the recommended stop as the primary decision', () => {
+  it('uses human route duration text when the agent provides it', () => {
     render(
       <A2UIRenderer
         blocks={[
           {
-            id: 'recommended',
-            type: 'RecommendedStopCard',
+            id: 'route',
+            type: 'RouteSummaryCard',
             version: 1,
-            props: { name: 'Almansa HPC', powerKw: 180, distanceKm: 1.2, detourMin: 8, confidence: 'media' },
+            props: {
+              distanceKm: 356.7,
+              durationMin: 240,
+              durationText: '4 h 0 min',
+              energyKwh: null,
+              arrivalBattery: null,
+            },
           },
         ]}
       />,
     )
 
-    expect(screen.getByText('Parada recomendada')).toBeInTheDocument()
-    expect(screen.getByText('Almansa HPC')).toBeInTheDocument()
-    expect(screen.getByText('1.2 km')).toBeInTheDocument()
+    expect(screen.getByText('4 h 0 min')).toBeInTheDocument()
+    expect(screen.queryByText('240 min')).not.toBeInTheDocument()
   })
 
-  it('renders place-first stop recommendations with traceable charging point detail', () => {
+  it('renders a station detail as the primary charging decision', () => {
     render(
       <A2UIRenderer
         blocks={[
           {
             id: 'recommended',
-            type: 'RecommendedStopCard',
+            type: 'StationDetailCard',
             version: 1,
             props: {
-              placeName: 'Área de servicio Almansa',
               stationName: 'Almansa HPC',
-              name: 'Almansa HPC',
+              powerKw: 180,
+              distanceKm: 1.2,
+              detourMin: 8,
+              availableEvses: 2,
+              connectorTypes: ['CCS2'],
+            },
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('Estación de carga')).toBeInTheDocument()
+    expect(screen.getByText('Almansa HPC')).toBeInTheDocument()
+    expect(screen.getByText('1.2 km')).toBeInTheDocument()
+    expect(screen.getByText('2 EVSEs')).toBeInTheDocument()
+    expect(screen.getByText('CCS2')).toBeInTheDocument()
+  })
+
+  it('renders urgent station data without repeating the user battery as a primary metric', () => {
+    const stationName = 'BALLENOIL-ES336090-COLON'
+
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'urgent',
+            type: 'StationDetailCard',
+            version: 1,
+            props: {
+              title: 'Estación cercana',
+              stationName,
+              distanceKm: 0.3,
+              powerKw: 150,
+              availableEvses: 2,
+              connectorTypes: ['CCS2'],
+            },
+          },
+          {
+            id: 'risk',
+            type: 'RiskExplanationCard',
+            version: 1,
+            props: {
+              level: 'alto',
+              text: 'Margen bajo: confirma acceso y disponibilidad antes de depender de esta estación.',
+            },
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('Estación cercana')).toBeInTheDocument()
+    expect(screen.queryByText('12%')).not.toBeInTheDocument()
+    expect(screen.getByText(stationName)).toHaveClass('break-words')
+    expect(screen.getByText('Margen bajo: confirma acceso y disponibilidad antes de depender de esta estación.')).toBeInTheDocument()
+  })
+
+  it('renders station recommendations with traceable station details', () => {
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'recommended',
+            type: 'StationDetailCard',
+            version: 1,
+            props: {
+              stationName: 'Almansa HPC',
+              address: 'Área de servicio Almansa',
               powerKw: 180,
               distanceKm: 1.2,
               detourMin: 8,
               confidence: 'media',
+              availableEvses: 2,
+              connectorTypes: ['CCS2', 'TYPE2'],
             },
           },
           {
             id: 'alternatives',
-            type: 'AlternativeStopsList',
+            type: 'StationList',
             version: 1,
             props: {
-              stops: [
+              title: 'Otras estaciones viables',
+              stations: [
                 {
-                  placeName: 'Parking centro',
                   stationName: 'Centro CCS',
-                  name: 'Centro CCS',
+                  address: 'Parking centro',
                   powerKw: 90,
                   distanceKm: 0.7,
+                  availableEvses: 3,
+                  connectorTypes: ['CCS2'],
                 },
               ],
             },
@@ -138,11 +212,62 @@ describe('A2UIRenderer', () => {
       />,
     )
 
+    expect(screen.getByText('Almansa HPC')).toBeInTheDocument()
     expect(screen.getByText('Área de servicio Almansa')).toBeInTheDocument()
-    expect(screen.getByText('Punto de carga: Almansa HPC')).toBeInTheDocument()
-    expect(screen.getByText('Otras paradas viables')).toBeInTheDocument()
-    expect(screen.getByText('Parking centro')).toBeInTheDocument()
-    expect(screen.getByText(/Punto de carga: Centro CCS/)).toBeInTheDocument()
+    expect(screen.getByText('Capacidad')).toBeInTheDocument()
+    expect(screen.getByText('2 EVSEs')).toBeInTheDocument()
+    expect(screen.getByText('Conectores trazados')).toBeInTheDocument()
+    expect(screen.getByText('TYPE2')).toBeInTheDocument()
+    expect(screen.getByText('Otras estaciones viables')).toBeInTheDocument()
+    expect(screen.getByText('Centro CCS')).toBeInTheDocument()
+    expect(screen.getByText(/Capacidad trazada: 3 EVSEs/)).toBeInTheDocument()
+    expect(screen.getByText(/Conectores trazados: CCS2/)).toBeInTheDocument()
+  })
+
+  it('renders traced amenities without claiming unverified proximity or child suitability', () => {
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'recommended',
+            type: 'StationDetailCard',
+            version: 1,
+            props: {
+              stationName: 'Moya Hub Honrubia',
+              powerKw: 240,
+              distanceKm: 1.23,
+              detourMin: 3,
+              confidence: 'media',
+              amenities: ['HOTEL', 'RESTAURANT', 'PARKING_LOT', 'FUEL_STATION', 'WIFI', 'CAFE', 'SUPERMARKET'],
+            },
+          },
+          {
+            id: 'alternatives',
+            type: 'StationList',
+            version: 1,
+            props: {
+              stations: [
+                {
+                  stationName: 'Aparcamiento CTM',
+                  powerKw: 400,
+                  distanceKm: 4.77,
+                  detourMin: 11,
+                  amenities: ['RESTAURANT', 'CAFE'],
+                },
+              ],
+            },
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('Servicios trazados')).toBeInTheDocument()
+    expect(screen.getByText('Restaurante')).toBeInTheDocument()
+    expect(screen.getByText('Cafetería')).toBeInTheDocument()
+    expect(screen.getByText('+3 más')).toBeInTheDocument()
+    expect(screen.getByText(/400 kW · 4.8 km · Desvío 11 min/)).toBeInTheDocument()
+    expect(screen.getByText(/Servicios trazados: Restaurante, Cafetería/)).toBeInTheDocument()
+    expect(screen.queryByText(/apto para niños|ideal|seguro/i)).not.toBeInTheDocument()
   })
 
   it('labels medium uncertainty as data to confirm', () => {
@@ -208,7 +333,7 @@ describe('A2UIRenderer', () => {
       />,
     )
 
-    expect(screen.getByRole('button', { name: longChip })).toHaveClass('max-w-full', 'whitespace-normal', 'break-words')
+    expect(screen.getByRole('button', { name: longChip })).toHaveClass('max-w-full', 'whitespace-normal', 'break-words', 'py-2')
   })
 
   it('opens registered local function actions', () => {

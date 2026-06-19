@@ -26,7 +26,7 @@ class CaseSpec:
 CASE_SPECS: dict[int, CaseSpec] = {
     10: CaseSpec(
         turns=["Voy de Zaragoza a Barcelona y quiero llegar con al menos 25%"],
-        any_components=({"AlternativeStopsList", "RecommendedStopCard"},),
+        any_components=({"StationList", "StationDetailCard"},),
         expected_tools={"plan_route"},
     ),
     11: CaseSpec(
@@ -66,19 +66,19 @@ CASE_SPECS: dict[int, CaseSpec] = {
     17: CaseSpec(
         turns=["Voy el finde a Granada y duermo cerca de la Alhambra"],
         expected_components={"DestinationChargingCard"},
-        any_components=({"AlternativeStopsList", "RecommendedStopCard"},),
+        any_components=({"StationList", "StationDetailCard"},),
         expected_tools={"search_destination_chargers"},
     ),
     18: CaseSpec(
         turns=["Voy a un hotel sin cargador, necesito cargar durante la estancia", "En Valencia centro"],
         expected_components={"DestinationChargingCard"},
-        any_components=({"AlternativeStopsList", "RecommendedStopCard"},),
+        any_components=({"StationList", "StationDetailCard"},),
         expected_tools={"search_destination_chargers"},
     ),
     19: CaseSpec(
         turns=["Voy una semana a Cadiz y necesito cargar durante la estancia"],
         expected_components={"StayPlanningCard"},
-        any_components=({"AlternativeStopsList", "RecommendedStopCard"},),
+        any_components=({"StationList", "StationDetailCard"},),
         expected_tools={"search_destination_chargers"},
     ),
     20: CaseSpec(

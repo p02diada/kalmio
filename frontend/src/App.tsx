@@ -28,6 +28,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { A2UIRenderer } from '@/components/a2ui/a2ui-renderer'
+import { A2UIShowcasePage } from '@/components/a2ui/a2ui-showcase'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
@@ -850,11 +851,18 @@ const settingsRoute = createRoute({
   component: SettingsPage,
 })
 
+const a2uiRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/a2ui',
+  component: A2UIShowcasePage,
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   chatRoute,
   activityRoute,
   settingsRoute,
+  a2uiRoute,
 ])
 
 const router = createRouter({ routeTree })

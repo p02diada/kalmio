@@ -66,7 +66,7 @@ def facts_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
     facts: dict[str, Any] = {
         "locations": [],
         "routes": [],
-        "stops": [],
+        "stations": [],
         "risks": [],
     }
     for block in blocks:
@@ -78,13 +78,13 @@ def facts_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
             facts["locations"].append(with_source(props, source_component_id))
         elif block_type == "RouteSummaryCard":
             facts["routes"].append(with_source(props, source_component_id))
-        elif block_type == "RecommendedStopCard":
-            facts["stops"].append(with_source(props, source_component_id))
-        elif block_type == "AlternativeStopsList" and isinstance(props.get("stops"), list):
-            facts["stops"].extend(
-                with_source(stop, source_component_id)
-                for stop in props["stops"]
-                if isinstance(stop, dict)
+        elif block_type == "StationDetailCard":
+            facts["stations"].append(with_source(props, source_component_id))
+        elif block_type == "StationList" and isinstance(props.get("stations"), list):
+            facts["stations"].extend(
+                with_source(station, source_component_id)
+                for station in props["stations"]
+                if isinstance(station, dict)
             )
         elif block_type == "RiskExplanationCard":
             facts["risks"].append(with_source(props, source_component_id))

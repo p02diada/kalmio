@@ -3,7 +3,7 @@
   "$id": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
   "catalogId": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
   "version": "v1.0",
-  "description": "Kalmio EV assistant A2UI catalog. Agents may use only these domain components and registered functions. Stop recommendations are place-first and backed by traceable charging-point data.",
+  "description": "Kalmio EV assistant A2UI catalog. Agents may use only these domain components and registered functions. Charging recommendations are station-first and backed by traceable station, EVSE and connector data.",
   "components": {
     "AssistantMessage": {
       "type": "object",
@@ -51,9 +51,9 @@
         }
       ]
     },
-    "RecommendedStopCard": {
+    "StationDetailCard": {
       "allOf": [
-        { "$ref": "#/$defs/stopDecisionProps" },
+        { "$ref": "#/$defs/stationProps" },
         { "$ref": "#/$defs/decisionProps" }
       ]
     },
@@ -70,17 +70,18 @@
       "required": ["routes"],
       "additionalProperties": false
     },
-    "AlternativeStopsList": {
+    "StationList": {
       "type": "object",
       "properties": {
-        "stops": {
+        "title": { "type": "string" },
+        "stations": {
           "type": "array",
           "maxItems": 5,
-          "items": { "$ref": "#/$defs/stopDecisionProps" }
+          "items": { "$ref": "#/$defs/stationProps" }
         },
         "uncertainty": { "$ref": "#/$defs/uncertainty" }
       },
-      "required": ["stops"],
+      "required": ["stations"],
       "additionalProperties": false
     },
     "RiskExplanationCard": {
@@ -103,20 +104,6 @@
             "best": { "$ref": "#/$defs/displayValue" },
             "estimatedCostEur": { "type": ["number", "null"], "minimum": 0 },
             "savingEur": { "type": ["number", "null"] }
-          },
-          "additionalProperties": true
-        }
-      ]
-    },
-    "UrgentChargeCard": {
-      "allOf": [
-        { "$ref": "#/$defs/stopDecisionProps" },
-        { "$ref": "#/$defs/decisionProps" },
-        {
-          "type": "object",
-          "properties": {
-            "battery": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
-            "nearest": { "$ref": "#/$defs/displayValue" }
           },
           "additionalProperties": true
         }
@@ -357,10 +344,9 @@
       },
       "additionalProperties": true
     },
-    "stopDecisionProps": {
+    "stationProps": {
       "type": "object",
       "properties": {
-        "placeName": { "$ref": "#/$defs/displayValue" },
         "stationName": { "$ref": "#/$defs/displayValue" },
         "name": { "$ref": "#/$defs/displayValue" },
         "address": { "$ref": "#/$defs/displayValue" },
@@ -370,6 +356,7 @@
           "maxItems": 8
         },
         "availableEvses": { "type": ["number", "null"], "minimum": 0 },
+        "connectorCount": { "type": ["number", "null"], "minimum": 0 },
         "amenities": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
@@ -384,7 +371,6 @@
       },
       "additionalProperties": true
     },
-    "stationDecisionProps": { "$ref": "#/$defs/stopDecisionProps" },
     "listItem": {
       "type": "object",
       "properties": {
