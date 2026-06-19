@@ -256,19 +256,18 @@ def test_conversation_message_handles_destination_charging_without_route_planner
     body = response.json()
     block_types = [block["type"] for block in blocks_from_a2ui_response(body)]
     assert "UserMessage" in block_types
-    assert "DestinationChargingCard" in block_types
-    assert "LocationDetailCard" in block_types
+    assert "PlaceDetailCard" in block_types
     assert "RouteSummaryCard" not in block_types
     assert RoutePlan.objects.count() == 0
 
 
 @pytest.mark.django_db
-def test_location_detail_card_normalizes_embedded_location_text():
+def test_place_detail_card_normalizes_embedded_location_text():
     blocks = validate_blocks(
         [
             {
-                "id": "location-detail",
-                "type": "LocationDetailCard",
+                "id": "place-detail",
+                "type": "PlaceDetailCard",
                 "version": 1,
                 "props": {
                     "location": "{'label': 'Córdoba', 'lat': 37.8882, 'lon': -4.7794}",
@@ -508,7 +507,7 @@ def test_action_buttons_adds_label_for_open_url_function_call():
     assert blocks[0]["props"]["actions"][0]["label"] == "Abrir en Google Maps"
 
 
-def test_destination_charging_card_normalizes_hotel_location_label():
+def test_removed_destination_and_stay_cards_render_fallbacks():
     blocks = validate_blocks(
         [
             {
@@ -516,86 +515,19 @@ def test_destination_charging_card_normalizes_hotel_location_label():
                 "type": "DestinationChargingCard",
                 "version": 1,
                 "props": {"locationLabel": "Valencia centro", "needsConfirmation": True},
-            }
-        ]
-    )
-
-    assert blocks[0]["props"]["destination"] == "Valencia centro"
-
-
-def test_stay_planning_card_normalizes_stay_variants_and_extracts_primary_stop():
-    blocks = validate_blocks(
-        [
+            },
             {
                 "id": "stay",
                 "type": "StayPlanningCard",
                 "version": 1,
-                "props": {
-                    "durationText": "1 semana",
-                    "locationLabel": "Cádiz",
-                    "primaryStop": {
-                        "name": "ONCE DZ Cádiz",
-                        "powerKw": 22,
-                        "distanceKm": 0.23,
-                    },
-                },
+                "props": {"duration": "finde", "context": "Estancia en Granada"},
             }
         ]
     )
 
-    assert blocks[0]["props"] == {"nights": 7, "city": "Cádiz", "recommendation": "ONCE DZ Cádiz"}
-    assert blocks[1]["type"] == "StationDetailCard"
-    assert blocks[1]["props"]["name"] == "ONCE DZ Cádiz"
-
-
-def test_stay_planning_card_extracts_chargers_variant_as_alternative_stops():
-    blocks = validate_blocks(
-        [
-            {
-                "id": "stay",
-                "type": "StayPlanningCard",
-                "version": 1,
-                "props": {
-                    "duration": "1 semana",
-                    "location": {"label": "Cádiz", "lat": 36.5271, "lon": -6.2886},
-                    "chargers": [
-                        {
-                            "name": "ONCE DZ Cádiz",
-                            "powerKw": 22,
-                            "distanceKm": 0.23,
-                        }
-                    ],
-                },
-            }
-        ]
-    )
-
-    assert blocks[0]["props"] == {"nights": 7, "city": "Cádiz", "recommendation": "ONCE DZ Cádiz"}
-    assert blocks[1]["type"] == "StationList"
-    assert blocks[1]["props"]["stations"][0]["name"] == "ONCE DZ Cádiz"
-
-
-def test_stay_planning_card_normalizes_context_and_suggestion():
-    blocks = validate_blocks(
-        [
-            {
-                "id": "stay",
-                "type": "StayPlanningCard",
-                "version": 1,
-                "props": {
-                    "duration": "finde",
-                    "context": "Estancia en Granada",
-                    "suggestion": "Pregunta al alojamiento si tiene parking con carga.",
-                },
-            }
-        ]
-    )
-
-    assert blocks[0]["props"] == {
-        "nights": 2,
-        "city": "Granada",
-        "recommendation": "Pregunta al alojamiento si tiene parking con carga.",
-    }
+    assert [block["type"] for block in blocks] == ["ErrorFallbackCard", "ErrorFallbackCard"]
+    assert blocks[0]["props"]["originalType"] == "DestinationChargingCard"
+    assert blocks[1]["props"]["originalType"] == "StayPlanningCard"
 
 
 def test_risk_explanation_card_normalizes_singular_risk_text():
@@ -665,6 +597,28 @@ def test_search_destination_chargers_tool_exposes_traced_comfort_and_reliability
     assert stop["amenities"] == ["restaurant", "bathroom"]
     assert stop["reliability"] == 88
     assert stop["address"] == "A-31 Almansa"
+    assert stop["pricePerKwhEur"] == 0.49
+    assert stop["currency"] == "EUR"
+    assert stop["priceIsEstimated"] is False
+
+
+@pytest.mark.django_db
+def test_search_destination_chargers_tool_omits_estimated_tariff_value(real_station):
+    real_station.tariffs.update(is_estimated=True)
+
+    result = search_destination_chargers_tool(
+        {
+            "location": {"label": "Almansa", "lat": 38.87, "lon": -1.09},
+            "connector": "CCS2",
+            "radius_km": 5,
+            "limit": 1,
+        }
+    )
+
+    stop = result["stops"][0]
+    assert "pricePerKwhEur" not in stop
+    assert "currency" not in stop
+    assert stop["priceIsEstimated"] is True
 
 
 def test_parse_preferences_arg_accepts_max_useful_power_cap():
@@ -717,7 +671,7 @@ def test_codex_prompt_guides_followups_without_backend_intent_mapping():
     assert "no puedes ubicar esa calle exacta" in prompt
     assert "sin perfil de vehículo" in prompt
     assert "planningLevel=chargers_only" in prompt
-    assert "DestinationChargingCard + StationDetailCard + StationList" in prompt
+    assert "PlaceDetailCard + StationDetailCard + StationList" in prompt
     assert "preferences.max_useful_power_kw" in prompt
     assert "no presentes la potencia superior como ventaja" in prompt
     assert "llama search_destination_chargers directamente" in prompt
@@ -730,7 +684,7 @@ def test_codex_prompt_guides_followups_without_backend_intent_mapping():
     assert "tool_call no es un componente A2UI" in prompt
     assert "nunca debe aparecer dentro de blocks" in prompt
     assert "No llames plan_route con coordenadas vacías o 0,0" in prompt
-    assert "incluye StayPlanningCard" in prompt
+    assert "usa PlaceDetailCard para la ubicación" in prompt
 
 
 def test_codex_prompt_exposes_max_useful_power_tool_argument():
@@ -893,7 +847,7 @@ def test_codex_prompt_limits_night_safety_claims():
 
     assert "Preferencias de seguridad nocturna o evitar sitios solitarios" in prompt
     assert "llama search_destination_chargers con esa ubicación" in prompt
-    assert "no respondas solo con LocationDetailCard" in prompt
+    assert "no respondas solo con PlaceDetailCard" in prompt
     assert "no afirmes seguridad, vigilancia, iluminación, afluencia" in prompt
     assert "Kalmio no valida seguridad ni entorno en vivo" in prompt
     assert "RiskExplanationCard antes de StationList" in prompt
@@ -1116,8 +1070,8 @@ def test_codex_prompt_guides_price_preference_without_route_context():
 
     assert "Preferencias de precio" in prompt
     assert "pide origen/destino o ubicación" in prompt
-    assert "No inventes tarifas/precios" in prompt
-    assert "no inventas tarifas" in prompt
+    assert "pricePerKwhEur/currency solo cuando venga trazado" in prompt
+    assert "solo hay tarifas estimadas" in prompt
 
 
 def test_codex_prompt_guides_large_hub_preference_without_location_context():
@@ -1125,7 +1079,7 @@ def test_codex_prompt_guides_large_hub_preference_without_location_context():
 
     assert "Preferencias de precio, hubs grandes o tamaño de parada" in prompt
     assert "no llames herramientas sin ruta/ubicación" in prompt
-    assert "no validas tarifas si el proveedor no las da" in prompt
+    assert "si la herramienta trae tarifas trazadas, compara tarifa/kWh" in prompt
 
 
 def test_codex_prompt_guides_model_and_departure_battery_without_vehicle_profile():
@@ -1303,10 +1257,10 @@ def test_a2ui_contract_rejects_empty_stops_without_station_tool_result():
     blocks = validate_blocks(
         [
             {
-                "id": "destination",
-                "type": "DestinationChargingCard",
+                "id": "stations",
+                "type": "StationList",
                 "version": 1,
-                "props": {"destination": "Cádiz", "stations": []},
+                "props": {"stations": []},
             }
         ]
     )
@@ -1320,10 +1274,10 @@ def test_a2ui_contract_allows_empty_stops_after_station_tool_result():
     blocks = validate_blocks(
         [
             {
-                "id": "destination",
-                "type": "DestinationChargingCard",
+                "id": "stations",
+                "type": "StationList",
                 "version": 1,
-                "props": {"destination": "Cádiz", "stations": []},
+                "props": {"stations": []},
             }
         ]
     )
@@ -1695,6 +1649,92 @@ def test_a2ui_contract_allows_available_evses_copy_for_single_connector_preferen
     )
 
     assert issues == []
+
+
+def test_a2ui_contract_allows_traced_station_price_and_cost_comparison():
+    tool_history = [
+        {
+            "call": {"tool": "search_destination_chargers", "args": {"location": {"label": "Almansa"}}},
+            "result": {
+                "ok": True,
+                "tool": "search_destination_chargers",
+                "stops": [
+                    {"name": "Almansa HPC", "pricePerKwhEur": 0.49, "currency": "EUR", "priceIsEstimated": False},
+                    {"name": "Almansa AC", "pricePerKwhEur": 0.59, "currency": "EUR", "priceIsEstimated": False},
+                ],
+            },
+        }
+    ]
+    blocks = validate_blocks(
+        [
+            {
+                "id": "station",
+                "type": "StationDetailCard",
+                "version": 1,
+                "props": {"name": "Almansa HPC", "pricePerKwhEur": 0.49, "currency": "EUR", "priceIsEstimated": False},
+            },
+            {
+                "id": "cost",
+                "type": "CostComparisonCard",
+                "version": 1,
+                "props": {
+                    "best": "Almansa HPC",
+                    "pricePerKwhEur": 0.49,
+                    "comparedWith": "Almansa AC",
+                    "comparedWithPricePerKwhEur": 0.59,
+                    "savingPerKwhEur": 0.10,
+                    "currency": "EUR",
+                    "priceIsEstimated": False,
+                },
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(blocks, tool_history)
+
+    assert issues == []
+
+
+def test_a2ui_contract_rejects_estimated_or_mismatched_prices():
+    tool_history = [
+        {
+            "call": {"tool": "search_destination_chargers", "args": {"location": {"label": "Almansa"}}},
+            "result": {
+                "ok": True,
+                "tool": "search_destination_chargers",
+                "stops": [
+                    {"name": "Almansa HPC", "pricePerKwhEur": 0.49, "currency": "EUR", "priceIsEstimated": True},
+                    {"name": "Almansa AC", "pricePerKwhEur": 0.59, "currency": "EUR", "priceIsEstimated": False},
+                ],
+            },
+        }
+    ]
+    blocks = validate_blocks(
+        [
+            {
+                "id": "station",
+                "type": "StationDetailCard",
+                "version": 1,
+                "props": {"name": "Almansa HPC", "pricePerKwhEur": 0.49, "currency": "EUR", "priceIsEstimated": True},
+            },
+            {
+                "id": "cost",
+                "type": "CostComparisonCard",
+                "version": 1,
+                "props": {
+                    "best": "Almansa AC",
+                    "pricePerKwhEur": 0.42,
+                    "currency": "EUR",
+                    "priceIsEstimated": False,
+                },
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(blocks, tool_history)
+
+    assert any("tarifa para Almansa HPC está marcada como estimada" in issue for issue in issues)
+    assert any("pricePerKwhEur no coincide" in issue for issue in issues)
 
 
 def test_a2ui_contract_rejects_untraced_default_reserve_attribution():
@@ -2429,7 +2469,7 @@ def test_codex_hotel_followup_with_known_city_can_search_from_location_hint(clie
                 },
                 {
                     "id": "destination-cordoba",
-                    "type": "DestinationChargingCard",
+                    "type": "PlaceDetailCard",
                     "version": 1,
                     "props": {"destination": "Córdoba (aproximación)", "needsConfirmation": True},
                 },
@@ -2647,7 +2687,7 @@ def test_codex_conversation_agent_does_not_repair_component_choice_from_urgent_h
             "blocks": [
                 {
                     "id": "wrong-destination",
-                    "type": "DestinationChargingCard",
+                    "type": "PlaceDetailCard",
                     "version": 1,
                     "props": {"destination": "Córdoba", "needsConfirmation": True},
                 }
@@ -2666,7 +2706,7 @@ def test_codex_conversation_agent_does_not_repair_component_choice_from_urgent_h
     new_blocks = blocks_from_a2ui_response(response)[len(session[ACTIVE_CONVERSATION_BLOCKS_KEY]) :]
     block_types = [block["type"] for block in new_blocks]
     assert repair_requests == []
-    assert "DestinationChargingCard" in block_types
+    assert "PlaceDetailCard" in block_types
     assert "StationDetailCard" not in block_types
 
 
@@ -2705,7 +2745,7 @@ def test_codex_conversation_agent_executes_allowlisted_tool(client, settings, mo
                 },
                 {
                     "id": "destination-from-tool",
-                    "type": "DestinationChargingCard",
+                    "type": "PlaceDetailCard",
                     "version": 1,
                     "props": {"destination": "Almansa", "needsConfirmation": True},
                 },
@@ -2787,7 +2827,7 @@ def test_deepseek_conversation_agent_uses_same_tool_and_a2ui_validation_loop(
                 },
                 {
                     "id": "destination-deepseek",
-                    "type": "DestinationChargingCard",
+                    "type": "PlaceDetailCard",
                     "version": 1,
                     "props": {"destination": "Almansa", "needsConfirmation": True},
                 },
@@ -2887,7 +2927,7 @@ def test_codex_allowed_tool_failure_returns_to_agent_for_contextual_final(client
 
 
 @pytest.mark.django_db
-def test_codex_destination_card_with_embedded_stops_requires_traced_station_data(client, settings, monkeypatch):
+def test_codex_station_list_requires_traced_station_data(client, settings, monkeypatch):
     settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
     repair_requests = []
 
@@ -2911,15 +2951,20 @@ def test_codex_destination_card_with_embedded_stops_requires_traced_station_data
             "type": "final",
             "blocks": [
                 {
-                    "id": "destination-from-codex",
-                    "type": "DestinationChargingCard",
+                    "id": "place-from-codex",
+                    "type": "PlaceDetailCard",
                     "version": 1,
                     "props": {
                         "location": "Valencia",
                         "approximate": True,
-                        "stops": [{"name": "Cargador real", "powerKw": 50, "distanceKm": 1.2}],
                     },
-                }
+                },
+                {
+                    "id": "stops-from-codex",
+                    "type": "StationList",
+                    "version": 1,
+                    "props": {"stations": [{"name": "Cargador real", "powerKw": 50, "distanceKm": 1.2}]},
+                },
             ],
         }
 
@@ -2983,7 +3028,7 @@ def test_codex_conversation_agent_allows_bounded_tool_chain(client, settings, mo
             "blocks": [
                 {
                     "id": "destination-from-chain",
-                    "type": "DestinationChargingCard",
+                    "type": "PlaceDetailCard",
                     "version": 1,
                     "props": {"destination": "Valencia", "needsConfirmation": True},
                 },
@@ -3013,7 +3058,7 @@ def test_codex_conversation_agent_allows_bounded_tool_chain(client, settings, mo
     assert response.status_code == 200
     assert calls == [0, 1, 2]
     blocks = blocks_from_a2ui_response(response)
-    assert any(block["type"] == "DestinationChargingCard" for block in blocks)
+    assert any(block["type"] == "PlaceDetailCard" for block in blocks)
     stops_block = next(block for block in blocks if block["type"] == "StationList")
     assert stops_block["props"]["stations"][0]["name"] == valencia_station.name
 
@@ -4149,7 +4194,7 @@ def test_a2ui_contract_rejects_hotel_exact_destination_from_city_search():
             },
             {
                 "id": "destination",
-                "type": "DestinationChargingCard",
+                "type": "PlaceDetailCard",
                 "version": 1,
                 "props": {"destination": "Meliá Córdoba", "needsConfirmation": True},
             },
@@ -4168,7 +4213,7 @@ def test_a2ui_contract_rejects_hotel_exact_destination_from_city_search():
         message="Me voy 3 días a Córdoba y me quedo en el hotel Meliá",
     )
 
-    assert any("presenta el hotel/POI como destino exacto" in issue for issue in issues)
+    assert any("presenta el hotel/POI como ubicación exacta" in issue for issue in issues)
     assert any("debe decir visiblemente que es una aproximación" in issue for issue in issues)
     assert any("para refinar la búsqueda" in issue for issue in issues)
 
@@ -4203,7 +4248,7 @@ def test_a2ui_contract_allows_hotel_city_approximation_with_refinement_request()
             },
             {
                 "id": "destination",
-                "type": "DestinationChargingCard",
+                "type": "PlaceDetailCard",
                 "version": 1,
                 "props": {"destination": "Córdoba (aproximación)", "needsConfirmation": True},
             },
@@ -4262,7 +4307,7 @@ def test_a2ui_contract_allows_weekend_alhambra_destination_with_early_warning():
             },
             {
                 "id": "destination",
-                "type": "DestinationChargingCard",
+                "type": "PlaceDetailCard",
                 "version": 1,
                 "props": {"destination": "Alhambra, Granada (aproximación)", "needsConfirmation": True},
             },
@@ -4271,16 +4316,6 @@ def test_a2ui_contract_allows_weekend_alhambra_destination_with_early_warning():
                 "type": "StationList",
                 "version": 1,
                 "props": {"stations": [{"name": "Parking Ave María Vistillas", "distanceKm": 0.51, "powerKw": 22}]},
-            },
-            {
-                "id": "stay",
-                "type": "StayPlanningCard",
-                "version": 1,
-                "props": {
-                    "duration": "finde",
-                    "city": "Granada",
-                    "advice": "Confirma con el alojamiento si tiene parking con carga o si puedes usar estos puntos.",
-                },
             },
             {
                 "id": "risk",
@@ -4327,40 +4362,6 @@ def test_a2ui_contract_allows_future_round_trip_clarifying_origin_without_volati
     )
 
     assert issues == []
-
-
-def test_a2ui_contract_rejects_weekend_stay_without_city_or_nights():
-    blocks = validate_blocks(
-        [
-            {
-                "id": "assistant",
-                "type": "AssistantMessage",
-                "version": 1,
-                "props": {
-                    "text": (
-                        "Uso Alhambra como aproximación. Para el finde, disponibilidad, acceso y tarifas "
-                        "pueden cambiar antes del viaje. Dame dirección exacta para refinar."
-                    )
-                },
-            },
-            {
-                "id": "stay",
-                "type": "StayPlanningCard",
-                "version": 1,
-                "props": {"context": "Estancia cerca del alojamiento"},
-            },
-        ]
-    )
-
-    issues = a2ui_contract_issues(
-        blocks,
-        tool_history=[],
-        message="Voy el finde a Granada y duermo cerca de la Alhambra",
-    )
-
-    assert any("nights=2" in issue for issue in issues)
-    assert any("debe conservar Granada" in issue for issue in issues)
-
 
 @pytest.mark.django_db
 def test_codex_conversation_agent_stops_repeated_tool_call(client, settings, monkeypatch):
@@ -4556,7 +4557,7 @@ def test_codex_urgent_response_does_not_repair_component_choice_by_intent(client
             "blocks": [
                 {
                     "id": "wrong-destination",
-                    "type": "DestinationChargingCard",
+                    "type": "PlaceDetailCard",
                     "version": 1,
                     "props": {"destination": "Córdoba", "needsConfirmation": True},
                 }
@@ -4574,7 +4575,7 @@ def test_codex_urgent_response_does_not_repair_component_choice_by_intent(client
     assert response.status_code == 200
     block_types = [block["type"] for block in blocks_from_a2ui_response(response)]
     assert repair_requests == []
-    assert "DestinationChargingCard" in block_types
+    assert "PlaceDetailCard" in block_types
     assert "StationDetailCard" not in block_types
 
 

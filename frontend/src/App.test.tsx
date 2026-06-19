@@ -84,10 +84,17 @@ describe('App', () => {
                   props: { text: 'Quiero planificar dónde cargar al llegar a mi hotel o destino. Si falta la ubicación exacta, pregúntame antes de buscar opciones.' },
                 },
                 {
-                  id: 'destination-1',
-                  type: 'DestinationChargingCard',
+                  id: 'location-1',
+                  type: 'PlaceDetailCard',
                   version: 1,
-                  props: { destination: 'Valencia', needsConfirmation: true },
+                  props: {
+                    label: 'Valencia',
+                    lat: 39.4699,
+                    lon: -0.3763,
+                    precision: 'approximate',
+                    context: 'Lugar usado para buscar estaciones de carga',
+                    needsConfirmation: true,
+                  },
                 },
               ])),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -113,7 +120,7 @@ describe('App', () => {
     expect(JSON.parse(messageCall?.[1]?.body?.toString() ?? '{}')).toEqual({
       text: 'Quiero planificar dónde cargar al llegar a mi hotel o destino. Si falta la ubicación exacta, pregúntame antes de buscar opciones.',
     })
-    expect(await screen.findByText('Plan al llegar')).toBeInTheDocument()
+    expect(await screen.findByText('Lugar resuelto')).toBeInTheDocument()
     expect(screen.getByText('Valencia')).toBeInTheDocument()
   })
 

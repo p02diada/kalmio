@@ -32,7 +32,7 @@ const scenarios: ExperienceScenario[] = [
         precision: 'approximate',
         manualFields: ['Ciudad', 'Coordenadas', 'Carretera o salida'],
       }),
-      block('urgent-location-detail', 'LocationDetailCard', {
+      block('urgent-place-detail', 'PlaceDetailCard', {
         label: { label: 'Zaragoza, entorno urbano' },
         lat: 41.6488,
         lon: -0.8891,
@@ -80,7 +80,7 @@ const scenarios: ExperienceScenario[] = [
         origin: { label: 'Zaragoza' },
         destination: { label: 'Valencia' },
         battery: 24,
-        reserve: 12,
+        arrivalReservePercent: 12,
       }),
       block('route-summary', 'RouteSummaryCard', {
         distanceKm: 309,
@@ -93,6 +93,9 @@ const scenarios: ExperienceScenario[] = [
         stationName: 'Kalmio demo HPC',
         address: 'Area de servicio La Plana',
         powerKw: 150,
+        pricePerKwhEur: 0.39,
+        currency: 'EUR',
+        priceIsEstimated: false,
         distanceKm: 118,
         detourMin: 6,
         availableEvses: 4,
@@ -113,6 +116,9 @@ const scenarios: ExperienceScenario[] = [
             stationName: 'Demo Charge 1',
             address: 'Area Mudejar',
             powerKw: 100,
+            pricePerKwhEur: 0.52,
+            currency: 'EUR',
+            priceIsEstimated: false,
             distanceKm: 92,
             detourMin: 4,
             availableEvses: 2,
@@ -131,17 +137,14 @@ const scenarios: ExperienceScenario[] = [
           },
         ],
       }),
-      block('route-alternative-routes', 'AlternativeRoutesList', {
-        routes: [
-          { name: 'Ruta directa por A-23', deltaMin: 0 },
-          { name: 'Ruta con parada mas comoda', deltaMin: 14 },
-          { name: 'Ruta con mas margen de bateria', deltaMin: 22 },
-        ],
-      }),
       block('route-cost', 'CostComparisonCard', {
-        best: { label: 'Parada con menor coste estimado' },
-        estimatedCostEur: 18.7,
-        savingEur: 4.2,
+        best: { label: 'Kalmio demo HPC' },
+        pricePerKwhEur: 0.39,
+        comparedWith: { label: 'Demo Charge 1' },
+        comparedWithPricePerKwhEur: 0.52,
+        savingPerKwhEur: 0.13,
+        currency: 'EUR',
+        priceIsEstimated: false,
       }),
       block('route-preferences', 'PreferenceChips', {
         title: 'Preferencias',
@@ -161,14 +164,17 @@ const scenarios: ExperienceScenario[] = [
         question: 'Para cerrar el plan necesito un dato mas.',
         fields: ['Direccion del hotel', 'Bateria al llegar', 'Conector'],
       }),
-      block('destination-charging', 'DestinationChargingCard', {
-        destination: { label: 'Hotel Centro Valencia' },
+      block('destination-location', 'PlaceDetailCard', {
+        label: { label: 'Valencia centro' },
+        lat: 39.4699,
+        lon: -0.3763,
+        precision: 'approximate',
+        context: 'Zona usada para buscar estaciones cerca del alojamiento',
         needsConfirmation: true,
       }),
-      block('destination-stay', 'StayPlanningCard', {
-        nights: 2,
-        city: { label: 'Valencia' },
-        recommendation: { label: 'Cargar al llegar y dejar margen para desplazamientos urbanos.' },
+      block('destination-risk', 'RiskExplanationCard', {
+        level: 'medio',
+        text: 'El hotel exacto no está confirmado. Usa estos resultados como aproximación y confirma acceso, tarifa y disponibilidad antes de depender de ellos.',
       }),
       block('destination-station', 'StationDetailCard', {
         title: 'Estación cerca del destino',

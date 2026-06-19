@@ -30,7 +30,7 @@
             "origin": { "$ref": "#/$defs/displayValue" },
             "destination": { "$ref": "#/$defs/displayValue" },
             "battery": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
-            "reserve": { "type": ["number", "null"], "minimum": 0, "maximum": 100 }
+            "arrivalReservePercent": { "type": ["number", "null"], "minimum": 0, "maximum": 100 }
           },
           "additionalProperties": true
         }
@@ -56,19 +56,6 @@
         { "$ref": "#/$defs/stationProps" },
         { "$ref": "#/$defs/decisionProps" }
       ]
-    },
-    "AlternativeRoutesList": {
-      "type": "object",
-      "properties": {
-        "routes": {
-          "type": "array",
-          "maxItems": 5,
-          "items": { "$ref": "#/$defs/listItem" }
-        },
-        "uncertainty": { "$ref": "#/$defs/uncertainty" }
-      },
-      "required": ["routes"],
-      "additionalProperties": false
     },
     "StationList": {
       "type": "object",
@@ -102,35 +89,14 @@
           "type": "object",
           "properties": {
             "best": { "$ref": "#/$defs/displayValue" },
+            "pricePerKwhEur": { "type": ["number", "null"], "minimum": 0 },
+            "comparedWith": { "$ref": "#/$defs/displayValue" },
+            "comparedWithPricePerKwhEur": { "type": ["number", "null"], "minimum": 0 },
+            "savingPerKwhEur": { "type": ["number", "null"] },
+            "currency": { "type": "string" },
+            "priceIsEstimated": { "type": ["boolean", "null"] },
             "estimatedCostEur": { "type": ["number", "null"], "minimum": 0 },
             "savingEur": { "type": ["number", "null"] }
-          },
-          "additionalProperties": true
-        }
-      ]
-    },
-    "DestinationChargingCard": {
-      "allOf": [
-        { "$ref": "#/$defs/decisionProps" },
-        {
-          "type": "object",
-          "properties": {
-            "destination": { "$ref": "#/$defs/displayValue" },
-            "needsConfirmation": { "type": "boolean" }
-          },
-          "additionalProperties": true
-        }
-      ]
-    },
-    "StayPlanningCard": {
-      "allOf": [
-        { "$ref": "#/$defs/decisionProps" },
-        {
-          "type": "object",
-          "properties": {
-            "nights": { "type": ["number", "null"], "minimum": 0 },
-            "city": { "$ref": "#/$defs/displayValue" },
-            "recommendation": { "$ref": "#/$defs/displayValue" }
           },
           "additionalProperties": true
         }
@@ -190,7 +156,7 @@
       "required": ["title", "body"],
       "additionalProperties": false
     },
-    "LocationDetailCard": {
+    "PlaceDetailCard": {
       "type": "object",
       "properties": {
         "label": { "$ref": "#/$defs/displayValue" },
@@ -363,6 +329,9 @@
           "maxItems": 12
         },
         "powerKw": { "type": ["number", "null"], "minimum": 0 },
+        "pricePerKwhEur": { "type": ["number", "null"], "minimum": 0 },
+        "currency": { "type": "string" },
+        "priceIsEstimated": { "type": ["boolean", "null"] },
         "distanceKm": { "type": ["number", "null"], "minimum": 0 },
         "detourMin": { "type": ["number", "null"] },
         "confidence": { "$ref": "#/$defs/displayValue" },

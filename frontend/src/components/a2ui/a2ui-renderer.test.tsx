@@ -17,9 +17,16 @@ describe('A2UIRenderer', () => {
         blocks={[
           {
             id: 'destination',
-            type: 'DestinationChargingCard',
+            type: 'PlaceDetailCard',
             version: 1,
-            props: { destination: { label: 'Alcobendas' }, needsConfirmation: true },
+            props: {
+              label: { label: 'Alcobendas' },
+              lat: 40.5403,
+              lon: -3.6358,
+              precision: 'approximate',
+              context: 'Lugar usado para buscar estaciones de carga',
+              needsConfirmation: true,
+            },
           },
         ]}
       />,
@@ -35,15 +42,15 @@ describe('A2UIRenderer', () => {
       <A2UIRenderer
         blocks={[
           {
-            id: 'location-detail',
-            type: 'LocationDetailCard',
+            id: 'place-detail',
+            type: 'PlaceDetailCard',
             version: 1,
             props: {
               label: { label: 'Córdoba' },
               lat: 37.8882,
               lon: -4.7794,
               precision: 'approximate',
-              context: 'Ubicación usada para buscar una parada de carga urgente',
+              context: 'Lugar usado para buscar una parada de carga urgente',
               needsConfirmation: true,
             },
           },
@@ -51,7 +58,7 @@ describe('A2UIRenderer', () => {
       />,
     )
 
-    expect(screen.getByText('Detalle de ubicación')).toBeInTheDocument()
+    expect(screen.getByText('Lugar resuelto')).toBeInTheDocument()
     expect(screen.getByText('Córdoba')).toBeInTheDocument()
     expect(screen.getByText('37.88820, -4.77940')).toBeInTheDocument()
     expect(screen.queryByText(/\[object Object\]/i)).not.toBeInTheDocument()
@@ -116,6 +123,9 @@ describe('A2UIRenderer', () => {
             props: {
               stationName: 'Almansa HPC',
               powerKw: 180,
+              pricePerKwhEur: 0.49,
+              currency: 'EUR',
+              priceIsEstimated: false,
               distanceKm: 1.2,
               detourMin: 8,
               availableEvses: 2,
@@ -129,6 +139,7 @@ describe('A2UIRenderer', () => {
     expect(screen.getByText('Estación de carga')).toBeInTheDocument()
     expect(screen.getByText('Almansa HPC')).toBeInTheDocument()
     expect(screen.getByText('1.2 km')).toBeInTheDocument()
+    expect(screen.getByText('0.49 €/kWh')).toBeInTheDocument()
     expect(screen.getByText('2 EVSEs')).toBeInTheDocument()
     expect(screen.getByText('CCS2')).toBeInTheDocument()
   })
@@ -201,6 +212,9 @@ describe('A2UIRenderer', () => {
                   stationName: 'Centro CCS',
                   address: 'Parking centro',
                   powerKw: 90,
+                  pricePerKwhEur: 0.59,
+                  currency: 'EUR',
+                  priceIsEstimated: false,
                   distanceKm: 0.7,
                   availableEvses: 3,
                   connectorTypes: ['CCS2'],
@@ -220,8 +234,86 @@ describe('A2UIRenderer', () => {
     expect(screen.getByText('TYPE2')).toBeInTheDocument()
     expect(screen.getByText('Otras estaciones viables')).toBeInTheDocument()
     expect(screen.getByText('Centro CCS')).toBeInTheDocument()
+    expect(screen.getByText(/Precio 0.59 €\/kWh/)).toBeInTheDocument()
     expect(screen.getByText(/Capacidad trazada: 3 EVSEs/)).toBeInTheDocument()
     expect(screen.getByText(/Conectores trazados: CCS2/)).toBeInTheDocument()
+  })
+
+  it('hides station prices marked as estimated', () => {
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'station',
+            type: 'StationDetailCard',
+            version: 1,
+            props: {
+              stationName: 'Almansa HPC',
+              powerKw: 180,
+              pricePerKwhEur: 0.49,
+              currency: 'EUR',
+              priceIsEstimated: true,
+            },
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.queryByText('0.49 €/kWh')).not.toBeInTheDocument()
+    expect(screen.queryByText('Precio')).not.toBeInTheDocument()
+  })
+
+  it('renders traced tariff comparisons per kWh', () => {
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'cost',
+            type: 'CostComparisonCard',
+            version: 1,
+            props: {
+              best: 'Almansa HPC',
+              pricePerKwhEur: 0.49,
+              comparedWith: 'Almansa AC',
+              comparedWithPricePerKwhEur: 0.59,
+              savingPerKwhEur: 0.1,
+              currency: 'EUR',
+              priceIsEstimated: false,
+            },
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('Almansa HPC')).toBeInTheDocument()
+    expect(screen.getByText('0.49 €/kWh')).toBeInTheDocument()
+    expect(screen.getByText('0.59 €/kWh')).toBeInTheDocument()
+    expect(screen.getByText('0.1 EUR')).toBeInTheDocument()
+    expect(screen.getByText('Comparado con Almansa AC.')).toBeInTheDocument()
+  })
+
+  it('does not render estimated tariffs as a cost comparison', () => {
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'cost',
+            type: 'CostComparisonCard',
+            version: 1,
+            props: {
+              best: 'Almansa HPC',
+              pricePerKwhEur: 0.49,
+              currency: 'EUR',
+              priceIsEstimated: true,
+            },
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('No puedo mostrar una parte de la respuesta')).toBeInTheDocument()
+    expect(screen.queryByText('0.49 €/kWh')).not.toBeInTheDocument()
+    expect(screen.queryByText('Tarifa')).not.toBeInTheDocument()
   })
 
   it('renders traced amenities without claiming unverified proximity or child suitability', () => {
@@ -428,7 +520,7 @@ describe('A2UIRenderer', () => {
       <A2UIRenderer
         blocks={[
           {
-            id: 'location',
+            id: 'place',
             type: 'LocationRequestCard',
             version: 1,
             props: {

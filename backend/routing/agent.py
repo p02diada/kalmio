@@ -38,17 +38,14 @@ A2UI_COMPONENT_TYPES = {
     "TripSummaryCard",
     "RouteSummaryCard",
     "StationDetailCard",
-    "AlternativeRoutesList",
     "StationList",
     "RiskExplanationCard",
     "CostComparisonCard",
-    "DestinationChargingCard",
-    "StayPlanningCard",
     "MapPreviewCard",
     "ActionButtons",
     "ClarifyingQuestionCard",
     "LocationRequestCard",
-    "LocationDetailCard",
+    "PlaceDetailCard",
     "PreferenceChips",
     "ErrorFallbackCard",
 }
@@ -790,7 +787,7 @@ def grounded_user_context_text(
         props = item.get("props") if isinstance(item.get("props"), dict) else {}
         if item.get("type") == "UserMessage":
             parts.append(display_text(props.get("text"), ""))
-        elif item.get("type") in {"LocationDetailCard", "DestinationChargingCard"}:
+        elif item.get("type") == "PlaceDetailCard":
             parts.append(block_visible_text(item))
 
     for entry in tool_history:
@@ -947,29 +944,29 @@ def codex_prompt(
         "Usa LocationRequestCard solo si basta con ubicación actual; no muestres campos genéricos de ciudad si el usuario ya dijo que está en carretera y quiere poco desvío.\n"
         "- Si el coche carga máximo a X kW, pasa X como preferences.max_useful_power_kw; si recomiendas un cargador de más potencia, di antes de la primera parada que el coche no aprovechará más de 100 kW cuando X=100 y no presentes la potencia superior como ventaja. No digas que has filtrado o excluido paradas por potencia si todavía muestras una estación por encima de ese máximo útil; di que esa potencia superior no se premia ni cambia lo que el coche puede aprovechar.\n"
         "- Restricción dura de llegada: sin perfil de vehículo no la presentes como cumplida; pide modelo/consumo/autonomía. Si la herramienta devuelve arrivalBattery:null o energyKwh:null, no los sustituyas por estimaciones ni por frases de certeza. Si el usuario pide llegar con al menos X%, pasa X como reserve_min_percent y di antes de cualquier StationDetailCard/StationList que ese X% no se puede validar en chargers_only sin consumo/perfil.\n"
-        "- Preferencias de precio, hubs grandes o tamaño de parada: trátalas como preferencia de decisión sobre paradas, no como comparación de hardware. Si falta ruta o ubicación, no llames herramientas con ubicaciones vacías; pide origen/destino o ubicación actual. No inventes tarifas/precios; si no hay tarifas de proveedor, dilo. No conviertas una preferencia de precio en una ruta arriesgada.\n"
+        "- Preferencias de precio, hubs grandes o tamaño de parada: trátalas como preferencia de decisión sobre paradas, no como comparación de hardware. Si falta ruta o ubicación, no llames herramientas con ubicaciones vacías; pide origen/destino o ubicación actual. Usa pricePerKwhEur/currency solo cuando venga trazado de herramienta y priceIsEstimated no sea true. Puedes usar CostComparisonCard para comparar tarifas por kWh entre estaciones trazadas; no calcules coste total de una sesión si no hay energía/cantidad de carga trazada. Si no hay tarifas de proveedor o solo hay tarifas estimadas, dilo sin mostrar precio. Si los datos pueden estar desactualizados, usa RiskExplanationCard; no lo conviertas en una tarifa estimada visible. No conviertas una preferencia de precio en una ruta arriesgada.\n"
         "- Cargar antes de salir vs al llegar: si faltan datos, no calcules. Da una comparación conceptual breve: cargar antes reduce riesgo si sales bajo, la ruta es larga o no conoces carga en destino; cargar al llegar puede tener sentido si llegas con margen y hay punto trazado en destino. Luego pide origen, destino, batería actual y modelo/consumo/autonomía.\n"
         "- Viajes futuros: di visiblemente antes de mostrar paradas que disponibilidad, acceso y tarifas pueden cambiar antes del viaje. En reparaciones A2UI, no elimines esa advertencia; debe conservar las tres palabras disponibilidad, acceso y tarifas antes de cualquier lista de paradas. Niños/comodidad: si la herramienta trae amenities en la parada primaria, debes mencionarlos brevemente por nombre en la respuesta visible como servicios trazados o comodidad potencial despues del riesgo principal; no digas que están cerca, disponibles, son seguros, ideales, perfectos o aptos para niños salvo que el dato venga explícitamente trazado.\n"
         "- Preferencias de servicios como baños, cafetería, restaurante o comer: si faltan ruta o ubicación, pregunta por ubicación/ruta. Si el siguiente turno aporta ciudad, zona o coordenadas, conserva esa preferencia y llama search_destination_chargers con esa ubicación; no vuelvas a preguntar qué necesita. Si la búsqueda devuelve amenities vacíos o no incluye esos servicios, muestra los cargadores trazados y di visiblemente que baños/cafetería/restaurante no están verificados en esos resultados.\n"
         "- Preferencias de desvío controlado por comodidad: usa route tooling si hay ruta. Si la herramienta trae detourMin y amenities, presenta la parada primaria como punto trazado dentro o cerca del margen pedido y menciona servicios trazados como comodidad potencial; no digas 'buenos servicios', 'más cómodo' ni que el sitio es cómodo si la herramienta solo trae amenities. No introduzcas preferencias de pocas paradas salvo que el usuario las pida. Si muestras alternativas, conserva el desvío trazado para que el usuario pueda comparar.\n"
-        "- Preferencias de seguridad nocturna o evitar sitios solitarios: si falta ubicación/ruta, pregunta por el dato mínimo sin prometer que buscarás sitios con afluencia, actividad, vigilancia o iluminación. Si el siguiente turno aporta ciudad, zona o coordenadas, conserva esa preferencia y llama search_destination_chargers con esa ubicación; no respondas solo con LocationDetailCard. Puedes priorizar señales trazadas como dirección céntrica, potencia, EVSEs/conectores o hub si la herramienta lo trae; no afirmes seguridad, vigilancia, iluminación, afluencia, actividad ni que sea menos probable que un lugar sea solitario. Di de forma visible que Kalmio no valida seguridad ni entorno en vivo y que el conductor debe verificar el entorno al llegar de noche. Si muestras alternativas, coloca RiskExplanationCard antes de StationList para que el límite no quede escondido en móvil.\n"
-        "- Estancias de varios días: piensa en carga durante estancia y vuelta; si hay viaje redondo y falta origen, pídelo; si solo pide carga en destino y hay ubicación suficiente, busca en destino. Tras una búsqueda para estancia de varios días, incluye StayPlanningCard para el contexto de estancia junto a los puntos de carga trazados.\n"
-        "- Rutas baratas, reservas duras, carga justa o comparativas rápida/barata necesitan origen, destino y datos de vehículo/batería para calcular; si faltan, pregunta en el mismo turno por origen, destino, batería actual y modelo/consumo/autonomía. No inventes tarifas, kWh, llegada ni comparativas de precio; si no hay datos de tarifas de proveedor, dilo.\n"
+        "- Preferencias de seguridad nocturna o evitar sitios solitarios: si falta ubicación/ruta, pregunta por el dato mínimo sin prometer que buscarás sitios con afluencia, actividad, vigilancia o iluminación. Si el siguiente turno aporta ciudad, zona o coordenadas, conserva esa preferencia y llama search_destination_chargers con esa ubicación; no respondas solo con PlaceDetailCard. Puedes priorizar señales trazadas como dirección céntrica, potencia, EVSEs/conectores o hub si la herramienta lo trae; no afirmes seguridad, vigilancia, iluminación, afluencia, actividad ni que sea menos probable que un lugar sea solitario. Di de forma visible que Kalmio no valida seguridad ni entorno en vivo y que el conductor debe verificar el entorno al llegar de noche. Si muestras alternativas, coloca RiskExplanationCard antes de StationList para que el límite no quede escondido en móvil.\n"
+        "- Estancias de varios días: piensa en carga durante estancia y vuelta; si hay viaje redondo y falta origen, pídelo; si solo pide carga en destino y hay ubicación suficiente, busca en destino. Si la estancia añade riesgo o una decisión útil, explícalo con AssistantMessage o RiskExplanationCard; no repitas destino/noches en un componente dedicado.\n"
+        "- Rutas baratas, reservas duras, carga justa o comparativas rápida/barata necesitan origen, destino y datos de vehículo/batería para calcular energía, llegada o coste total; si faltan, pregunta en el mismo turno por origen, destino, batería actual y modelo/consumo/autonomía. Si la herramienta sí trae pricePerKwhEur y priceIsEstimated no es true, puedes comparar tarifa por kWh entre estaciones trazadas. No inventes tarifas, kWh, llegada ni comparativas de precio; si no hay datos de tarifas de proveedor, dilo.\n"
         "Ejemplos críticos por analogía, no reglas rígidas: 'Necesito cargar ya' -> pide ubicación, no destino; 'En Córdoba' tras urgencia -> busca Córdoba; "
         "'Paseo de la Victoria de Córdoba' -> si solo resuelves Córdoba, explica la aproximación; "
         "'Voy a dormir en Valencia, busca cargadores cerca del hotel' -> llama search_destination_chargers con Valencia como aproximación y explica que el hotel exacto refina; "
-        "'Valencia centro' tras hotel sin cargador -> DestinationChargingCard + StationDetailCard + StationList + StayPlanningCard, usando una parada primaria trazada y alternativas trazadas; "
+        "'Valencia centro' tras hotel sin cargador -> PlaceDetailCard + StationDetailCard + StationList + RiskExplanationCard si falta hotel exacto, usando una parada primaria trazada y alternativas trazadas; "
         "'Voy a Granada y duermo cerca de la Alhambra' -> llama search_destination_chargers con Alhambra/Granada aproximado; si es finde, antes de paradas di que disponibilidad, acceso y tarifas pueden cambiar, y pide hotel/zona/direccion exacta para refinar; "
         "'Me voy 3 días a Córdoba y me quedo en el hotel Meliá' -> llama search_destination_chargers con Córdoba como aproximación, no ActionButtons; "
-        "'Voy una semana a Cádiz y necesito cargar durante la estancia' -> llama search_destination_chargers con Cádiz como aproximación e incluye StayPlanningCard, no preguntes primero por hotel/zona; "
+        "'Voy una semana a Cádiz y necesito cargar durante la estancia' -> llama search_destination_chargers con Cádiz como aproximación; usa PlaceDetailCard para la ubicación y RiskExplanationCard/AssistantMessage para explicar la incertidumbre de estancia, no preguntes primero por hotel/zona; "
         "'Quiero la ruta más barata, pero sin bajar del 20%' sin origen/destino -> no llames plan_route, pregunta origen, destino y datos de vehículo/batería; "
         "'Voy a Córdoba el viernes y vuelvo el domingo' -> ClarifyingQuestionCard preguntando origen/salida para planificar ida/vuelta antes de llamar herramientas; "
         "'Zaragoza a Barcelona con 25%' sin consumo/modelo -> no valides ese 25%; "
         "'Córdoba a Valencia con 58%, no quiero llegar justo' -> plan_route puede mostrar RouteSummaryCard y paradas trazadas, pero debes decir que la llegada/reserva no se valida sin consumo o perfil; "
         "'Sevilla a Granada, me da para llegar sin cargar?' -> plan_route puede mostrar RouteSummaryCard de distancia/duración, pero no respondas sí/no sin batería actual/autonomía/modelo/consumo; pide esos datos; "
         "'Alicante a Bilbao, prefiero parar pocas veces' -> plan_route puede mostrar contexto y puntos de corredor, pero debes decir antes que no puedes optimizar pocas paradas sin autonomía/consumo/modelo; "
-        "'Evita cargadores caros si hay alternativas razonables' -> pide ruta o ubicación y aclara que no inventas tarifas; "
-        "'Prefiero hubs grandes aunque sean un poco más caros' -> no llames herramientas sin ruta/ubicación; pide ruta o ubicación actual y aclara que no validas tarifas si el proveedor no las da; "
+        "'Evita cargadores caros si hay alternativas razonables' -> pide ruta o ubicación; si la herramienta trae tarifas trazadas, compara tarifa/kWh, si no, aclara que no inventas tarifas; "
+        "'Prefiero hubs grandes aunque sean un poco más caros' -> no llames herramientas sin ruta/ubicación; pide ruta o ubicación actual y usa tarifas trazadas solo si el proveedor las da; "
         "'Me conviene cargar antes de salir o al llegar?' -> compara conceptualmente y pide origen, destino, batería y vehículo antes de calcular; "
         "'Busca una parada con baños y cafetería' -> pregunta ubicación/ruta; 'Estoy cerca de Almansa' después -> llama search_destination_chargers con Almansa, muestra cargadores trazados y di que baños/cafetería no están verificados si amenities viene vacío; "
         "'Prefiero desviarme 10 minutos si el sitio es más cómodo. Voy de Madrid a Valencia' -> plan_route, muestra desvío trazado y amenities como servicios trazados, no comodidad garantizada ni pocas paradas; "
@@ -978,15 +975,14 @@ def codex_prompt(
     )
     catalog_instructions = (
         "Catálogo A2UI permitido por propósito, no por reglas rígidas de intención:\n"
-        "AssistantMessage texto breve; TripSummaryCard ruta clara; RouteSummaryCard solo plan_route; "
+        "AssistantMessage texto breve; TripSummaryCard ruta clara con origin, destination, battery y arrivalReservePercent; RouteSummaryCard solo plan_route; "
         "StationDetailCard/StationList solo estaciones de carga respaldadas por herramientas; en esos bloques name/stationName debe ser la estación trazable; address puede ser dirección/zona trazada. RiskExplanationCard incertidumbre concreta; "
-        "CostComparisonCard solo costes de herramienta; StationDetailCard muestra estación concreta con distanceKm, powerKw, availableEvses, connectorTypes, lat/lon cuando estén trazados; "
+        "CostComparisonCard solo tarifas/costes de herramienta; para preferencias de precio usa pricePerKwhEur y savingPerKwhEur trazados y no estimados, no estimatedCostEur sin energía trazada. PlaceDetailCard muestra lugares o zonas resueltas; StationDetailCard muestra estación concreta con distanceKm, powerKw, pricePerKwhEur, availableEvses, connectorTypes, lat/lon cuando estén trazados; no muestres pricePerKwhEur si priceIsEstimated es true. "
         "si quieres mostrar alternativas o riesgo, usa bloques separados StationList y RiskExplanationCard elegidos por el agente. "
-        "DestinationChargingCard hotel/destino/ciudad; StayPlanningCard estancia; MapPreviewCard sin inventar geometría; "
-        "StayPlanningCard debe incluir city y nights o duration si el usuario dijo finde, dias o semana; "
+        "MapPreviewCard sin inventar geometría; "
         "ActionButtons usa event para backend/agente, functionCall.openUrl para abrir mapas, o disabled con reason; "
         "ClarifyingQuestionCard faltan datos críticos; "
-        "LocationRequestCard pide ubicación; LocationDetailCard coordenadas de usuario/herramienta; PreferenceChips preferencias; ErrorFallbackCard reservado.\n"
+        "LocationRequestCard pide ubicación; PlaceDetailCard coordenadas de usuario/herramienta; PreferenceChips preferencias; ErrorFallbackCard reservado.\n"
         "tool_call no es un componente A2UI y nunca debe aparecer dentro de blocks; si necesitas una herramienta, devuelve type=tool_call como objeto raíz.\n"
     )
     output_instructions = (
@@ -999,7 +995,7 @@ def codex_prompt(
         f"Tipos A2UI permitidos: {', '.join(sorted(A2UI_COMPONENT_TYPES))}. "
         "Dentro de blocks no uses type=tool_call, component=tool_call ni objetos con tool/args; eso solo es válido como objeto raíz. "
         "Para ClarifyingQuestionCard usa props question y fields. "
-        "Para LocationDetailCard usa props label, lat, lon, precision, context y needsConfirmation. "
+        "Para PlaceDetailCard usa props label, lat, lon, precision, context y needsConfirmation. "
         "Para ActionButtons usa actions con event {name, context} o functionCall {call:'openUrl', args:{url:'https://...'}}; "
         "no uses handlers arbitrarios. "
         "No inventes disponibilidad, precios, estaciones, coordenadas ni estado del vehículo. "
@@ -1311,6 +1307,9 @@ def station_props_from_result(value: dict[str, Any]) -> dict[str, Any]:
         "availableEvses",
         "connectorCount",
         "connectorTypes",
+        "pricePerKwhEur",
+        "currency",
+        "priceIsEstimated",
     ):
         if source in aliases:
             props[source] = aliases[source]
@@ -1323,18 +1322,23 @@ def station_props_from_result(value: dict[str, Any]) -> dict[str, Any]:
             ("available_evses", "availableEvses"),
             ("available_connectors", "availableEvses"),
             ("connector_types", "connectorTypes"),
+            ("price_eur_kwh", "pricePerKwhEur"),
+            ("price_per_kwh", "pricePerKwhEur"),
+            ("price_is_estimated", "priceIsEstimated"),
         ):
             if target not in props and source in value:
                 props[target] = value[source]
         amenities = value.get("amenities")
         if isinstance(amenities, list):
             props["amenities"] = amenities
+    if props.get("priceIsEstimated") is True:
+        props.pop("pricePerKwhEur", None)
     return props
 
 
 def station_props_from_nearby(value: Any) -> dict[str, Any]:
     station = value.station
-    return {
+    props = {
         "name": station.name,
         "stationName": station.name,
         "address": station.address,
@@ -1346,6 +1350,13 @@ def station_props_from_nearby(value: Any) -> dict[str, Any]:
         "lon": float(station.longitude),
         "amenities": station.amenities,
     }
+    tariff = station.tariffs.first()
+    if tariff:
+        props["priceIsEstimated"] = tariff.is_estimated
+        if not tariff.is_estimated:
+            props["pricePerKwhEur"] = float(tariff.price_per_kwh)
+            props["currency"] = tariff.currency
+    return props
 
 
 def blocks_from_tool_result(tool_result: dict[str, Any], message: str = "") -> list[dict]:
@@ -1369,9 +1380,9 @@ def blocks_from_tool_result(tool_result: dict[str, Any], message: str = "") -> l
         if parse_intent(message).is_urgent_request:
             nearest = stations[0] if stations and isinstance(stations[0], dict) else {}
             return [
-                location_detail_block(
+                place_detail_block(
                     location,
-                    context="Ubicación usada para buscar una estación de carga urgente",
+                    context="Lugar usado para buscar una estación de carga urgente",
                     needs_confirmation=True,
                 ),
                 block(
@@ -1400,14 +1411,9 @@ def blocks_from_tool_result(tool_result: dict[str, Any], message: str = "") -> l
                 ),
             ]
         return [
-            block(
-                f"destination-{uuid4().hex[:10]}",
-                "DestinationChargingCard",
-                {"destination": str(location.get("label") or "Destino"), "needsConfirmation": True},
-            ),
-            location_detail_block(
+            place_detail_block(
                 location,
-                context="Destino usado para buscar estaciones de carga",
+                context="Lugar usado para buscar estaciones de carga",
                 needs_confirmation=True,
             ),
             block(
@@ -1525,18 +1531,16 @@ def a2ui_contract_issues(
             issues.extend(station_metric_contract_issues("StationDetailCard", props, facts))
         elif block_type == "RouteSummaryCard":
             issues.extend(route_summary_contract_issues(props, facts))
-        elif block_type == "LocationDetailCard":
-            issues.extend(location_detail_contract_issues(props, facts, explicit_coordinates))
+        elif block_type == "PlaceDetailCard":
+            issues.extend(place_detail_contract_issues(props, facts, explicit_coordinates))
         elif block_type == "MapPreviewCard":
             issues.extend(station_reference_contract_issues("MapPreviewCard.stop", props.get("stop"), facts))
         elif block_type == "ActionButtons":
             issues.extend(action_buttons_contract_issues(props, facts, explicit_coordinates))
         elif block_type == "CostComparisonCard":
-            issues.extend(cost_contract_issues(props))
+            issues.extend(cost_contract_issues(props, facts))
         elif block_type == "RiskExplanationCard":
             issues.extend(risk_explanation_contract_issues(props))
-        elif block_type == "StayPlanningCard":
-            issues.extend(stay_planning_contract_issues(props, user_context))
 
     issues.extend(factual_charger_copy_contract_issues(blocks, facts))
     issues.extend(destination_city_approximation_contract_issues(blocks, tool_history, user_context))
@@ -1617,7 +1621,7 @@ def add_history_facts(facts: dict[str, Any], history_blocks: list[dict]) -> None
                     add_station_fact(facts, station)
         elif block_type == "StationDetailCard":
             add_station_fact(facts, props)
-        elif block_type == "LocationDetailCard":
+        elif block_type == "PlaceDetailCard":
             add_location_fact(facts, props)
         elif block_type == "RouteSummaryCard":
             facts["routes"].append(props)
@@ -1632,7 +1636,20 @@ def add_station_fact(facts: dict[str, Any], value: Any) -> None:
     key = station_key(name)
     current = facts["stations"].setdefault(key, {"name": name})
     normalized_values = station_value_aliases(value)
-    for field in ("powerKw", "distanceKm", "detourMin", "confidence", "lat", "lon", "availableEvses", "connectorTypes", "connectorCount"):
+    for field in (
+        "powerKw",
+        "distanceKm",
+        "detourMin",
+        "confidence",
+        "lat",
+        "lon",
+        "availableEvses",
+        "connectorTypes",
+        "connectorCount",
+        "pricePerKwhEur",
+        "currency",
+        "priceIsEstimated",
+    ):
         if field in normalized_values:
             current[field] = normalized_values.get(field)
 
@@ -1649,6 +1666,9 @@ def station_value_aliases(value: dict[str, Any]) -> dict[str, Any]:
         "availableEvses": ("availableEvses", "available_evses", "availableConnectors", "available_connectors"),
         "connectorCount": ("connectorCount", "connector_count"),
         "connectorTypes": ("connectorTypes", "connector_types"),
+        "pricePerKwhEur": ("pricePerKwhEur", "pricePerKwh", "price_eur_kwh", "price_per_kwh"),
+        "currency": ("currency",),
+        "priceIsEstimated": ("priceIsEstimated", "price_is_estimated", "tariff_is_estimated"),
     }
     for canonical, keys in aliases.items():
         for key in keys:
@@ -1852,10 +1872,7 @@ def user_message_mentions_night_safety(message: str) -> bool:
 
 
 def is_service_location_clarifying_copy(blocks: list[dict], visible_text: str) -> bool:
-    has_charge_result_block = any(
-        block.get("type") in {"StationDetailCard", "StationList", "DestinationChargingCard"}
-        for block in blocks
-    )
+    has_charge_result_block = any(block.get("type") in {"StationDetailCard", "StationList"} for block in blocks)
     if has_charge_result_block:
         return False
     asks_for_location = any(
@@ -2574,13 +2591,10 @@ def visible_text_has_term(visible_text: str, term: str) -> bool:
 def block_uses_factual_location(block: dict) -> bool:
     return block.get("type") in {
         "StationList",
-        "DestinationChargingCard",
-        "LocationDetailCard",
+        "PlaceDetailCard",
         "MapPreviewCard",
         "StationDetailCard",
         "RouteSummaryCard",
-        "StayPlanningCard",
-        "StationDetailCard",
     }
 
 
@@ -2706,20 +2720,20 @@ def destination_city_approximation_contract_issues(
         return []
 
     block_text_parts = [block_visible_text(block) for block in blocks]
-    destination_values = []
+    location_values = []
     for item in blocks:
-        if item.get("type") != "DestinationChargingCard":
+        if item.get("type") != "PlaceDetailCard":
             continue
         props = item.get("props") if isinstance(item.get("props"), dict) else {}
-        destination_values.append(display_text(props.get("destination"), ""))
-    visible_text = normalize(" ".join([*block_text_parts, *destination_values]))
+        location_values.append(display_text(props.get("label"), ""))
+    visible_text = normalize(" ".join([*block_text_parts, *location_values]))
 
     issues: list[str] = []
     for search in searches:
         label = display_text(search.get("label"), "")
         normalized_label = normalize(label)
-        for destination in destination_values:
-            normalized_destination = normalize(destination)
+        for location_value in location_values:
+            normalized_destination = normalize(location_value)
             if (
                 normalized_destination
                 and normalized_label in normalized_destination
@@ -2727,7 +2741,7 @@ def destination_city_approximation_contract_issues(
                 and not has_approximation_disclaimer(normalized_destination)
             ):
                 issues.append(
-                    "DestinationChargingCard.destination presenta el hotel/POI como destino exacto, "
+                    "PlaceDetailCard.label presenta el hotel/POI como ubicación exacta, "
                     f"pero la herramienta buscó solo con la ciudad '{label}'. "
                     "Debe mostrar la ciudad/zona como aproximación o pedir dirección/coordenadas exactas."
                 )
@@ -2861,12 +2875,17 @@ def station_metric_contract_issues(label: str, props: dict, facts: dict[str, Any
 
     issues: list[str] = []
     rendered_values = station_value_aliases(props)
-    for field in ("powerKw", "distanceKm", "detourMin", "lat", "lon", "availableEvses"):
+    for field in ("powerKw", "distanceKm", "detourMin", "lat", "lon", "availableEvses", "pricePerKwhEur"):
         if field not in rendered_values:
             continue
         rendered = rendered_values.get(field)
         expected = source.get(field)
         if rendered is None:
+            continue
+        if field == "pricePerKwhEur" and (
+            props.get("priceIsEstimated") is True or source.get("priceIsEstimated") is True
+        ):
+            issues.append(f"{label}.pricePerKwhEur no debe mostrarse porque la tarifa para {name} está marcada como estimada.")
             continue
         if expected is None:
             issues.append(f"{label}.{field} no está en el resultado de herramienta para {name}.")
@@ -2874,9 +2893,6 @@ def station_metric_contract_issues(label: str, props: dict, facts: dict[str, Any
             issues.append(f"{label}.{field} no coincide con el dato de herramienta para {name}.")
         elif not values_match(rendered, expected):
             issues.append(f"{label}.{field} no coincide con el dato de herramienta para {name}.")
-    for price_field in ("price", "priceKwh", "pricePerKwh", "pricePerKwhEur"):
-        if props.get(price_field) is not None:
-            issues.append(f"{label}.{price_field} no puede mostrarse porque ninguna herramienta devuelve precios.")
     return issues
 
 
@@ -2899,7 +2915,7 @@ def route_summary_contract_issues(props: dict, facts: dict[str, Any]) -> list[st
     return issues
 
 
-def location_detail_contract_issues(
+def place_detail_contract_issues(
     props: dict,
     facts: dict[str, Any],
     explicit_coordinates: list[tuple[float, float]],
@@ -2909,10 +2925,10 @@ def location_detail_contract_issues(
     if lat is None and lon is None:
         return []
     if lat is None or lon is None:
-        return ["LocationDetailCard necesita lat y lon válidos cuando muestra coordenadas."]
+        return ["PlaceDetailCard necesita lat y lon válidos cuando muestra coordenadas."]
     if coordinate_traced(lat, lon, facts["locations"], explicit_coordinates):
         return []
-    return ["LocationDetailCard muestra coordenadas que no vienen del usuario ni de una herramienta."]
+    return ["PlaceDetailCard muestra coordenadas que no vienen del usuario ni de una herramienta."]
 
 
 def action_buttons_contract_issues(
@@ -3047,10 +3063,43 @@ def close_station_coordinates(lat: float, lon: float, expected_lat: Any, expecte
     return abs(lat - other_lat) <= 0.0005 and abs(lon - other_lon) <= 0.0005
 
 
-def cost_contract_issues(props: dict) -> list[str]:
-    for field in ("estimatedCostEur", "savingEur", "price", "pricePerKwh"):
-        if props.get(field) is not None:
-            return ["CostComparisonCard no puede mostrar costes porque ninguna herramienta actual devuelve precios."]
+def cost_contract_issues(props: dict, facts: dict[str, Any]) -> list[str]:
+    rendered_price = optional_float(props.get("pricePerKwhEur") or props.get("pricePerKwh"))
+    if rendered_price is None:
+        return ["CostComparisonCard necesita pricePerKwhEur trazado; no debe mostrar comparativas sin tarifa."]
+
+    best = display_text(props.get("best") or props.get("stationName") or props.get("name"), "")
+    source = facts["stations"].get(station_key(best)) if best else None
+    if not source:
+        return ["CostComparisonCard.best debe referenciar una estación trazable con tarifa."]
+    if props.get("priceIsEstimated") is True or source.get("priceIsEstimated") is True:
+        return [f"CostComparisonCard no debe comparar precio porque la tarifa para {best} está marcada como estimada."]
+    expected = optional_float(source.get("pricePerKwhEur"))
+    if expected is None:
+        return [f"CostComparisonCard no puede comparar precio porque {best} no tiene tarifa trazada."]
+    if not values_match(rendered_price, expected):
+        return [f"CostComparisonCard.pricePerKwhEur no coincide con la tarifa trazada para {best}."]
+
+    compared_price = optional_float(props.get("comparedWithPricePerKwhEur"))
+    compared_with = display_text(props.get("comparedWith"), "")
+    if compared_price is not None:
+        compared_source = facts["stations"].get(station_key(compared_with)) if compared_with else None
+        if not compared_source:
+            return ["CostComparisonCard.comparedWith debe referenciar una estación trazable si muestra otra tarifa."]
+        if compared_source.get("priceIsEstimated") is True:
+            return [
+                f"CostComparisonCard no debe comparar precio porque la tarifa para {compared_with} está marcada como estimada."
+            ]
+        compared_expected = optional_float(compared_source.get("pricePerKwhEur"))
+        if compared_expected is None:
+            return [f"CostComparisonCard no puede comparar precio porque {compared_with} no tiene tarifa trazada."]
+        if not values_match(compared_price, compared_expected):
+            return [f"CostComparisonCard.comparedWithPricePerKwhEur no coincide con la tarifa trazada para {compared_with}."]
+
+    if props.get("estimatedCostEur") is not None:
+        return ["CostComparisonCard.estimatedCostEur requiere energía/cantidad de carga trazada; usa tarifa por kWh si no existe."]
+    if props.get("savingEur") is not None:
+        return ["CostComparisonCard.savingEur es ambiguo sin energía trazada; usa savingPerKwhEur para comparar tarifas."]
     return []
 
 
@@ -3067,19 +3116,6 @@ def risk_explanation_contract_issues(props: dict) -> list[str]:
     }:
         return ["RiskExplanationCard.text debe explicar la incertidumbre o el riesgo de forma concreta."]
     return []
-
-
-def stay_planning_contract_issues(props: dict, message: str) -> list[str]:
-    normalized_message = normalize(message)
-    issues: list[str] = []
-    if ("finde" in normalized_message or "fin de semana" in normalized_message) and props.get("nights") is None:
-        issues.append("StayPlanningCard debe incluir nights=2 o duration='finde' cuando el usuario dice finde.")
-    city = display_text(props.get("city"), "")
-    if (visible_text_has_term(normalized_message, "granada") or visible_text_has_term(normalized_message, "alhambra")) and (
-        not city or normalize(city) == "destino"
-    ):
-        issues.append("StayPlanningCard.city debe conservar Granada cuando la estancia es cerca de Alhambra/Granada.")
-    return issues
 
 
 def coordinates_from_text(value: str) -> list[tuple[float, float]]:
@@ -3266,15 +3302,15 @@ def summarize_block_for_context(block_type: str, props: dict) -> str:
         fields_text = ", ".join(str(field) for field in fields if field)
         return f"Asistente pidió aclaración: {question} Campos: {fields_text}".strip()
     if block_type == "StationDetailCard":
+        price = props.get("pricePerKwhEur")
+        price_text = f", precio {price} {props.get('currency') or 'EUR'}/kWh" if price is not None else ""
         return (
             "Estación mostrada previamente: "
             f"{props.get('name') or props.get('stationName')}, potencia {props.get('powerKw')} kW, "
             f"distancia {props.get('distanceKm')} km, EVSEs {props.get('availableEvses')}, "
-            f"conectores {props.get('connectorTypes')}, desvío {props.get('detourMin')} min."
+            f"conectores {props.get('connectorTypes')}, desvío {props.get('detourMin')} min{price_text}."
         )
-    if block_type == "DestinationChargingCard":
-        return f"Resultado previo de carga en destino: {props.get('destination')}."
-    if block_type == "LocationDetailCard":
+    if block_type == "PlaceDetailCard":
         return (
             "Ubicación validada previamente: "
             f"{props.get('label')} ({props.get('lat')}, {props.get('lon')}), "
@@ -3284,7 +3320,7 @@ def summarize_block_for_context(block_type: str, props: dict) -> str:
         return (
             "Resumen previo de viaje: "
             f"origen {props.get('origin')}, destino {props.get('destination')}, "
-            f"batería {props.get('battery')}, reserva {props.get('reserve')}."
+            f"batería {props.get('battery')}, llegada mínima {props.get('arrivalReservePercent')}."
         )
     if block_type == "RouteSummaryCard":
         return (
@@ -3316,6 +3352,9 @@ def summarize_stop_for_context(stop: dict) -> str:
     power = aliases.get("powerKw")
     if power is not None:
         details.append(f"potencia {power} kW")
+    price = aliases.get("pricePerKwhEur")
+    if price is not None:
+        details.append(f"precio {price} {aliases.get('currency') or 'EUR'}/kWh")
     connectors = aliases.get("connectorTypes")
     if isinstance(connectors, list) and connectors:
         connector_text = ", ".join(str(connector) for connector in connectors if connector)
@@ -3378,7 +3417,7 @@ def urgent_charge_blocks(intent: ParsedIntent, location: ParsedLocation) -> list
     nearest = stations[0]
     top = stations[:3]
     return [
-        location_detail_block(
+        place_detail_block(
             location,
             context="Ubicación usada para buscar una estación de carga urgente",
             needs_confirmation=True,
@@ -3429,14 +3468,9 @@ def destination_charge_blocks(intent: ParsedIntent) -> list[dict]:
     )
     if not stations:
         return [
-            block(
-                f"destination-{uuid4().hex[:10]}",
-                "DestinationChargingCard",
-                {"destination": location.label, "needsConfirmation": True},
-            ),
-            location_detail_block(
+            place_detail_block(
                 location,
-                context="Destino usado para buscar estaciones de carga",
+                context="Lugar usado para buscar estaciones de carga",
                 needs_confirmation=True,
             ),
             block(
@@ -3451,14 +3485,9 @@ def destination_charge_blocks(intent: ParsedIntent) -> list[dict]:
 
     top = stations[:3]
     return [
-        block(
-            f"destination-{uuid4().hex[:10]}",
-            "DestinationChargingCard",
-            {"destination": location.label, "needsConfirmation": True},
-        ),
-        location_detail_block(
+        place_detail_block(
             location,
-            context="Destino usado para buscar estaciones de carga",
+            context="Lugar usado para buscar estaciones de carga",
             needs_confirmation=True,
         ),
         block(
@@ -3516,7 +3545,7 @@ def route_planning_blocks(intent: ParsedIntent) -> list[dict]:
                 "origin": intent.origin.label,
                 "destination": intent.destination.label,
                 "battery": intent.vehicle_fields.get("battery"),
-                "reserve": intent.preferences.reserve_min_percent,
+                "arrivalReservePercent": intent.preferences.reserve_min_percent,
             },
         ),
         block(
@@ -3542,6 +3571,7 @@ def route_planning_blocks(intent: ParsedIntent) -> list[dict]:
                 "lat": station.get("lat"),
                 "lon": station.get("lon"),
                 "confidence": "media",
+                **station_price_props_from_mapping(station),
             },
         ),
     ]
@@ -3558,6 +3588,7 @@ def route_planning_blocks(intent: ParsedIntent) -> list[dict]:
                             "stationName": alternative.station["name"],
                             "powerKw": alternative.station["power_kw"],
                             "distanceKm": alternative.station["distance_to_route_km"],
+                            **station_price_props_from_mapping(alternative.station),
                         }
                         for alternative in plan.alternatives
                     ]
@@ -3598,6 +3629,14 @@ def route_planning_blocks(intent: ParsedIntent) -> list[dict]:
         ]
     )
     return blocks
+
+
+def station_price_props_from_mapping(station: dict[str, Any]) -> dict[str, Any]:
+    props: dict[str, Any] = {"priceIsEstimated": station.get("price_is_estimated")}
+    if station.get("price_eur_kwh") is not None and station.get("price_is_estimated") is not True:
+        props["pricePerKwhEur"] = station.get("price_eur_kwh")
+        props["currency"] = "EUR"
+    return props
 
 
 def parse_intent(message: str) -> ParsedIntent:
@@ -3763,7 +3802,7 @@ def location_request_block(reason: str, title: str, body: str) -> dict:
     )
 
 
-def location_detail_block(
+def place_detail_block(
     location: dict[str, Any] | ParsedLocation,
     *,
     context: str,
@@ -3774,12 +3813,12 @@ def location_detail_block(
         lat = location.lat
         lon = location.lon
     else:
-        label = display_text(location.get("label") or location.get("name"), "Ubicación indicada")
+        label = display_text(location.get("label") or location.get("name"), "Lugar indicado")
         lat = location.get("lat")
         lon = location.get("lon")
     return block(
-        f"location-detail-{uuid4().hex[:10]}",
-        "LocationDetailCard",
+        f"place-detail-{uuid4().hex[:10]}",
+        "PlaceDetailCard",
         {
             "label": label,
             "lat": lat,
@@ -3936,57 +3975,6 @@ def normalize_block_props(block_type: str, props: dict) -> dict:
                 normalized_action["label"] = display_text(label, "Continuar")
             normalized_actions.append(normalized_action)
         return {**props, "actions": normalized_actions}
-    if block_type == "DestinationChargingCard":
-        destination = (
-            props.get("destination")
-            or props.get("location")
-            or props.get("locationLabel")
-            or props.get("hotel")
-            or props.get("hotelName")
-            or props.get("city")
-            or props.get("label")
-            or props.get("name")
-            or "Destino aproximado"
-        )
-        return {
-            "destination": display_text(destination, "Destino aproximado"),
-            "needsConfirmation": bool(props.get("needsConfirmation", props.get("approximate", True))),
-        }
-    if block_type == "StayPlanningCard":
-        nights = props.get("nights")
-        if nights is None:
-            days = optional_float(props.get("days"))
-            nights = max(1, int(days) - 1) if days is not None and days >= 1 else None
-        if nights is None and (props.get("durationText") or props.get("duration")):
-            nights = nights_from_duration_text(str(props.get("durationText") or props.get("duration")))
-        city = (
-            props.get("city")
-            or props.get("locationLabel")
-            or props.get("destination")
-            or props.get("location")
-            or known_location_label_from_text(
-                display_text(props.get("context") or props.get("suggestion") or props.get("advice"), "")
-            )
-            or "Destino"
-        )
-        chargers = props.get("chargers") if isinstance(props.get("chargers"), list) else []
-        primary_stop = props.get("primaryStop") if isinstance(props.get("primaryStop"), dict) else {}
-        if not primary_stop and chargers and isinstance(chargers[0], dict):
-            primary_stop = chargers[0]
-        recommendation = (
-            props.get("recommendation")
-            or props.get("plan")
-            or props.get("advice")
-            or props.get("suggestion")
-            or props.get("context")
-            or primary_stop.get("name")
-            or "Controlar carga cerca del alojamiento y confirmar antes de depender de ella."
-        )
-        return {
-            "nights": nights,
-            "city": display_text(city, "Destino"),
-            "recommendation": display_text(recommendation, "Controlar carga cerca del alojamiento."),
-        }
     if block_type == "RiskExplanationCard":
         text_value = props.get("text") or props.get("message") or props.get("description") or props.get("risk")
         if not text_value and isinstance(props.get("risks"), list):
@@ -4018,19 +4006,19 @@ def normalize_block_props(block_type: str, props: dict) -> dict:
             "precision": precision,
             "manualFields": [str(item) for item in manual_fields if item],
         }
-    if block_type == "LocationDetailCard":
+    if block_type == "PlaceDetailCard":
         precision = props.get("precision")
         if precision not in {"exact", "approximate"}:
             precision = "approximate"
         return {
             "label": display_text(
                 props.get("label") or props.get("location") or props.get("destination") or props.get("name"),
-                "Ubicación indicada",
+                "Lugar indicado",
             ),
             "lat": props.get("lat"),
             "lon": props.get("lon"),
             "precision": precision,
-            "context": str(props.get("context") or "Ubicación usada para la búsqueda."),
+            "context": str(props.get("context") or "Lugar usado para la búsqueda."),
             "needsConfirmation": bool(props.get("needsConfirmation", precision == "approximate")),
         }
     return props
@@ -4052,16 +4040,6 @@ def display_text(value: Any, fallback: str) -> str:
     return match.group(1) if match else text
 
 
-def known_location_label_from_text(value: str) -> str | None:
-    normalized = normalize(value)
-    if not normalized:
-        return None
-    for label, _, _ in KNOWN_LOCATIONS.values():
-        if normalize(label) in normalized:
-            return label
-    return None
-
-
 def normalize_battery_prop(value: Any) -> float | int | None:
     number = optional_float(value)
     if number is None or number < 0 or number > 100:
@@ -4072,58 +4050,9 @@ def normalize_battery_prop(value: Any) -> float | int | None:
 
 
 def extra_blocks_from_props(block_type: str, props: dict, index: int) -> list[dict]:
-    if block_type == "DestinationChargingCard" and (
-        isinstance(props.get("stations"), list) or isinstance(props.get("stops"), list)
-    ):
-        stations = props.get("stations") if isinstance(props.get("stations"), list) else props["stops"]
-        return [
-            block(
-                f"stations-{index}-{uuid4().hex[:8]}",
-                "StationList",
-                {"stations": stations},
-            )
-        ]
-    if block_type == "StayPlanningCard":
-        extra = []
-        primary_stop = props.get("primaryStop") if isinstance(props.get("primaryStop"), dict) else None
-        if primary_stop:
-            extra.append(
-                block(
-                    f"stay-stop-{index}-{uuid4().hex[:8]}",
-                    "StationDetailCard",
-                    primary_stop,
-                )
-            )
-        stations = props.get("stations") or props.get("stops") or props.get("alternatives") or props.get("chargers")
-        if isinstance(stations, list):
-            extra.append(
-                block(
-                    f"stay-stations-{index}-{uuid4().hex[:8]}",
-                    "StationList",
-                    {"stations": stations},
-                )
-            )
-        return extra
     return []
 
 
 def normalize(value: str) -> str:
     substitutions = str.maketrans("áéíóúüñ", "aeiouun")
     return value.lower().translate(substitutions)
-
-
-def first_number(value: str) -> int | None:
-    match = re.search(r"\d+", value)
-    return int(match.group(0)) if match else None
-
-
-def nights_from_duration_text(value: str) -> int | None:
-    normalized = normalize(value)
-    number = first_number(normalized)
-    if "semana" in normalized:
-        return (number or 1) * 7
-    if "finde" in normalized or "fin de semana" in normalized:
-        return 2
-    if "dia" in normalized and number is not None:
-        return max(1, number - 1)
-    return number

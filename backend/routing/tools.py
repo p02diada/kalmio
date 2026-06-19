@@ -106,6 +106,7 @@ def search_destination_chargers_tool(args: dict[str, Any]) -> dict[str, Any]:
             "address": item.station.address,
             "lat": float(item.station.latitude),
             "lon": float(item.station.longitude),
+            **station_tariff_payload(item.station),
         }
         for item in stations[:limit]
     ]
@@ -163,7 +164,7 @@ def plan_route_tool(args: dict[str, Any]) -> dict[str, Any]:
 
 
 def station_score_payload(score) -> dict[str, Any]:
-    return {
+    payload = {
         "name": score.station["name"],
         "stationName": score.station["name"],
         "powerKw": score.station["power_kw"],
@@ -177,7 +178,23 @@ def station_score_payload(score) -> dict[str, Any]:
         "scoreReasons": score.reasons,
         "lat": score.station["lat"],
         "lon": score.station["lon"],
+        "priceIsEstimated": score.station.get("price_is_estimated"),
     }
+    if score.station.get("price_eur_kwh") is not None and score.station.get("price_is_estimated") is not True:
+        payload["pricePerKwhEur"] = score.station.get("price_eur_kwh")
+        payload["currency"] = "EUR"
+    return payload
+
+
+def station_tariff_payload(station) -> dict[str, Any]:
+    tariff = station.tariffs.first()
+    if not tariff:
+        return {}
+    payload: dict[str, Any] = {"priceIsEstimated": tariff.is_estimated}
+    if not tariff.is_estimated:
+        payload["pricePerKwhEur"] = float(tariff.price_per_kwh)
+        payload["currency"] = tariff.currency
+    return payload
 
 
 def parse_location_arg(value: Any) -> dict[str, Any]:

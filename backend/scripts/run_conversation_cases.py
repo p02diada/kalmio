@@ -60,24 +60,24 @@ CASE_SPECS: dict[int, CaseSpec] = {
     ),
     16: CaseSpec(
         turns=["Me voy 3 dias a Cordoba y me quedo en el hotel Melia"],
-        expected_components={"DestinationChargingCard"},
+        expected_components={"PlaceDetailCard"},
         expected_text_any=("aproxim", "referencia", "hotel", "zona", "direccion"),
     ),
     17: CaseSpec(
         turns=["Voy el finde a Granada y duermo cerca de la Alhambra"],
-        expected_components={"DestinationChargingCard"},
+        expected_components={"PlaceDetailCard"},
         any_components=({"StationList", "StationDetailCard"},),
         expected_tools={"search_destination_chargers"},
     ),
     18: CaseSpec(
         turns=["Voy a un hotel sin cargador, necesito cargar durante la estancia", "En Valencia centro"],
-        expected_components={"DestinationChargingCard"},
+        expected_components={"PlaceDetailCard"},
         any_components=({"StationList", "StationDetailCard"},),
         expected_tools={"search_destination_chargers"},
     ),
     19: CaseSpec(
         turns=["Voy una semana a Cadiz y necesito cargar durante la estancia"],
-        expected_components={"StayPlanningCard"},
+        expected_components={"PlaceDetailCard"},
         any_components=({"StationList", "StationDetailCard"},),
         expected_tools={"search_destination_chargers"},
     ),

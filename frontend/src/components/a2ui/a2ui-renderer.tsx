@@ -8,7 +8,6 @@ import {
   MessageCircle,
   Navigation,
   Route,
-  Utensils,
 } from 'lucide-react'
 import { Component, type ReactNode, useState } from 'react'
 
@@ -98,49 +97,12 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
       )
     case 'StationDetailCard':
       return <StationDetailCard block={block} />
-    case 'AlternativeRoutesList':
-      return <ListCard title="Rutas alternativas" items={list(block.props.routes)} />
     case 'StationList':
       return <ListCard title={text(block.props.title, 'Estaciones cercanas')} items={list(block.props.stations)} itemKind="station" />
     case 'RiskExplanationCard':
       return <RiskBand level={text(block.props.level, 'medio')} body={text(block.props.text)} />
     case 'CostComparisonCard':
-      return (
-        <MetricCard
-          icon={Euro}
-          title={text(block.props.best)}
-          tone="primary"
-          rows={[
-            ['Coste estimado', metric(block.props.estimatedCostEur, 'EUR')],
-            ['Ahorro estimado', metric(block.props.savingEur, 'EUR')],
-          ]}
-        />
-      )
-    case 'DestinationChargingCard':
-      return (
-        <MetricCard
-          icon={MapPinned}
-          title="Plan al llegar"
-          tone="assistant"
-          rows={[
-            ['Destino', text(block.props.destination)],
-            ['Confirmación', bool(block.props.needsConfirmation) ? 'Necesaria' : 'No necesaria'],
-          ]}
-        />
-      )
-    case 'StayPlanningCard':
-      return (
-        <MetricCard
-          icon={Utensils}
-          title="Plan de estancia"
-          tone="assistant"
-          rows={[
-            ['Noches', count(block.props.nights)],
-            ['Ciudad', text(block.props.city)],
-            ['Plan', text(block.props.recommendation)],
-          ]}
-        />
-      )
+      return <CostComparisonCard block={block} />
     case 'MapPreviewCard':
       return <MapPreviewCard block={block} />
     case 'ActionButtons':
@@ -180,8 +142,8 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
           onManualLocationRequest={actions.onManualLocationRequest}
         />
       )
-    case 'LocationDetailCard':
-      return <LocationDetailCard block={block} />
+    case 'PlaceDetailCard':
+      return <PlaceDetailCard block={block} />
     case 'PreferenceChips':
       return (
         <div className="flex min-w-0 max-w-full flex-wrap gap-2">
@@ -293,7 +255,7 @@ function LocationRequestCard({
   )
 }
 
-function LocationDetailCard({ block }: { block: A2UIBlock }) {
+function PlaceDetailCard({ block }: { block: A2UIBlock }) {
   const needsConfirmation = bool(block.props.needsConfirmation)
   const precision = text(block.props.precision, 'approximate') === 'exact' ? 'Precisa' : 'Aproximada'
   const coordinates = coordinatePair(block.props.lat, block.props.lon)
@@ -305,13 +267,13 @@ function LocationDetailCard({ block }: { block: A2UIBlock }) {
           <span className="grid size-7 place-items-center rounded-md bg-surface">
             <MapPinned className="size-4 text-route" aria-hidden="true" />
           </span>
-          Detalle de ubicación
+          Lugar resuelto
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
-          <span className="text-base font-semibold tracking-tight">{text(block.props.label, 'Ubicación indicada')}</span>
-          <span className="text-sm leading-6 text-body">{text(block.props.context, 'Ubicación usada para la búsqueda.')}</span>
+          <span className="text-base font-semibold tracking-tight">{text(block.props.label, 'Lugar indicado')}</span>
+          <span className="text-sm leading-6 text-body">{text(block.props.context, 'Lugar usado para la búsqueda.')}</span>
         </div>
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div>
@@ -325,7 +287,7 @@ function LocationDetailCard({ block }: { block: A2UIBlock }) {
         </div>
         {needsConfirmation ? (
           <Badge variant="secondary" className="w-fit">
-            Confirma acceso y ubicación final
+            Confirma el lugar final
           </Badge>
         ) : null}
       </CardContent>
@@ -388,7 +350,7 @@ function TripSummaryCard({ block }: { block: A2UIBlock }) {
         <MetricGrid
           rows={[
             ['Batería', percentOrUnknown(block.props.battery)],
-            ['Reserva', percent(block.props.reserve)],
+            ['Mínimo al llegar', percent(block.props.arrivalReservePercent)],
             ['Tipo', 'Conservadora'],
           ]}
         />
@@ -470,6 +432,7 @@ function StationDetailCard({ block }: { block: A2UIBlock }) {
           rows={compactRows([
             ['Distancia', metric(block.props.distanceKm, 'km')],
             ['Potencia', metric(block.props.powerKw, 'kW')],
+            stationPriceRow(block.props),
             capacity ? ['Capacidad', capacity] : ['Confianza', text(block.props.confidence)],
             ['Desvío', metric(block.props.detourMin, 'min')],
           ])}
@@ -511,6 +474,29 @@ function StationDetailCard({ block }: { block: A2UIBlock }) {
         ) : null}
       </CardContent>
     </Card>
+  )
+}
+
+function CostComparisonCard({ block }: { block: A2UIBlock }) {
+  const tariff = pricePerKwhValue(block.props.pricePerKwhEur, block.props.currency)
+  if (bool(block.props.priceIsEstimated) || !tariff) {
+    return <ErrorFallbackCard type={block.type} message="No hay tarifas trazadas para comparar." />
+  }
+
+  return (
+    <MetricCard
+      icon={Euro}
+      title={text(block.props.best)}
+      tone="primary"
+      rows={compactRows([
+        ['Tarifa', tariff],
+        pricePerKwhValue(block.props.comparedWithPricePerKwhEur, block.props.currency)
+          ? ['Comparada con', pricePerKwh(block.props.comparedWithPricePerKwhEur, block.props.currency)]
+          : null,
+        isKnownNumber(block.props.savingPerKwhEur) ? ['Ahorro/kWh', metric(block.props.savingPerKwhEur, 'EUR')] : null,
+      ])}
+      note={priceNote(block.props)}
+    />
   )
 }
 
@@ -762,6 +748,7 @@ function stationDetails(item: Record<string, unknown>) {
   const connectors = connectorLabels(item.connectorTypes)
   const metricParts = [
     isKnownNumber(item.powerKw) ? metric(item.powerKw, 'kW') : '',
+    stationPriceDetail(item),
     isKnownNumber(item.distanceKm) ? metric(item.distanceKm, 'km') : '',
     isKnownNumber(item.detourMin) ? `Desvío ${metric(item.detourMin, 'min')}` : '',
     capacity ? `Capacidad trazada: ${capacity}` : '',
@@ -794,6 +781,44 @@ function routeDetails(item: Record<string, unknown>) {
   return isKnownNumber(item.powerKw)
     ? `${metric(item.powerKw, 'kW')}${isKnownNumber(item.distanceKm) ? ` · ${metric(item.distanceKm, 'km')}` : ''}`
     : metric(item.deltaMin, 'min de diferencia')
+}
+
+function pricePerKwh(value: unknown, currency: unknown = 'EUR') {
+  return pricePerKwhValue(value, currency) ?? 'No disponible'
+}
+
+function pricePerKwhValue(value: unknown, currency: unknown = 'EUR') {
+  const number = knownNumber(value)
+  if (number === null) {
+    return null
+  }
+  const symbol = text(currency, 'EUR').toUpperCase() === 'EUR' ? '€' : text(currency, 'EUR')
+  return `${formatPrice(number)} ${symbol}/kWh`
+}
+
+function stationPrice(item: Record<string, unknown>) {
+  if (bool(item.priceIsEstimated)) {
+    return 'No disponible'
+  }
+  const value = pricePerKwh(item.pricePerKwhEur, item.currency)
+  return value
+}
+
+function stationPriceRow(item: Record<string, unknown>): [string, string] | null {
+  const value = stationPrice(item)
+  return value === 'No disponible' ? null : ['Precio', value]
+}
+
+function stationPriceDetail(item: Record<string, unknown>) {
+  const value = stationPrice(item)
+  return value === 'No disponible' ? '' : `Precio ${value}`
+}
+
+function priceNote(props: Record<string, unknown>) {
+  const comparedWith = text(props.comparedWith, '')
+  return compactParts([
+    comparedWith ? `Comparado con ${comparedWith}.` : '',
+  ]).join(' ')
 }
 
 function compactRows(rows: Array<[string, string] | null>): Array<[string, string]> {
@@ -935,11 +960,6 @@ function coordinatePair(lat: unknown, lon: unknown) {
   return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
 }
 
-function count(value: unknown) {
-  const number = knownNumber(value)
-  return number === null ? 'No disponible' : formatNumber(number)
-}
-
 function isKnownNumber(value: unknown, options: { zeroUnknown?: boolean } = {}) {
   return knownNumber(value, options) !== null
 }
@@ -953,6 +973,10 @@ function knownNumber(value: unknown, options: { zeroUnknown?: boolean } = {}) {
 
 function formatNumber(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, '')
+}
+
+function formatPrice(value: number) {
+  return value.toFixed(2).replace(/0$/, '').replace(/\.0$/, '')
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
