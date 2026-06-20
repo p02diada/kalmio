@@ -21,6 +21,7 @@ from routing.tools import (
     ConversationToolError,
     ToolCall,
     execute_conversation_tool,
+    route_geometry_payload,
 )
 from routing.instrumentation import (
     agent_trace_turn,
@@ -979,7 +980,8 @@ def codex_prompt(
         "StationDetailCard/StationList solo estaciones de carga respaldadas por herramientas; en esos bloques name/stationName debe ser la estación trazable; address puede ser dirección/zona trazada. RiskExplanationCard incertidumbre concreta; "
         "CostComparisonCard solo tarifas/costes de herramienta; para preferencias de precio usa pricePerKwhEur y savingPerKwhEur trazados y no estimados, no estimatedCostEur sin energía trazada. PlaceDetailCard muestra lugares o zonas resueltas; StationDetailCard muestra estación concreta con distanceKm, powerKw, pricePerKwhEur, availableEvses, connectorTypes, lat/lon cuando estén trazados; no muestres pricePerKwhEur si priceIsEstimated es true. "
         "si quieres mostrar alternativas o riesgo, usa bloques separados StationList y RiskExplanationCard elegidos por el agente. "
-        "MapPreviewCard sin inventar geometría; "
+        "MapPreviewCard solo para rutas de plan_route con routeGeometry GeoJSON LineString trazada, origin/destination con coordenadas trazadas, primaryStation/stations trazadas, corridorRadiusKm y geometryPrecision='provider'. "
+        "Si no tienes geometría de proveedor, usa geometryPrecision='schematic' o no muestres mapa; no inventes coordenadas ni geometría. "
         "ActionButtons usa event para backend/agente, functionCall.openUrl para abrir mapas, o disabled con reason; "
         "ClarifyingQuestionCard faltan datos críticos; "
         "PositionRequestCard pide posición actual/manual del conductor; PlaceDetailCard muestra lugares o zonas resueltas; PreferenceChips preferencias; ErrorFallbackCard reservado.\n"
@@ -1432,6 +1434,7 @@ def blocks_from_tool_result(tool_result: dict[str, Any], message: str = "") -> l
         ]
     if tool == "plan_route":
         recommendation = tool_result.get("recommendation") if isinstance(tool_result.get("recommendation"), dict) else {}
+        alternatives = tool_result.get("alternatives") if isinstance(tool_result.get("alternatives"), list) else []
         return [
             block(
                 f"route-{uuid4().hex[:10]}",
@@ -1447,6 +1450,20 @@ def blocks_from_tool_result(tool_result: dict[str, Any], message: str = "") -> l
                 f"station-{uuid4().hex[:10]}",
                 "StationDetailCard",
                 {"title": "Estación recomendada", **station_props_from_result(recommendation)},
+            ),
+            block(
+                f"map-{uuid4().hex[:10]}",
+                "MapPreviewCard",
+                {
+                    "origin": tool_result.get("origin"),
+                    "destination": tool_result.get("destination"),
+                    "primaryStation": station_props_from_result(recommendation),
+                    "stations": [station_props_from_result(station) for station in alternatives],
+                    "routeGeometry": tool_result.get("routeGeometry"),
+                    "corridorRadiusKm": tool_result.get("corridorRadiusKm"),
+                    "geometryPrecision": "provider" if tool_result.get("routeGeometry") else "unknown",
+                    "source": "plan_route",
+                },
             ),
         ]
     return [block(f"assistant-{uuid4().hex[:10]}", "AssistantMessage", {"text": "Herramienta ejecutada."})]
@@ -1534,7 +1551,7 @@ def a2ui_contract_issues(
         elif block_type == "PlaceDetailCard":
             issues.extend(place_detail_contract_issues(props, facts, explicit_coordinates))
         elif block_type == "MapPreviewCard":
-            issues.extend(station_reference_contract_issues("MapPreviewCard.stop", props.get("stop"), facts))
+            issues.extend(map_preview_contract_issues(props, facts, explicit_coordinates))
         elif block_type == "ActionButtons":
             issues.extend(action_buttons_contract_issues(props, facts, explicit_coordinates))
         elif block_type == "CostComparisonCard":
@@ -2915,6 +2932,91 @@ def route_summary_contract_issues(props: dict, facts: dict[str, Any]) -> list[st
     return issues
 
 
+def map_preview_contract_issues(
+    props: dict,
+    facts: dict[str, Any],
+    explicit_coordinates: list[tuple[float, float]],
+) -> list[str]:
+    issues: list[str] = []
+    route_geometry = props.get("routeGeometry")
+    geometry_precision = props.get("geometryPrecision")
+    if geometry_precision == "provider":
+        if not facts["routes"]:
+            issues.append("MapPreviewCard necesita un resultado plan_route trazable.")
+        if not isinstance(route_geometry, dict):
+            issues.append("MapPreviewCard.routeGeometry debe venir de plan_route cuando geometryPrecision='provider'.")
+
+    if isinstance(route_geometry, dict):
+        expected_geometry = facts["routes"][-1].get("routeGeometry") if facts["routes"] else None
+        if expected_geometry is None:
+            issues.append("MapPreviewCard.routeGeometry no está en el resultado plan_route.")
+        elif not line_string_geometry_matches(route_geometry, expected_geometry):
+            issues.append("MapPreviewCard.routeGeometry no coincide con plan_route.")
+
+    for field in ("origin", "destination"):
+        point = props.get(field)
+        if not isinstance(point, dict):
+            continue
+        lat = optional_float(point.get("lat"))
+        lon = optional_float(point.get("lon"))
+        if lat is None and lon is None:
+            continue
+        if lat is None or lon is None:
+            issues.append(f"MapPreviewCard.{field} necesita lat y lon juntos.")
+        elif not coordinate_traced(lat, lon, facts["locations"], explicit_coordinates):
+            issues.append(f"MapPreviewCard.{field} no coincide con una ubicación trazada.")
+
+    primary_station = props.get("primaryStation")
+    if isinstance(primary_station, dict):
+        station_name = primary_station.get("name") or primary_station.get("stationName")
+        issues.extend(required_station_reference_contract_issues("MapPreviewCard.primaryStation.name", station_name, facts))
+        issues.extend(station_reference_contract_issues("MapPreviewCard.primaryStation.name", station_name, facts))
+        issues.extend(station_metric_contract_issues("MapPreviewCard.primaryStation", primary_station, facts))
+
+    stations = props.get("stations")
+    if isinstance(stations, list):
+        for index, station in enumerate(stations):
+            if not isinstance(station, dict):
+                issues.append(f"MapPreviewCard.stations[{index}] debe ser un objeto.")
+                continue
+            station_name = station.get("name") or station.get("stationName")
+            issues.extend(required_station_reference_contract_issues(f"MapPreviewCard.stations[{index}].name", station_name, facts))
+            issues.extend(station_reference_contract_issues(f"MapPreviewCard.stations[{index}].name", station_name, facts))
+            issues.extend(station_metric_contract_issues(f"MapPreviewCard.stations[{index}]", station, facts))
+    return issues
+
+
+def line_string_geometry_matches(rendered: dict[str, Any], expected: Any) -> bool:
+    if not isinstance(expected, dict):
+        return False
+    if rendered.get("type") != "LineString" or expected.get("type") != "LineString":
+        return False
+    rendered_coordinates = rendered.get("coordinates")
+    expected_coordinates = expected.get("coordinates")
+    if not isinstance(rendered_coordinates, list) or not isinstance(expected_coordinates, list):
+        return False
+    if len(rendered_coordinates) != len(expected_coordinates):
+        return False
+    for rendered_pair, expected_pair in zip(rendered_coordinates, expected_coordinates):
+        if not coordinate_pair_matches(rendered_pair, expected_pair):
+            return False
+    return True
+
+
+def coordinate_pair_matches(rendered: Any, expected: Any) -> bool:
+    if not isinstance(rendered, list) or not isinstance(expected, list):
+        return False
+    if len(rendered) != 2 or len(expected) != 2:
+        return False
+    rendered_lon = optional_float(rendered[0])
+    rendered_lat = optional_float(rendered[1])
+    expected_lon = optional_float(expected[0])
+    expected_lat = optional_float(expected[1])
+    if rendered_lon is None or rendered_lat is None or expected_lon is None or expected_lat is None:
+        return False
+    return close_coordinates(rendered_lat, rendered_lon, expected_lat, expected_lon)
+
+
 def place_detail_contract_issues(
     props: dict,
     facts: dict[str, Any],
@@ -3526,6 +3628,8 @@ def route_planning_blocks(intent: ParsedIntent) -> list[dict]:
     )
 
     station = plan.recommendation.station
+    primary_station_props = route_station_props(station, title="Estación recomendada")
+    alternative_station_props = [route_station_props(alternative.station) for alternative in plan.alternatives]
     blocks = [
         block(
             f"assistant-{uuid4().hex[:10]}",
@@ -3542,8 +3646,8 @@ def route_planning_blocks(intent: ParsedIntent) -> list[dict]:
             f"trip-{uuid4().hex[:10]}",
             "TripSummaryCard",
             {
-                "origin": intent.origin.label,
-                "destination": intent.destination.label,
+                "origin": {"label": intent.origin.label, "lat": intent.origin.lat, "lon": intent.origin.lon},
+                "destination": {"label": intent.destination.label, "lat": intent.destination.lat, "lon": intent.destination.lon},
                 "battery": intent.vehicle_fields.get("battery"),
                 "arrivalReservePercent": intent.preferences.reserve_min_percent,
             },
@@ -3561,18 +3665,7 @@ def route_planning_blocks(intent: ParsedIntent) -> list[dict]:
         block(
             f"station-{uuid4().hex[:10]}",
             "StationDetailCard",
-            {
-                "title": "Estación recomendada",
-                "name": station["name"],
-                "stationName": station["name"],
-                "powerKw": station["power_kw"],
-                "distanceKm": station.get("distance_to_route_km"),
-                "detourMin": station["detour_min"],
-                "lat": station.get("lat"),
-                "lon": station.get("lon"),
-                "confidence": "media",
-                **station_price_props_from_mapping(station),
-            },
+            primary_station_props,
         ),
     ]
     if plan.alternatives:
@@ -3582,16 +3675,7 @@ def route_planning_blocks(intent: ParsedIntent) -> list[dict]:
                 "StationList",
                 {
                     "title": "Otras estaciones viables",
-                    "stations": [
-                        {
-                            "name": alternative.station["name"],
-                            "stationName": alternative.station["name"],
-                            "powerKw": alternative.station["power_kw"],
-                            "distanceKm": alternative.station["distance_to_route_km"],
-                            **station_price_props_from_mapping(alternative.station),
-                        }
-                        for alternative in plan.alternatives
-                    ]
+                    "stations": alternative_station_props,
                 },
             )
         )
@@ -3602,7 +3686,16 @@ def route_planning_blocks(intent: ParsedIntent) -> list[dict]:
             block(
                 f"map-{uuid4().hex[:10]}",
                 "MapPreviewCard",
-                {"origin": intent.origin.label, "destination": intent.destination.label, "stop": station["name"]},
+                {
+                    "origin": {"label": intent.origin.label, "lat": intent.origin.lat, "lon": intent.origin.lon},
+                    "destination": {"label": intent.destination.label, "lat": intent.destination.lat, "lon": intent.destination.lon},
+                    "primaryStation": primary_station_props,
+                    "stations": alternative_station_props,
+                    "routeGeometry": route_geometry_payload(plan.route),
+                    "corridorRadiusKm": 25,
+                    "geometryPrecision": "provider",
+                    "source": "plan_route",
+                },
             ),
             block(
                 f"actions-{uuid4().hex[:10]}",
@@ -3629,6 +3722,31 @@ def route_planning_blocks(intent: ParsedIntent) -> list[dict]:
         ]
     )
     return blocks
+
+
+def route_station_props(station: dict[str, Any], title: str | None = None) -> dict[str, Any]:
+    props: dict[str, Any] = {
+        "name": station["name"],
+        "stationName": station["name"],
+        "powerKw": station.get("power_kw"),
+        "distanceKm": station.get("distance_to_route_km"),
+        "detourMin": station.get("detour_min"),
+        "lat": station.get("lat"),
+        "lon": station.get("lon"),
+        "confidence": "media",
+        **station_price_props_from_mapping(station),
+    }
+    if title:
+        props["title"] = title
+    if station.get("available_connectors") is not None:
+        props["availableEvses"] = station.get("available_connectors")
+    if station.get("connector_count") is not None:
+        props["connectorCount"] = station.get("connector_count")
+    if station.get("connector"):
+        props["connectorTypes"] = [station.get("connector")]
+    if isinstance(station.get("services"), list):
+        props["amenities"] = station.get("services")
+    return props
 
 
 def station_price_props_from_mapping(station: dict[str, Any]) -> dict[str, Any]:

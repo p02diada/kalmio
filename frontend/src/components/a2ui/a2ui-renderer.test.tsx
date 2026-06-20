@@ -1,9 +1,13 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { A2UIRenderer } from './a2ui-renderer'
 
 describe('A2UIRenderer', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('renders a fallback for unknown blocks', () => {
     render(<A2UIRenderer blocks={[{ id: 'x', type: 'UnknownCard', version: 1, props: {} }]} />)
 
@@ -237,6 +241,49 @@ describe('A2UIRenderer', () => {
     expect(screen.getByText(/Precio 0.59 €\/kWh/)).toBeInTheDocument()
     expect(screen.getByText(/Capacidad trazada: 3 EVSEs/)).toBeInTheDocument()
     expect(screen.getByText(/Conectores trazados: CCS2/)).toBeInTheDocument()
+  })
+
+  it('renders an expandable route map with traced route stations', () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'route-map',
+            type: 'MapPreviewCard',
+            version: 1,
+            props: {
+              origin: { label: 'Zaragoza', lat: 41.6488, lon: -0.8891 },
+              destination: { label: 'Valencia', lat: 39.4699, lon: -0.3763 },
+              primaryStation: { stationName: 'Kalmio demo HPC', lat: 40.345, lon: -0.997 },
+              stations: [{ stationName: 'Demo Charge 1', lat: 40.583, lon: -1.268 }],
+              routeGeometry: {
+                type: 'LineString',
+                coordinates: [
+                  [-0.8891, 41.6488],
+                  [-1.105, 40.343],
+                  [-0.3763, 39.4699],
+                ],
+              },
+              corridorRadiusKm: 25,
+              geometryPrecision: 'provider',
+              source: 'plan_route',
+            },
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('Mapa de ruta')).toBeInTheDocument()
+    expect(screen.getByText('Ruta real')).toBeInTheDocument()
+    expect(screen.getByText('2 estaciones')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expandir mapa' }))
+
+    expect(screen.getByText('Cargadores en ruta')).toBeInTheDocument()
+    expect(screen.getAllByText('Kalmio demo HPC').length).toBeGreaterThan(1)
+    expect(screen.getAllByText('Demo Charge 1').length).toBeGreaterThan(1)
   })
 
   it('hides station prices marked as estimated', () => {

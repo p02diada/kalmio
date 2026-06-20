@@ -4,21 +4,44 @@ import {
   Bot,
   CircleHelp,
   Euro,
+  Maximize2,
   MapPinned,
   MessageCircle,
   Navigation,
   Route,
 } from 'lucide-react'
-import { Component, type ReactNode, useState } from 'react'
+import { Component, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import type { Map as MapLibreMap, Marker as MapLibreMarker, StyleSpecification } from 'maplibre-gl'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import type { A2UIBlock } from '@/lib/a2ui/types'
 import { cn } from '@/lib/utils'
 
 type RecordList = Array<Record<string, unknown>>
+type CoordinateTuple = [number, number]
+type LineStringGeometry = { type: 'LineString'; coordinates: CoordinateTuple[] }
+type RouteMapPoint = {
+  id: string
+  label: string
+  lat: number
+  lon: number
+  kind: 'origin' | 'destination' | 'primary' | 'station'
+}
+type RouteMapData = {
+  originLabel: string
+  destinationLabel: string
+  primaryLabel: string
+  routeGeometry: LineStringGeometry | null
+  points: RouteMapPoint[]
+  stationPoints: RouteMapPoint[]
+  corridorRadiusKm: number | null
+  geometryPrecision: 'provider' | 'schematic' | 'unknown'
+  source: string
+}
 type A2UIRendererActions = {
   onChipClick?: (value: string) => void
   onActionEvent?: (name: string, context?: Record<string, unknown>, sourceComponentId?: string) => void
@@ -572,32 +595,461 @@ function RiskBand({ level, body }: { level: string; body: string }) {
 }
 
 function MapPreviewCard({ block }: { block: A2UIBlock }) {
+  const mapData = useMemo(() => routeMapData(block.props), [block.props])
+  const stationCount = mapData.stationPoints.length
+  const geometryLabel = mapData.geometryPrecision === 'provider' ? 'Ruta real' : 'Vista esquemática'
+
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <MapPinned className="size-4 text-route" aria-hidden="true" />
-          Vista de ruta
-        </CardTitle>
+      <CardHeader className="pb-2">
+        <div className="flex items-start justify-between gap-3">
+          <CardTitle className="flex min-w-0 items-center gap-2 text-base">
+            <MapPinned className="size-4 shrink-0 text-route" aria-hidden="true" />
+            <span className="min-w-0 truncate">Mapa de ruta</span>
+          </CardTitle>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button type="button" variant="outline" size="sm" className="h-8 shrink-0 px-2" aria-label="Expandir mapa">
+                <Maximize2 className="size-4" aria-hidden="true" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-h-[92svh] max-w-[min(68rem,calc(100%-1rem))] overflow-hidden p-0">
+              <DialogHeader className="border-b border-border px-4 pb-3 pt-4 sm:px-5">
+                <DialogTitle>Mapa de ruta</DialogTitle>
+                <DialogDescription>
+                  {compactParts([
+                    `${mapData.originLabel} → ${mapData.destinationLabel}`,
+                    stationCount > 0 ? `${stationCount} estaciones en el corredor` : '',
+                  ]).join(' · ')}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid max-h-[calc(92svh-5rem)] min-h-0 gap-0 overflow-auto md:grid-cols-[minmax(0,1fr)_18rem]">
+                <RouteMapCanvas data={mapData} variant="expanded" />
+                <RouteMapStationPanel data={mapData} />
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="a2ui-map-canvas">
-          <div className="a2ui-map-grid" />
-          <div className="a2ui-route-line" />
-          <div className="absolute left-7 top-24 size-4 rounded-full border-2 border-surface bg-primary" />
-          <div className="absolute left-[48%] top-[47%] size-5 -translate-x-1/2 rounded-full border-2 border-surface bg-warning" />
-          <div className="absolute right-9 top-14 size-4 rounded-full border-2 border-surface bg-primary" />
-          <span className="absolute bottom-4 left-7 text-xs font-bold text-foreground">{text(block.props.origin)}</span>
-          <span className="absolute right-6 top-7 text-xs font-bold text-foreground">{text(block.props.destination)}</span>
-        </div>
+        <RouteMapCanvas data={mapData} variant="compact" />
         <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
-          <span>{text(block.props.origin)}</span>
-          <span className="text-center">{text(block.props.stop)}</span>
-          <span className="text-right">{text(block.props.destination)}</span>
+          <span className="truncate">{mapData.originLabel}</span>
+          <span className="truncate text-center">{mapData.primaryLabel || geometryLabel}</span>
+          <span className="truncate text-right">{mapData.destinationLabel}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <Badge variant="secondary">{geometryLabel}</Badge>
+          {stationCount > 0 ? <Badge variant="secondary">{stationCount} estaciones</Badge> : null}
+          {mapData.corridorRadiusKm !== null ? <Badge variant="secondary">Corredor {formatNumber(mapData.corridorRadiusKm)} km</Badge> : null}
         </div>
       </CardContent>
     </Card>
   )
+}
+
+function RouteMapCanvas({ data, variant }: { data: RouteMapData; variant: 'compact' | 'expanded' }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<MapLibreMap | null>(null)
+  const [status, setStatus] = useState<'idle' | 'static' | 'failed'>('idle')
+  const dataKey = useMemo(() => JSON.stringify({
+    routeGeometry: data.routeGeometry,
+    points: data.points.map((point) => [point.id, point.lat, point.lon, point.kind]),
+  }), [data])
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container || !data.routeGeometry || !canUseWebGl()) {
+      setStatus('static')
+      return
+    }
+
+    let disposed = false
+    const markers: MapLibreMarker[] = []
+
+    async function setupMap() {
+      try {
+        const maplibregl = await import('maplibre-gl')
+        if (disposed || !containerRef.current) {
+          return
+        }
+        const map = new maplibregl.Map({
+          container: containerRef.current,
+          style: mapLibreStyle(),
+          center: routeCenter(data),
+          zoom: 6,
+          attributionControl: Boolean(mapStyleUrl()),
+          interactive: true,
+        })
+        mapRef.current = map
+        map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
+        map.once('load', () => {
+          if (disposed) {
+            return
+          }
+          map.addSource('route', {
+            type: 'geojson',
+            data: {
+              type: 'Feature',
+              properties: {},
+              geometry: data.routeGeometry,
+            },
+          })
+          map.addLayer({
+            id: 'route-shadow',
+            type: 'line',
+            source: 'route',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-color': '#ffffff', 'line-width': 8, 'line-opacity': 0.92 },
+          })
+          map.addLayer({
+            id: 'route-line',
+            type: 'line',
+            source: 'route',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-color': '#146c5f', 'line-width': 4 },
+          })
+          for (const point of data.points) {
+            const marker = new maplibregl.Marker({ element: mapMarkerElement(point), anchor: 'center' })
+              .setLngLat([point.lon, point.lat])
+              .addTo(map)
+            markers.push(marker)
+          }
+          const bounds = routeBounds(data)
+          if (bounds) {
+            map.fitBounds(bounds, {
+              padding: variant === 'expanded' ? 72 : 34,
+              maxZoom: variant === 'expanded' ? 11 : 8,
+              duration: 0,
+            })
+          }
+          map.resize()
+        })
+        map.on('error', () => setStatus('failed'))
+      } catch {
+        if (!disposed) {
+          setStatus('failed')
+        }
+      }
+    }
+
+    setStatus('idle')
+    void setupMap()
+
+    return () => {
+      disposed = true
+      markers.forEach((marker) => marker.remove())
+      mapRef.current?.remove()
+      mapRef.current = null
+    }
+  }, [data, dataKey, variant])
+
+  return (
+    <div className={cn('a2ui-map-shell', variant === 'expanded' && 'a2ui-map-shell-expanded')}>
+      <div ref={containerRef} className={cn('a2ui-maplibre-canvas', status !== 'idle' && 'opacity-0')} aria-label="Mapa interactivo de ruta" />
+      {status !== 'idle' ? <StaticRouteMap data={data} /> : null}
+      {status === 'failed' ? (
+        <span className="absolute left-3 top-3 rounded-md bg-surface px-2 py-1 text-xs font-medium text-muted-foreground shadow-sm">
+          Vista estática
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
+function StaticRouteMap({ data }: { data: RouteMapData }) {
+  const geometry = data.routeGeometry ?? schematicGeometry(data)
+  const projected = projectedRoute(geometry, data.points)
+  return (
+    <svg className="a2ui-static-map" viewBox="0 0 640 280" role="img" aria-label="Vista de ruta">
+      <rect width="640" height="280" rx="14" className="fill-[color-mix(in_oklch,var(--color-route-soft)_32%,var(--color-muted))]" />
+      <path d={projected.path} className="fill-none stroke-white/90 stroke-[12] [stroke-linecap:round] [stroke-linejoin:round]" />
+      <path d={projected.path} className="fill-none stroke-route stroke-[5] [stroke-linecap:round] [stroke-linejoin:round]" />
+      {projected.points.map((point) => (
+        <g key={point.id} transform={`translate(${point.x} ${point.y})`}>
+          <circle r={point.kind === 'primary' ? 9 : 7} className={point.kind === 'primary' ? 'fill-warning stroke-surface stroke-[3]' : 'fill-primary stroke-surface stroke-[3]'} />
+          <text x={point.kind === 'destination' ? -10 : 10} y="-10" textAnchor={point.kind === 'destination' ? 'end' : 'start'} className="fill-foreground text-[18px] font-bold">
+            {point.label}
+          </text>
+        </g>
+      ))}
+    </svg>
+  )
+}
+
+function RouteMapStationPanel({ data }: { data: RouteMapData }) {
+  const stations = data.stationPoints
+  return (
+    <aside className="flex min-h-0 flex-col gap-3 border-t border-border p-4 md:border-l md:border-t-0">
+      <div className="flex flex-col gap-1">
+        <span className="text-sm font-semibold tracking-tight">Cargadores en ruta</span>
+        <span className="text-xs leading-5 text-muted-foreground">
+          {stations.length > 0 ? `${stations.length} estaciones trazadas cerca del corredor.` : 'Sin estaciones trazadas para este mapa.'}
+        </span>
+      </div>
+      <div className="flex min-h-0 flex-col divide-y divide-border overflow-auto">
+        {stations.map((station, index) => (
+          <div key={station.id} className="flex gap-3 py-3 text-sm first:pt-0 last:pb-0">
+            <span className={cn(
+              'grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold',
+              station.kind === 'primary' ? 'bg-warning text-foreground' : 'bg-muted text-muted-foreground',
+            )}>
+              {index + 1}
+            </span>
+            <div className="min-w-0">
+              <div className="truncate font-semibold tracking-tight">{station.label}</div>
+              <div className="text-xs leading-5 text-muted-foreground">
+                {station.kind === 'primary' ? 'Parada principal' : 'Alternativa del corredor'}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </aside>
+  )
+}
+
+function routeMapData(props: Record<string, unknown>): RouteMapData {
+  const routeGeometry = lineStringGeometry(props.routeGeometry)
+  const primaryStation = record(props.primaryStation)
+  const stations = list(props.stations)
+  const origin = mapPoint(props.origin, 'origin', 'Origen')
+    ?? pointFromGeometry(routeGeometry, 0, 'origin', text(props.origin, 'Origen'))
+  const destination = mapPoint(props.destination, 'destination', 'Destino')
+    ?? pointFromGeometry(routeGeometry, -1, 'destination', text(props.destination, 'Destino'))
+  const primary = primaryStation ? stationMapPoint(primaryStation, 'primary', 0) : null
+  const alternativePoints = stations
+    .map((station, index) => stationMapPoint(station, 'station', index + 1))
+    .filter((point): point is RouteMapPoint => point !== null)
+  const stationPoints = uniqueMapPoints(compactMapPoints([primary, ...alternativePoints]))
+  const points = uniqueMapPoints(compactMapPoints([origin, destination, ...stationPoints]))
+
+  return {
+    originLabel: origin?.label ?? text(props.origin, 'Origen'),
+    destinationLabel: destination?.label ?? text(props.destination, 'Destino'),
+    primaryLabel: primary?.label ?? text(primaryStation, ''),
+    routeGeometry,
+    points,
+    stationPoints,
+    corridorRadiusKm: knownNumber(props.corridorRadiusKm),
+    geometryPrecision: routeGeometry ? geometryPrecision(props.geometryPrecision) : 'schematic',
+    source: text(props.source, ''),
+  }
+}
+
+function lineStringGeometry(value: unknown): LineStringGeometry | null {
+  const geometry = record(value)
+  if (geometry?.type !== 'LineString' || !Array.isArray(geometry.coordinates)) {
+    return null
+  }
+  const coordinates = geometry.coordinates
+    .map((coordinate) => coordinateTuple(coordinate))
+    .filter((coordinate): coordinate is CoordinateTuple => coordinate !== null)
+  return coordinates.length >= 2 ? { type: 'LineString', coordinates } : null
+}
+
+function coordinateTuple(value: unknown): CoordinateTuple | null {
+  if (!Array.isArray(value) || value.length < 2) {
+    return null
+  }
+  const lon = knownNumber(value[0])
+  const lat = knownNumber(value[1])
+  if (lat === null || lon === null || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+    return null
+  }
+  return [lon, lat]
+}
+
+function mapPoint(value: unknown, kind: RouteMapPoint['kind'], fallback: string): RouteMapPoint | null {
+  const item = record(value)
+  if (!item) {
+    return null
+  }
+  const lat = knownNumber(item.lat)
+  const lon = knownNumber(item.lon)
+  if (lat === null || lon === null) {
+    return null
+  }
+  return {
+    id: kind,
+    label: text(item, fallback),
+    lat,
+    lon,
+    kind,
+  }
+}
+
+function stationMapPoint(item: Record<string, unknown>, kind: 'primary' | 'station', index: number): RouteMapPoint | null {
+  const lat = knownNumber(item.lat)
+  const lon = knownNumber(item.lon)
+  const label = stationTitle(item, '')
+  if (lat === null || lon === null || !label) {
+    return null
+  }
+  return {
+    id: `${kind}-${stationKey(label)}-${index}`,
+    label,
+    lat,
+    lon,
+    kind,
+  }
+}
+
+function pointFromGeometry(
+  geometry: LineStringGeometry | null,
+  index: number,
+  kind: 'origin' | 'destination',
+  label: string,
+): RouteMapPoint | null {
+  if (!geometry) {
+    return null
+  }
+  const coordinate = index < 0
+    ? geometry.coordinates[geometry.coordinates.length + index]
+    : geometry.coordinates[index]
+  if (!coordinate) {
+    return null
+  }
+  return { id: kind, label, lon: coordinate[0], lat: coordinate[1], kind }
+}
+
+function compactMapPoints(points: Array<RouteMapPoint | null>): RouteMapPoint[] {
+  return points.filter((point): point is RouteMapPoint => point !== null)
+}
+
+function uniqueMapPoints(points: RouteMapPoint[]) {
+  const seen = new Set<string>()
+  return points.filter((point) => {
+    const key = `${stationKey(point.label)}:${point.lat.toFixed(5)}:${point.lon.toFixed(5)}`
+    if (seen.has(key)) {
+      return false
+    }
+    seen.add(key)
+    return true
+  })
+}
+
+function geometryPrecision(value: unknown): RouteMapData['geometryPrecision'] {
+  return value === 'provider' || value === 'unknown' || value === 'schematic' ? value : 'unknown'
+}
+
+function mapStyleUrl() {
+  return text(import.meta.env.VITE_KALMIO_MAP_STYLE_URL, '').trim()
+}
+
+function mapLibreStyle(): string | StyleSpecification {
+  const styleUrl = mapStyleUrl()
+  if (styleUrl) {
+    return styleUrl
+  }
+  return {
+    version: 8,
+    sources: {},
+    layers: [
+      {
+        id: 'background',
+        type: 'background',
+        paint: { 'background-color': '#eef4f1' },
+      },
+    ],
+  }
+}
+
+function routeCenter(data: RouteMapData): CoordinateTuple {
+  const coordinates = allRouteCoordinates(data)
+  if (coordinates.length === 0) {
+    return [-3.7, 40.4]
+  }
+  const totals = coordinates.reduce(
+    (sum, coordinate) => ({ lon: sum.lon + coordinate[0], lat: sum.lat + coordinate[1] }),
+    { lon: 0, lat: 0 },
+  )
+  return [totals.lon / coordinates.length, totals.lat / coordinates.length]
+}
+
+function routeBounds(data: RouteMapData): [CoordinateTuple, CoordinateTuple] | null {
+  const coordinates = allRouteCoordinates(data)
+  if (coordinates.length === 0) {
+    return null
+  }
+  const bounds = coordinates.reduce(
+    (current, coordinate) => ({
+      minLon: Math.min(current.minLon, coordinate[0]),
+      minLat: Math.min(current.minLat, coordinate[1]),
+      maxLon: Math.max(current.maxLon, coordinate[0]),
+      maxLat: Math.max(current.maxLat, coordinate[1]),
+    }),
+    { minLon: coordinates[0][0], minLat: coordinates[0][1], maxLon: coordinates[0][0], maxLat: coordinates[0][1] },
+  )
+  return [[bounds.minLon, bounds.minLat], [bounds.maxLon, bounds.maxLat]]
+}
+
+function allRouteCoordinates(data: RouteMapData): CoordinateTuple[] {
+  return [
+    ...(data.routeGeometry?.coordinates ?? []),
+    ...data.points.map((point): CoordinateTuple => [point.lon, point.lat]),
+  ]
+}
+
+function canUseWebGl() {
+  if (typeof document === 'undefined') {
+    return false
+  }
+  try {
+    const canvas = document.createElement('canvas')
+    return Boolean(canvas.getContext('webgl') || canvas.getContext('experimental-webgl'))
+  } catch {
+    return false
+  }
+}
+
+function mapMarkerElement(point: RouteMapPoint) {
+  const element = document.createElement('div')
+  element.className = `a2ui-map-marker a2ui-map-marker-${point.kind}`
+  element.title = point.label
+  const dot = document.createElement('span')
+  dot.className = 'a2ui-map-marker-dot'
+  const label = document.createElement('span')
+  label.className = 'a2ui-map-marker-label'
+  label.textContent = point.label
+  element.append(dot, label)
+  return element
+}
+
+function schematicGeometry(data: RouteMapData): LineStringGeometry {
+  const coordinates = data.points.map((point): CoordinateTuple => [point.lon, point.lat])
+  if (coordinates.length >= 2) {
+    return { type: 'LineString', coordinates }
+  }
+  return { type: 'LineString', coordinates: [[-4.8, 37.9], [-0.4, 39.5]] }
+}
+
+function projectedRoute(geometry: LineStringGeometry, points: RouteMapPoint[]) {
+  const width = 640
+  const height = 280
+  const padding = 38
+  const coordinates = [...geometry.coordinates, ...points.map((point): CoordinateTuple => [point.lon, point.lat])]
+  const lons = coordinates.map((coordinate) => coordinate[0])
+  const lats = coordinates.map((coordinate) => coordinate[1])
+  const minLon = Math.min(...lons)
+  const maxLon = Math.max(...lons)
+  const minLat = Math.min(...lats)
+  const maxLat = Math.max(...lats)
+  const lonRange = Math.max(maxLon - minLon, 0.001)
+  const latRange = Math.max(maxLat - minLat, 0.001)
+  const project = ([lon, lat]: CoordinateTuple) => ({
+    x: padding + ((lon - minLon) / lonRange) * (width - padding * 2),
+    y: height - padding - ((lat - minLat) / latRange) * (height - padding * 2),
+  })
+  const routePoints = geometry.coordinates.map(project)
+  return {
+    path: routePoints.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' '),
+    points: points.map((point) => ({ ...point, ...project([point.lon, point.lat]) })),
+  }
+}
+
+function stationKey(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')
 }
 
 function ActionButtons({

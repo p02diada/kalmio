@@ -5,7 +5,7 @@ from typing import Any
 
 from charging.selectors import get_nearby_stations
 from routing.production_planner import PlanningDataError, plan_route_with_persisted_stations
-from routing.providers import Coordinate, RoutingProviderError, get_route_provider
+from routing.providers import Coordinate, ProviderRoute, RoutingProviderError, get_route_provider
 from routing.scoring import Preferences, VehicleContext
 
 
@@ -157,9 +157,18 @@ def plan_route_tool(args: dict[str, Any]) -> dict[str, Any]:
         "durationMin": plan.route.duration_min,
         "energyKwh": round(plan.energy_kwh, 1) if plan.energy_kwh is not None else None,
         "arrivalBattery": round(plan.arrival_battery_percent, 1) if plan.arrival_battery_percent is not None else None,
+        "routeGeometry": route_geometry_payload(plan.route),
+        "corridorRadiusKm": corridor_radius_km,
         "recommendation": recommendation,
         "alternatives": [station_score_payload(item) for item in plan.alternatives],
         "warnings": plan.warnings,
+    }
+
+
+def route_geometry_payload(route: ProviderRoute) -> dict[str, Any]:
+    return {
+        "type": "LineString",
+        "coordinates": [[point.lon, point.lat] for point in route.geometry],
     }
 
 

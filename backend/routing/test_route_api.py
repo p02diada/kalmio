@@ -4630,6 +4630,77 @@ def test_plan_route_tool_treats_partial_vehicle_profile_as_chargers_only(monkeyp
     assert result["energyKwh"] is None
     assert result["arrivalBattery"] is None
     assert result["recommendation"]["stationName"] == real_station.name
+    assert result["routeGeometry"] == {
+        "type": "LineString",
+        "coordinates": [
+            [-3.7038, 40.4168],
+            [-2.4, 38.35],
+            [-1.1, 38.85],
+            [-0.3763, 39.4699],
+        ],
+    }
+    assert result["corridorRadiusKm"] == 25
+
+
+def test_a2ui_contract_rejects_map_preview_with_untraced_route_geometry():
+    tool_history = [
+        {
+            "call": {"tool": "plan_route", "args": {}},
+            "result": {
+                "ok": True,
+                "tool": "plan_route",
+                "origin": {"label": "Madrid", "lat": 40.4168, "lon": -3.7038},
+                "destination": {"label": "Valencia", "lat": 39.4699, "lon": -0.3763},
+                "distanceKm": 520,
+                "durationMin": 355,
+                "energyKwh": None,
+                "arrivalBattery": None,
+                "routeGeometry": {
+                    "type": "LineString",
+                    "coordinates": [[-3.7038, 40.4168], [-0.3763, 39.4699]],
+                },
+                "recommendation": {
+                    "name": "Almansa HPC",
+                    "stationName": "Almansa HPC",
+                    "powerKw": 180,
+                    "distanceKm": 1.2,
+                    "detourMin": 8,
+                    "lat": 38.869,
+                    "lon": -1.0971,
+                },
+                "alternatives": [],
+            },
+        }
+    ]
+    blocks = [
+        {
+            "id": "map",
+            "type": "MapPreviewCard",
+            "version": 1,
+            "props": {
+                "origin": {"label": "Madrid", "lat": 40.4168, "lon": -3.7038},
+                "destination": {"label": "Valencia", "lat": 39.4699, "lon": -0.3763},
+                "primaryStation": {
+                    "name": "Almansa HPC",
+                    "stationName": "Almansa HPC",
+                    "powerKw": 180,
+                    "distanceKm": 1.2,
+                    "detourMin": 8,
+                    "lat": 38.869,
+                    "lon": -1.0971,
+                },
+                "routeGeometry": {
+                    "type": "LineString",
+                    "coordinates": [[-3.7038, 40.4168], [-2.2, 41.1], [-0.3763, 39.4699]],
+                },
+                "geometryPrecision": "provider",
+            },
+        }
+    ]
+
+    issues = a2ui_contract_issues(blocks, tool_history)
+
+    assert any("MapPreviewCard.routeGeometry no coincide con plan_route" in issue for issue in issues)
 
 
 @pytest.mark.django_db
