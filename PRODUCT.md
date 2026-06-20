@@ -29,6 +29,10 @@ Claim: "Viaja sin ansiedad de carga."
 
 Calm, precise, conservative, and practical. Kalmio should feel like a trusted co-driver, not a flashy AI demo.
 
+## Visual Direction
+
+Kalmio uses the Agentic Signal visual direction: the assistant should be visibly intelligent without becoming a generic AI demo. The product should feel calm, mobile-first, premium, and trustworthy. Agent color is reserved for active assistant participation, clarification, and reasoning states; route, charging, warning, and error colors carry factual EV planning meaning.
+
 ## Strategic Principles
 
 - Chat first, map second. The map is contextual, never the home screen.
