@@ -25,7 +25,7 @@ const scenarios: ExperienceScenario[] = [
       block('urgent-user', 'UserMessage', {
         text: 'Estoy en Zaragoza con 9%, no conozco la zona y necesito cargar ya.',
       }),
-      block('urgent-location-request', 'LocationRequestCard', {
+      block('urgent-position-request', 'PositionRequestCard', {
         reason: 'urgent_charge',
         title: 'Necesito tu ubicacion',
         body: 'Comparte una ubicacion aproximada o escribe ciudad y carretera para buscar cargadores cercanos.',
@@ -306,8 +306,8 @@ export function A2UIShowcasePage() {
               blocks={scenario.blocks}
               onChipClick={(value) => setLastAction(`chip:${value}`)}
               onActionEvent={(name) => setLastAction(`event:${name}`)}
-              onLocationSubmit={(value) => setLastAction(`location:${value}`)}
-              onManualLocationRequest={() => setLastAction('manual-location')}
+              onPositionSubmit={(value) => setLastAction(`position:${value}`)}
+              onManualPositionRequest={() => setLastAction('manual-position')}
             />
           </article>
         ))}

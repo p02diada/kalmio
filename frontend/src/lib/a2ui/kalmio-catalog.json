@@ -140,7 +140,7 @@
       "required": ["question"],
       "additionalProperties": false
     },
-    "LocationRequestCard": {
+    "PositionRequestCard": {
       "type": "object",
       "properties": {
         "reason": { "enum": ["urgent_charge", "nearby_chargers", "route_origin"] },

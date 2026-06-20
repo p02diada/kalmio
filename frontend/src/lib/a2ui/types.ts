@@ -14,7 +14,7 @@ export type KalmioA2UIType =
   | 'MapPreviewCard'
   | 'ActionButtons'
   | 'ClarifyingQuestionCard'
-  | 'LocationRequestCard'
+  | 'PositionRequestCard'
   | 'PlaceDetailCard'
   | 'PreferenceChips'
   | 'ErrorFallbackCard'

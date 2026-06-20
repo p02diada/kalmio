@@ -514,14 +514,14 @@ describe('A2UIRenderer', () => {
       configurable: true,
       value: { getCurrentPosition },
     })
-    const onLocationSubmit = vi.fn()
+    const onPositionSubmit = vi.fn()
 
     render(
       <A2UIRenderer
         blocks={[
           {
             id: 'place',
-            type: 'LocationRequestCard',
+            type: 'PositionRequestCard',
             version: 1,
             props: {
               title: 'Necesito tu ubicación',
@@ -530,7 +530,7 @@ describe('A2UIRenderer', () => {
             },
           },
         ]}
-        onLocationSubmit={onLocationSubmit}
+        onPositionSubmit={onPositionSubmit}
       />,
     )
 
@@ -541,6 +541,6 @@ describe('A2UIRenderer', () => {
       expect.any(Function),
       expect.objectContaining({ maximumAge: 60000, timeout: 10000 }),
     )
-    expect(onLocationSubmit).toHaveBeenCalledWith('Estoy en 37.880000, -4.780000')
+    expect(onPositionSubmit).toHaveBeenCalledWith('Estoy en 37.880000, -4.780000')
   })
 })

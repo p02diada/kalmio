@@ -22,20 +22,20 @@ type RecordList = Array<Record<string, unknown>>
 type A2UIRendererActions = {
   onChipClick?: (value: string) => void
   onActionEvent?: (name: string, context?: Record<string, unknown>, sourceComponentId?: string) => void
-  onLocationSubmit?: (value: string) => void
-  onManualLocationRequest?: () => void
+  onPositionSubmit?: (value: string) => void
+  onManualPositionRequest?: () => void
 }
 
 export function A2UIRenderer({
   blocks,
   onChipClick,
   onActionEvent,
-  onLocationSubmit,
-  onManualLocationRequest,
+  onPositionSubmit,
+  onManualPositionRequest,
 }: {
   blocks: A2UIBlock[]
 } & A2UIRendererActions) {
-  const actions = { onChipClick, onActionEvent, onLocationSubmit, onManualLocationRequest }
+  const actions = { onChipClick, onActionEvent, onPositionSubmit, onManualPositionRequest }
 
   return (
     <div className="flex min-w-0 max-w-full flex-col gap-3">
@@ -134,12 +134,12 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
           </CardContent>
         </Card>
       )
-    case 'LocationRequestCard':
+    case 'PositionRequestCard':
       return (
-        <LocationRequestCard
+        <PositionRequestCard
           block={block}
-          onLocationSubmit={actions.onLocationSubmit ?? actions.onChipClick}
-          onManualLocationRequest={actions.onManualLocationRequest}
+          onPositionSubmit={actions.onPositionSubmit ?? actions.onChipClick}
+          onManualPositionRequest={actions.onManualPositionRequest}
         />
       )
     case 'PlaceDetailCard':
@@ -168,14 +168,14 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
   }
 }
 
-function LocationRequestCard({
+function PositionRequestCard({
   block,
-  onLocationSubmit,
-  onManualLocationRequest,
+  onPositionSubmit,
+  onManualPositionRequest,
 }: {
   block: A2UIBlock
-  onLocationSubmit?: (value: string) => void
-  onManualLocationRequest?: () => void
+  onPositionSubmit?: (value: string) => void
+  onManualPositionRequest?: () => void
 }) {
   const [status, setStatus] = useState<'idle' | 'pending' | 'unsupported' | 'failed' | 'manual'>('idle')
   const manualFields = strings(block.props.manualFields)
@@ -190,7 +190,7 @@ function LocationRequestCard({
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setStatus('idle')
-        onLocationSubmit?.(
+        onPositionSubmit?.(
           `Estoy en ${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}`,
         )
       },
@@ -243,7 +243,7 @@ function LocationRequestCard({
             className="h-auto min-h-11 w-full whitespace-normal leading-5"
             onClick={() => {
               setStatus('manual')
-              onManualLocationRequest?.()
+              onManualPositionRequest?.()
             }}
           >
             Escribir ubicación

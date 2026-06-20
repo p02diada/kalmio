@@ -2376,7 +2376,7 @@ def test_conversation_message_preserves_urgent_charge_intent_for_location_follow
     )
 
     assert first_response.status_code == 200
-    assert blocks_from_a2ui_response(first_response)[-1]["type"] == "LocationRequestCard"
+    assert blocks_from_a2ui_response(first_response)[-1]["type"] == "PositionRequestCard"
 
     second_response = client.post(
         "/api/conversation/message",
@@ -2396,7 +2396,7 @@ def test_conversation_message_preserves_urgent_charge_intent_for_location_follow
     assert "StationDetailCard" in new_block_types
     assert "StationList" in new_block_types
     assert "ClarifyingQuestionCard" not in new_block_types
-    assert "LocationRequestCard" not in new_block_types
+    assert "PositionRequestCard" not in new_block_types
     urgent_block = next(block for block in new_blocks if block["type"] == "StationDetailCard")
     assert urgent_block["props"]["name"] == station.name
     assert urgent_block["props"]["stationName"] == station.name
@@ -2580,7 +2580,7 @@ def test_codex_conversation_agent_interprets_vehicle_followup_from_available_tra
         {"id": "user-urgent", "type": "UserMessage", "version": 1, "props": {"text": "Necesito cargar ya"}},
         {
             "id": "location-request",
-            "type": "LocationRequestCard",
+            "type": "PositionRequestCard",
             "version": 1,
             "props": {
                 "reason": "urgent_charge",
@@ -2668,7 +2668,7 @@ def test_codex_conversation_agent_does_not_repair_component_choice_from_urgent_h
         {"id": "user-urgent", "type": "UserMessage", "version": 1, "props": {"text": "Necesito cargar ya"}},
         {
             "id": "location-request",
-            "type": "LocationRequestCard",
+            "type": "PositionRequestCard",
             "version": 1,
             "props": {
                 "reason": "urgent_charge",
@@ -4511,7 +4511,7 @@ def test_local_conversation_agent_failure_uses_dev_fallback_without_technical_de
     assert "JSON" not in rendered_text
     block_types = [block["type"] for block in blocks]
     assert "UserMessage" in block_types
-    assert "LocationRequestCard" in block_types
+    assert "PositionRequestCard" in block_types
     assert "RiskExplanationCard" not in block_types
 
 
@@ -4539,7 +4539,7 @@ def test_codex_conversation_agent_failure_uses_minimal_safe_fallback(client, set
     assert "UserMessage" in block_types
     assert "AssistantMessage" in block_types
     assert "ClarifyingQuestionCard" in block_types
-    assert "LocationRequestCard" not in block_types
+    assert "PositionRequestCard" not in block_types
     assert "StationDetailCard" not in block_types
 
 

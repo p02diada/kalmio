@@ -44,7 +44,7 @@ A2UI_COMPONENT_TYPES = {
     "MapPreviewCard",
     "ActionButtons",
     "ClarifyingQuestionCard",
-    "LocationRequestCard",
+    "PositionRequestCard",
     "PlaceDetailCard",
     "PreferenceChips",
     "ErrorFallbackCard",
@@ -131,7 +131,7 @@ def run_local_agent(message: str, history_blocks: list[dict] | None = None) -> l
         location = intent.origin or intent.destination_search or intent.destination
         if not location:
             blocks.append(
-                location_request_block(
+                position_request_block(
                     reason="urgent_charge",
                     title="Necesito tu ubicación",
                     body=(
@@ -941,7 +941,7 @@ def codex_prompt(
         "Recuerda que la disponibilidad en vivo puede cambiar.\n"
         "- En carretera y poco desvío: pide carretera, zona actual/coordenadas y destino si faltan; no lo reduzcas a búsqueda urbana arbitraria. "
         "Cuando no haya ubicación suficiente, prefiere ClarifyingQuestionCard con una pregunta breve sobre carretera/zona actual/destino y campos carretera_o_zona_actual, destino y coordenadas. "
-        "Usa LocationRequestCard solo si basta con ubicación actual; no muestres campos genéricos de ciudad si el usuario ya dijo que está en carretera y quiere poco desvío.\n"
+        "Usa PositionRequestCard solo si basta con posición actual/manual del conductor; no muestres campos genéricos de ciudad si el usuario ya dijo que está en carretera y quiere poco desvío.\n"
         "- Si el coche carga máximo a X kW, pasa X como preferences.max_useful_power_kw; si recomiendas un cargador de más potencia, di antes de la primera parada que el coche no aprovechará más de 100 kW cuando X=100 y no presentes la potencia superior como ventaja. No digas que has filtrado o excluido paradas por potencia si todavía muestras una estación por encima de ese máximo útil; di que esa potencia superior no se premia ni cambia lo que el coche puede aprovechar.\n"
         "- Restricción dura de llegada: sin perfil de vehículo no la presentes como cumplida; pide modelo/consumo/autonomía. Si la herramienta devuelve arrivalBattery:null o energyKwh:null, no los sustituyas por estimaciones ni por frases de certeza. Si el usuario pide llegar con al menos X%, pasa X como reserve_min_percent y di antes de cualquier StationDetailCard/StationList que ese X% no se puede validar en chargers_only sin consumo/perfil.\n"
         "- Preferencias de precio, hubs grandes o tamaño de parada: trátalas como preferencia de decisión sobre paradas, no como comparación de hardware. Si falta ruta o ubicación, no llames herramientas con ubicaciones vacías; pide origen/destino o ubicación actual. Usa pricePerKwhEur/currency solo cuando venga trazado de herramienta y priceIsEstimated no sea true. Puedes usar CostComparisonCard para comparar tarifas por kWh entre estaciones trazadas; no calcules coste total de una sesión si no hay energía/cantidad de carga trazada. Si no hay tarifas de proveedor o solo hay tarifas estimadas, dilo sin mostrar precio. Si los datos pueden estar desactualizados, usa RiskExplanationCard; no lo conviertas en una tarifa estimada visible. No conviertas una preferencia de precio en una ruta arriesgada.\n"
@@ -982,7 +982,7 @@ def codex_prompt(
         "MapPreviewCard sin inventar geometría; "
         "ActionButtons usa event para backend/agente, functionCall.openUrl para abrir mapas, o disabled con reason; "
         "ClarifyingQuestionCard faltan datos críticos; "
-        "LocationRequestCard pide ubicación; PlaceDetailCard coordenadas de usuario/herramienta; PreferenceChips preferencias; ErrorFallbackCard reservado.\n"
+        "PositionRequestCard pide posición actual/manual del conductor; PlaceDetailCard muestra lugares o zonas resueltas; PreferenceChips preferencias; ErrorFallbackCard reservado.\n"
         "tool_call no es un componente A2UI y nunca debe aparecer dentro de blocks; si necesitas una herramienta, devuelve type=tool_call como objeto raíz.\n"
     )
     output_instructions = (
@@ -3292,7 +3292,7 @@ def summarize_block_for_context(block_type: str, props: dict) -> str:
     if block_type == "AssistantMessage":
         text = str(props.get("text") or "").strip()
         return f"Asistente: {text}" if text else ""
-    if block_type == "LocationRequestCard":
+    if block_type == "PositionRequestCard":
         title = str(props.get("title") or "Necesito ubicación").strip()
         body = str(props.get("body") or "").strip()
         return f"Asistente pidió ubicación: {title}. {body}".strip()
@@ -3404,7 +3404,7 @@ def urgent_charge_blocks(intent: ParsedIntent, location: ParsedLocation) -> list
                     ),
                 },
             ),
-            location_request_block(
+            position_request_block(
                 reason="urgent_charge",
                 title="Prueba con otra ubicación cercana",
                 body=(
@@ -3788,10 +3788,10 @@ def clarifying_block(question: str, fields: list[str]) -> dict:
     return block(f"clarify-{uuid4().hex[:10]}", "ClarifyingQuestionCard", {"question": question, "fields": fields})
 
 
-def location_request_block(reason: str, title: str, body: str) -> dict:
+def position_request_block(reason: str, title: str, body: str) -> dict:
     return block(
-        f"location-{uuid4().hex[:10]}",
-        "LocationRequestCard",
+        f"position-{uuid4().hex[:10]}",
+        "PositionRequestCard",
         {
             "reason": reason,
             "title": title,
@@ -3986,7 +3986,7 @@ def normalize_block_props(block_type: str, props: dict) -> dict:
         if not text_value:
             text_value = props.get("title") or "Hay incertidumbre que debes confirmar antes de depender de este resultado."
         return {"level": str(props.get("level") or "medio"), "text": str(text_value)}
-    if block_type == "LocationRequestCard":
+    if block_type == "PositionRequestCard":
         reason = props.get("reason")
         if reason not in {"urgent_charge", "nearby_chargers", "route_origin"}:
             reason = "nearby_chargers"
