@@ -7,6 +7,7 @@ export type KalmioA2UIType =
   | 'UserMessage'
   | 'TripSummaryCard'
   | 'RouteSummaryCard'
+  | 'StationPreviewCard'
   | 'StationDetailCard'
   | 'StationList'
   | 'RiskExplanationCard'

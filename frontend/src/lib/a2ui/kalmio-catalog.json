@@ -51,6 +51,12 @@
         }
       ]
     },
+    "StationPreviewCard": {
+      "allOf": [
+        { "$ref": "#/$defs/stationProps" },
+        { "$ref": "#/$defs/decisionProps" }
+      ]
+    },
     "StationDetailCard": {
       "allOf": [
         { "$ref": "#/$defs/stationProps" },
