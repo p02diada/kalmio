@@ -181,7 +181,7 @@ describe('App', () => {
       }
       if (url.includes('/api/conversation/message')) {
         return Promise.resolve(
-          new Response(JSON.stringify({ detail: 'Codex local no devolvió JSON válido.' }), {
+          new Response(JSON.stringify({ detail: 'El agente no devolvió JSON válido.' }), {
             status: 502,
             headers: { 'Content-Type': 'application/json' },
           }),
@@ -199,7 +199,7 @@ describe('App', () => {
 
     expect(await screen.findByText(/No he podido completar la comprobación/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument()
-    expect(screen.queryByText(/Codex local/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/DeepSeek/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/JSON válido/i)).not.toBeInTheDocument()
   })
 

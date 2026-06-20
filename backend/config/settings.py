@@ -237,22 +237,8 @@ if KALMIO_ROUTE_CONVERSATION_THROTTLE_WINDOW_SECONDS <= 0:
     )
 
 KALMIO_CONVERSATION_AGENT_MODE = os.getenv("KALMIO_CONVERSATION_AGENT_MODE", "local").strip().lower()
-if KALMIO_CONVERSATION_AGENT_MODE not in {"local", "codex", "deepseek"}:
-    raise ImproperlyConfigured("KALMIO_CONVERSATION_AGENT_MODE must be local, codex, or deepseek.")
-KALMIO_CODEX_COMMAND = os.getenv("KALMIO_CODEX_COMMAND", "codex").strip() or "codex"
-KALMIO_CODEX_MODEL = os.getenv("KALMIO_CODEX_MODEL", "gpt-5.4-mini").strip() or "gpt-5.4-mini"
-try:
-    KALMIO_CODEX_TIMEOUT_SECONDS = float(os.getenv("KALMIO_CODEX_TIMEOUT_SECONDS", "60"))
-except ValueError as exc:
-    raise ImproperlyConfigured("KALMIO_CODEX_TIMEOUT_SECONDS must be a number.") from exc
-if KALMIO_CODEX_TIMEOUT_SECONDS <= 0:
-    raise ImproperlyConfigured("KALMIO_CODEX_TIMEOUT_SECONDS must be greater than zero.")
-try:
-    KALMIO_CODEX_MAX_TOOL_CALLS = int(os.getenv("KALMIO_CODEX_MAX_TOOL_CALLS", "3"))
-except ValueError as exc:
-    raise ImproperlyConfigured("KALMIO_CODEX_MAX_TOOL_CALLS must be an integer.") from exc
-if KALMIO_CODEX_MAX_TOOL_CALLS < 0 or KALMIO_CODEX_MAX_TOOL_CALLS > 8:
-    raise ImproperlyConfigured("KALMIO_CODEX_MAX_TOOL_CALLS must be between 0 and 8.")
+if KALMIO_CONVERSATION_AGENT_MODE not in {"local", "deepseek"}:
+    raise ImproperlyConfigured("KALMIO_CONVERSATION_AGENT_MODE must be local or deepseek.")
 
 KALMIO_DEEPSEEK_API_KEY = (
     os.getenv("KALMIO_DEEPSEEK_API_KEY") or os.getenv("DEEPSEEK_API_KEY") or ""

@@ -1911,7 +1911,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function safeFallbackMessage(message: string) {
   const normalized = message.toLowerCase()
-  if (normalized.includes('a2ui') || normalized.includes('codex') || normalized.includes('json')) {
+  if (normalized.includes('a2ui') || normalized.includes('deepseek') || normalized.includes('json')) {
     return 'He ocultado una parte que no venía en un formato seguro. Puedes continuar corrigiendo la petición o reintentarla.'
   }
   return message || 'He ocultado una parte que no venía en un formato seguro.'

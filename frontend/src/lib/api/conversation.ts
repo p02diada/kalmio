@@ -116,7 +116,7 @@ function conversationErrorMessage(body: unknown, status: number, action: 'load' 
 function hasTechnicalDetail(value: string) {
   const normalized = value.toLowerCase()
   return (
-    normalized.includes('codex')
+    normalized.includes('deepseek')
     || normalized.includes('json')
     || normalized.includes('backend')
     || normalized.includes('a2ui')

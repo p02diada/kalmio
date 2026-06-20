@@ -24,9 +24,64 @@ class CaseSpec:
 
 
 CASE_SPECS: dict[int, CaseSpec] = {
+    1: CaseSpec(
+        turns=["Necesito cargar ya, estoy al 12%", "En Cordoba"],
+        any_components=({"StationPreviewCard", "StationList"},),
+        expected_tools={"search_destination_chargers"},
+        expected_text_any=("12", "confirma", "acceso", "tarifa", "disponibilidad"),
+    ),
+    2: CaseSpec(
+        turns=["Estoy al 8% y no conozco la zona", "Estoy en Cordoba"],
+        any_components=({"StationPreviewCard", "StationList"},),
+        expected_tools={"search_destination_chargers"},
+        expected_text_any=("8", "margen", "riesgo", "confirma"),
+    ),
+    3: CaseSpec(
+        turns=["Necesito cargar ya. Estoy en Cordoba", "El cargador al que iba esta ocupado, dame un plan B"],
+        any_components=({"StationPreviewCard", "StationList", "RiskExplanationCard"},),
+        expected_text_any=("ocup", "alternativa", "plan b", "disponibilidad"),
+    ),
+    4: CaseSpec(
+        turns=["Estoy en carretera con 18%, no quiero desviarme mucho"],
+        any_components=({"ClarifyingQuestionCard", "PositionRequestCard", "AssistantMessage"},),
+        forbidden_tools={"plan_route", "search_destination_chargers"},
+        expected_text_any=("carretera", "zona", "destino", "coordenadas"),
+    ),
+    5: CaseSpec(
+        turns=["Tengo poca bateria y voy con ninos", "Estoy en Cordoba"],
+        any_components=({"StationPreviewCard", "StationList"},),
+        expected_tools={"search_destination_chargers"},
+        expected_text_any=("bateria", "ninos", "servicios", "confirma"),
+    ),
+    6: CaseSpec(
+        turns=["Voy de Cordoba a Valencia con 58%. No quiero llegar justo"],
+        expected_components={"RouteSummaryCard"},
+        any_components=({"StationPreviewCard", "StationList"},),
+        expected_tools={"plan_route"},
+        expected_text_any=("no puedo validar", "consumo", "perfil", "58"),
+    ),
+    7: CaseSpec(
+        turns=["Voy de Madrid a Malaga manana y salgo con 80%"],
+        expected_components={"RouteSummaryCard"},
+        any_components=({"StationPreviewCard", "StationList"},),
+        expected_tools={"plan_route"},
+        expected_text_any=("disponibilidad", "acceso", "tarifas", "cambiar"),
+    ),
+    8: CaseSpec(
+        turns=["Voy de Sevilla a Granada, me da para llegar sin cargar?"],
+        any_components=({"RouteSummaryCard", "ClarifyingQuestionCard", "AssistantMessage"},),
+        expected_tools={"plan_route"},
+        expected_text_any=("no puedo", "bateria", "modelo", "consumo"),
+    ),
+    9: CaseSpec(
+        turns=["Tengo que ir de Alicante a Bilbao y prefiero parar pocas veces"],
+        expected_components={"RouteSummaryCard"},
+        expected_tools={"plan_route"},
+        expected_text_any=("no puedo", "pocas paradas", "autonomia", "consumo"),
+    ),
     10: CaseSpec(
         turns=["Voy de Zaragoza a Barcelona y quiero llegar con al menos 25%"],
-        any_components=({"StationList", "StationDetailCard"},),
+        any_components=({"StationList", "StationPreviewCard"},),
         expected_tools={"plan_route"},
     ),
     11: CaseSpec(
@@ -66,19 +121,19 @@ CASE_SPECS: dict[int, CaseSpec] = {
     17: CaseSpec(
         turns=["Voy el finde a Granada y duermo cerca de la Alhambra"],
         expected_components={"PlaceDetailCard"},
-        any_components=({"StationList", "StationDetailCard"},),
+        any_components=({"StationList", "StationPreviewCard"},),
         expected_tools={"search_destination_chargers"},
     ),
     18: CaseSpec(
         turns=["Voy a un hotel sin cargador, necesito cargar durante la estancia", "En Valencia centro"],
         expected_components={"PlaceDetailCard"},
-        any_components=({"StationList", "StationDetailCard"},),
+        any_components=({"StationList", "StationPreviewCard"},),
         expected_tools={"search_destination_chargers"},
     ),
     19: CaseSpec(
         turns=["Voy una semana a Cadiz y necesito cargar durante la estancia"],
         expected_components={"PlaceDetailCard"},
-        any_components=({"StationList", "StationDetailCard"},),
+        any_components=({"StationList", "StationPreviewCard"},),
         expected_tools={"search_destination_chargers"},
     ),
     20: CaseSpec(
@@ -86,6 +141,66 @@ CASE_SPECS: dict[int, CaseSpec] = {
         expected_components={"ClarifyingQuestionCard"},
         forbidden_tools={"plan_route", "search_destination_chargers"},
         expected_text_any=("origen", "desde donde", "sales", "salida"),
+    ),
+    21: CaseSpec(
+        turns=["Voy con ninos y quiero parar a comer mientras carga. Voy de Madrid a Valencia con 60%"],
+        any_components=({"StationPreviewCard", "StationList"},),
+        expected_tools={"plan_route"},
+        expected_text_any=("servicios", "indicad", "ninos", "confirma"),
+    ),
+    22: CaseSpec(
+        turns=["Busca una parada con banos y cafeteria", "Estoy cerca de Almansa"],
+        any_components=({"StationPreviewCard", "StationList"},),
+        expected_tools={"search_destination_chargers"},
+        expected_text_any=("banos", "cafeteria", "no estan verificados", "confirma"),
+    ),
+    23: CaseSpec(
+        turns=["No quiero cargar en sitios solitarios de noche", "Estoy en Valencia centro"],
+        any_components=({"StationPreviewCard", "StationList"},),
+        expected_tools={"search_destination_chargers"},
+        expected_text_any=("no valida seguridad", "noche", "verificar", "entorno"),
+    ),
+    24: CaseSpec(
+        turns=["Prefiero desviarme 10 minutos si el sitio es mas comodo. Voy de Madrid a Valencia con 60%"],
+        any_components=({"StationPreviewCard", "StationList"},),
+        expected_tools={"plan_route"},
+        expected_text_any=("desvio", "servicios", "indicad"),
+    ),
+    25: CaseSpec(
+        turns=["Quiero parar donde haya restaurante y cargadores rapidos. Voy de Madrid a Valencia con 60%"],
+        any_components=({"StationPreviewCard", "StationList"},),
+        expected_tools={"plan_route"},
+        expected_text_any=("restaurante", "servicios", "indicad", "rapida"),
+    ),
+    26: CaseSpec(
+        turns=["Mi coche carga maximo a 100 kW, no necesito ultrarrapidos. Voy de Madrid a Valencia con 60%"],
+        any_components=({"StationPreviewCard", "StationList"},),
+        expected_tools={"plan_route"},
+        expected_text_any=("100 kw", "no aprovechara", "potencia superior", "no se premia"),
+    ),
+    27: CaseSpec(
+        turns=["Evita cargadores con un solo conector. Estoy en Cordoba y necesito cargar"],
+        any_components=({"StationPreviewCard", "StationList"},),
+        expected_tools={"search_destination_chargers"},
+        expected_text_any=("puestos", "conectores", "confirma"),
+    ),
+    28: CaseSpec(
+        turns=["No quiero bajar nunca del 30%. Madrid a Valencia con 70%"],
+        expected_components={"RouteSummaryCard"},
+        expected_tools={"plan_route"},
+        expected_text_any=("30", "no puedo validar", "consumo", "perfil"),
+    ),
+    29: CaseSpec(
+        turns=["Prefiero hubs grandes aunque sean un poco mas caros. Voy de Madrid a Valencia"],
+        any_components=({"StationPreviewCard", "StationList"},),
+        expected_tools={"plan_route"},
+        expected_text_any=("hub", "tarifas", "no puedo", "coste"),
+    ),
+    30: CaseSpec(
+        turns=["Tengo un Tesla Model Y y salgo con 45%. Madrid a Valencia"],
+        any_components=({"StationPreviewCard", "StationList"},),
+        expected_tools={"plan_route"},
+        expected_text_any=("tesla", "45", "no puedo validar", "consumo"),
     ),
 }
 

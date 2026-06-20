@@ -15,9 +15,9 @@ from routing.agent import (
     AgentResponseError,
     a2ui_contract_issues,
     blocks_from_tool_result,
-    codex_prompt,
+    conversation_agent_prompt,
     contextualized_prompt,
-    decode_codex_json,
+    decode_agent_json,
     parse_openai_compatible_decision,
     run_deepseek_decision,
     station_search_result_prompt,
@@ -203,9 +203,9 @@ def test_conversation_messages_initializes_a2ui_blocks(client):
 
 @pytest.mark.django_db
 def test_conversation_message_accepts_a2ui_action_transport_without_visible_action_echo(client, settings, monkeypatch):
-    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
 
-    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+    def fake_deepseek_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
         assert 'Acción A2UI: refine_search con contexto {"radiusKm": 80}' in message
         return {
             "type": "final",
@@ -219,7 +219,7 @@ def test_conversation_message_accepts_a2ui_action_transport_without_visible_acti
             ],
         }
 
-    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+    monkeypatch.setattr("routing.agent.run_deepseek_decision", fake_deepseek_decision)
 
     response = client.post(
         "/api/conversation/message",
@@ -309,7 +309,7 @@ def test_urgent_charge_card_normalizes_nested_recommended_stop():
     }
 
 
-def test_urgent_charge_card_normalizes_name_variant_from_codex():
+def test_urgent_charge_card_normalizes_name_variant_from_agent():
     blocks = validate_blocks(
         [
             {
@@ -329,7 +329,7 @@ def test_urgent_charge_card_normalizes_name_variant_from_codex():
     assert blocks[0]["props"]["distanceKm"] == 0.3
 
 
-def test_urgent_charge_card_normalizes_station_name_variant_from_codex():
+def test_urgent_charge_card_normalizes_station_name_variant_from_agent():
     blocks = validate_blocks(
         [
             {
@@ -622,7 +622,7 @@ def test_urgent_tool_fallback_renders_station_without_repeating_user_battery():
         message="Necesito cargar ya. Estoy en Córdoba con un 18%",
     )
 
-    urgent_block = next(block for block in blocks if block["type"] == "StationDetailCard")
+    urgent_block = next(block for block in blocks if block["type"] == "StationPreviewCard")
     assert urgent_block["props"]["name"] == "Córdoba Centro HPC"
     assert urgent_block["props"]["stationName"] == "Córdoba Centro HPC"
     assert urgent_block["props"]["distanceKm"] == 1.4
@@ -728,8 +728,8 @@ def test_score_exploration_station_does_not_overweight_power_above_user_cap():
     assert capped.score < uncapped.score
 
 
-def test_codex_prompt_guides_followups_without_backend_intent_mapping():
-    prompt = codex_prompt("Me equivoqué, estoy en Valencia centro")
+def test_conversation_agent_prompt_guides_followups_without_backend_intent_mapping():
+    prompt = conversation_agent_prompt("Me equivoqué, estoy en Valencia centro")
 
     assert "No pidas destino para una carga urgente" in prompt
     assert "No llames resolve_location con frases que no son ubicaciones concretas" in prompt
@@ -761,8 +761,8 @@ def test_codex_prompt_guides_followups_without_backend_intent_mapping():
     assert "usa PlaceDetailCard para la ubicación" in prompt
 
 
-def test_codex_prompt_exposes_max_useful_power_tool_argument():
-    prompt = codex_prompt("Mi coche carga máximo a 100 kW, no necesito ultrarrápidos")
+def test_conversation_agent_prompt_exposes_max_useful_power_tool_argument():
+    prompt = conversation_agent_prompt("Mi coche carga máximo a 100 kW, no necesito ultrarrápidos")
 
     assert '"max_useful_power_kw":null' in prompt
     assert "pasa X como preferences.max_useful_power_kw" in prompt
@@ -771,8 +771,8 @@ def test_codex_prompt_exposes_max_useful_power_tool_argument():
     assert "No digas que has filtrado" in prompt
 
 
-def test_codex_prompt_uses_city_first_for_destination_poi_searches():
-    prompt = codex_prompt("Voy el finde a Granada y duermo cerca de la Alhambra")
+def test_conversation_agent_prompt_uses_city_first_for_destination_poi_searches():
+    prompt = conversation_agent_prompt("Voy el finde a Granada y duermo cerca de la Alhambra")
 
     assert "usa Granada como primera búsqueda aproximada" in prompt
     assert "PlaceDetailCard de Granada/Alhambra como aproximación" in prompt
@@ -799,6 +799,87 @@ def test_station_search_result_prompt_anchors_destination_search_location():
     assert "incluye PlaceDetailCard antes de las estaciones" in prompt
     assert "precision='approximate'" in prompt
     assert "needsConfirmation=true" in prompt
+
+
+def test_conversation_agent_prompt_compacts_route_geometry_tool_history():
+    coordinates = [[-3.7 + index * 0.001, 40.4 - index * 0.001] for index in range(5000)]
+    tool_history = [
+        {
+            "call": {
+                "tool": "plan_route",
+                "args": {
+                    "origin": {"label": "Madrid", "lat": 40.4168, "lon": -3.7038},
+                    "destination": {"label": "Valencia", "lat": 39.4699, "lon": -0.3763},
+                },
+            },
+            "result": {
+                "ok": True,
+                "tool": "plan_route",
+                "planningLevel": "chargers_only",
+                "origin": {"label": "Madrid", "lat": 40.4168, "lon": -3.7038},
+                "destination": {"label": "Valencia", "lat": 39.4699, "lon": -0.3763},
+                "distanceKm": 356.7,
+                "durationMin": 240,
+                "routeGeometry": {"type": "LineString", "coordinates": coordinates},
+                "recommendation": {
+                    "name": "Moya Hub Honrubia",
+                    "powerKw": 240,
+                    "distanceKm": 1.23,
+                    "lat": 39.602992,
+                    "lon": -2.279669,
+                    "availableEvses": 9,
+                    "totalEvses": 12,
+                    "connectorTypes": ["CCS2"],
+                },
+                "alternatives": [],
+            },
+        }
+    ]
+
+    prompt = conversation_agent_prompt("Tengo un Tesla Model Y y salgo con 45%. Madrid a Valencia", tool_history)
+
+    assert "Historial de herramientas compactado" in prompt
+    assert "routeGeometrySummary" in prompt
+    assert '"pointCount": 5000' in prompt
+    assert '"coordinates"' not in prompt
+    assert "Moya Hub Honrubia" in prompt
+    assert len(prompt) < len(json.dumps(tool_history, ensure_ascii=False))
+
+
+def test_conversation_agent_prompt_compacts_rejected_map_blocks_for_repair():
+    coordinates = [[-3.7 + index * 0.001, 40.4 - index * 0.001] for index in range(5000)]
+    candidate_blocks = [
+        {
+            "id": "map",
+            "type": "MapPreviewCard",
+            "version": 1,
+            "props": {
+                "origin": {"label": "Madrid", "lat": 40.4168, "lon": -3.7038},
+                "destination": {"label": "Valencia", "lat": 39.4699, "lon": -0.3763},
+                "routeGeometry": {"type": "LineString", "coordinates": coordinates},
+                "primaryStation": {
+                    "name": "Moya Hub Honrubia",
+                    "powerKw": 240,
+                    "distanceKm": 1.23,
+                    "lat": 39.602992,
+                    "lon": -2.279669,
+                },
+            },
+        }
+    ]
+
+    prompt = conversation_agent_prompt(
+        "Tengo un Tesla Model Y y salgo con 45%. Madrid a Valencia",
+        tool_history=[],
+        repair_issues=["MapPreviewCard necesita geometría trazable."],
+        candidate_blocks=candidate_blocks,
+    )
+
+    assert "Bloques rechazados compactados" in prompt
+    assert "routeGeometrySummary" in prompt
+    assert '"pointCount": 5000' in prompt
+    assert '"coordinates"' not in prompt
+    assert "Moya Hub Honrubia" in prompt
 
 
 def test_a2ui_contract_rejects_hard_power_filter_copy_when_rendering_over_cap_station():
@@ -911,8 +992,8 @@ def test_a2ui_contract_allows_max_useful_power_copy_without_hard_filter_claim():
     assert issues == []
 
 
-def test_codex_prompt_prioritizes_low_margin_urgent_order():
-    prompt = codex_prompt("Estoy al 8% y no conozco la zona")
+def test_conversation_agent_prompt_prioritizes_low_margin_urgent_order():
+    prompt = conversation_agent_prompt("Estoy al 8% y no conozco la zona")
 
     assert "Con batería <=10%" in prompt
     assert "margen muy bajo" in prompt
@@ -921,11 +1002,11 @@ def test_codex_prompt_prioritizes_low_margin_urgent_order():
     assert "no lo sustituyas por texto" in prompt
     assert "explica la batería baja en RiskExplanationCard" in prompt
     assert "metadata son opcionales y no se muestran al usuario" in prompt
-    assert "StationDetailCard, RiskExplanationCard si hace falta, ActionButtons, y solo después StationList" in prompt
+    assert "StationPreviewCard, RiskExplanationCard si hace falta, ActionButtons, y solo después StationList" in prompt
 
 
-def test_codex_prompt_handles_qualitative_low_battery_and_children_amenities():
-    prompt = codex_prompt("Tengo poca batería y voy con niños")
+def test_conversation_agent_prompt_handles_qualitative_low_battery_and_children_amenities():
+    prompt = conversation_agent_prompt("Tengo poca batería y voy con niños")
 
     assert "sin porcentaje explícito" in prompt
     assert "no inventes un número" in prompt
@@ -939,8 +1020,8 @@ def test_codex_prompt_handles_qualitative_low_battery_and_children_amenities():
     assert "según los datos disponibles" in prompt
 
 
-def test_codex_prompt_keeps_service_preference_when_location_follows():
-    prompt = codex_prompt("Busca una parada con baños y cafetería")
+def test_conversation_agent_prompt_keeps_service_preference_when_location_follows():
+    prompt = conversation_agent_prompt("Busca una parada con baños y cafetería")
 
     assert "Preferencias de servicios como baños, cafetería, restaurante o comer" in prompt
     assert "Si el siguiente turno aporta ciudad, zona o coordenadas, conserva esa preferencia" in prompt
@@ -948,8 +1029,8 @@ def test_codex_prompt_keeps_service_preference_when_location_follows():
     assert "'Estoy cerca de Almansa' después -> llama search_destination_chargers con Almansa" in prompt
 
 
-def test_codex_prompt_limits_night_safety_claims():
-    prompt = codex_prompt("No quiero cargar en sitios solitarios de noche")
+def test_conversation_agent_prompt_limits_night_safety_claims():
+    prompt = conversation_agent_prompt("No quiero cargar en sitios solitarios de noche")
 
     assert "Preferencias de seguridad nocturna o evitar sitios solitarios" in prompt
     assert "llama search_destination_chargers con esa ubicación" in prompt
@@ -959,8 +1040,8 @@ def test_codex_prompt_limits_night_safety_claims():
     assert "RiskExplanationCard antes de StationList" in prompt
 
 
-def test_codex_prompt_warns_after_tool_when_requested_services_are_unverified():
-    prompt = codex_prompt(
+def test_conversation_agent_prompt_warns_after_tool_when_requested_services_are_unverified():
+    prompt = conversation_agent_prompt(
         "Historial reciente:\nUsuario: Busca una parada con baños y cafetería\nMensaje actual del usuario: Estoy cerca de Almansa",
         tool_history=[
             {
@@ -983,8 +1064,8 @@ def test_codex_prompt_warns_after_tool_when_requested_services_are_unverified():
     assert "no están verificados en esos resultados" in prompt
 
 
-def test_codex_prompt_keeps_plan_b_on_previous_traced_alternatives():
-    prompt = codex_prompt("El cargador al que iba está ocupado, dame un plan B")
+def test_conversation_agent_prompt_keeps_plan_b_on_previous_traced_alternatives():
+    prompt = conversation_agent_prompt("El cargador al que iba está ocupado, dame un plan B")
 
     assert "no la repitas como plan B" in prompt
     assert "nombra la parada descartada" in prompt
@@ -996,8 +1077,8 @@ def test_codex_prompt_keeps_plan_b_on_previous_traced_alternatives():
     assert "disponibilidad en vivo puede cambiar" in prompt
 
 
-def test_codex_prompt_asks_structured_road_context_before_low_detour_search():
-    prompt = codex_prompt("Estoy en carretera con 18%, no quiero desviarme mucho")
+def test_conversation_agent_prompt_asks_structured_road_context_before_low_detour_search():
+    prompt = conversation_agent_prompt("Estoy en carretera con 18%, no quiero desviarme mucho")
 
     assert "En carretera y poco desvío" in prompt
     assert "pide carretera, zona actual/coordenadas y destino" in prompt
@@ -1007,15 +1088,15 @@ def test_codex_prompt_asks_structured_road_context_before_low_detour_search():
     assert "no muestres campos genéricos de ciudad" in prompt
 
 
-def test_codex_prompt_guides_chargers_only_route_without_claiming_default_reserve():
-    prompt = codex_prompt("Voy de Córdoba a Valencia con 58%. No quiero llegar justo")
+def test_conversation_agent_prompt_guides_chargers_only_route_without_claiming_default_reserve():
+    prompt = conversation_agent_prompt("Voy de Córdoba a Valencia con 58%. No quiero llegar justo")
 
     assert "planningLevel=chargers_only" in prompt
     assert "Usa RouteSummaryCard para distancia/duración de la herramienta" in prompt
     assert "no puedes validar batería de llegada ni reserva sin consumo/perfil" in prompt
     assert "AssistantMessage inicial en una frase corta" in prompt
     assert "muestra la parada principal antes del aviso largo" in prompt
-    assert "RouteSummaryCard, StationDetailCard, RiskExplanationCard y después StationList" in prompt
+    assert "RouteSummaryCard, StationPreviewCard, RiskExplanationCard y después StationList" in prompt
     assert "no digas que indicó 20%" in prompt
     assert "margen conservador por defecto" in prompt
     assert "No digas asegurar/garantizar margen en chargers_only" in prompt
@@ -1025,12 +1106,12 @@ def test_codex_prompt_guides_chargers_only_route_without_claiming_default_reserv
     assert "ese X% es batería de salida" in prompt
     assert "no escribas 'llegas con X%'" in prompt
     assert "Si el viaje es futuro" in prompt
-    assert "antes de cualquier StationDetailCard o StationList" in prompt
+    assert "antes de cualquier StationPreviewCard o StationList" in prompt
     assert "disponibilidad, acceso y tarifas pueden cambiar" in prompt
 
 
-def test_codex_prompt_guides_controlled_detour_comfort_preference():
-    prompt = codex_prompt("Prefiero desviarme 10 minutos si el sitio es más cómodo. Voy de Madrid a Valencia con 60%")
+def test_conversation_agent_prompt_guides_controlled_detour_comfort_preference():
+    prompt = conversation_agent_prompt("Prefiero desviarme 10 minutos si el sitio es más cómodo. Voy de Madrid a Valencia con 60%")
 
     assert "Preferencias de desvío controlado por comodidad" in prompt
     assert "menciona servicios indicados como comodidad potencial" in prompt
@@ -1038,19 +1119,19 @@ def test_codex_prompt_guides_controlled_detour_comfort_preference():
     assert "No introduzcas preferencias de pocas paradas" in prompt
 
 
-def test_codex_prompt_guides_can_i_arrive_without_charging_question():
-    prompt = codex_prompt("Voy de Sevilla a Granada, ¿me da para llegar sin cargar?")
+def test_conversation_agent_prompt_guides_can_i_arrive_without_charging_question():
+    prompt = conversation_agent_prompt("Voy de Sevilla a Granada, ¿me da para llegar sin cargar?")
 
-    assert "puedes llamar plan_route para mostrar distancia/duración" in prompt
+    assert "debes llamar plan_route para mostrar distancia/duración de proveedor" in prompt
     assert "no respondas sí/no" in prompt
     assert "no afirmes que llega" in prompt
     assert "pide esos datos críticos" in prompt
-    assert "no muestres StationDetailCard/StationList como recomendación principal" in prompt
+    assert "no muestres StationPreviewCard/StationList como recomendación principal" in prompt
     assert "Sevilla a Granada, me da para llegar sin cargar?" in prompt
 
 
-def test_codex_prompt_guides_few_stops_without_vehicle_profile():
-    prompt = codex_prompt("Tengo que ir de Alicante a Bilbao y prefiero parar pocas veces")
+def test_conversation_agent_prompt_guides_few_stops_without_vehicle_profile():
+    prompt = conversation_agent_prompt("Tengo que ir de Alicante a Bilbao y prefiero parar pocas veces")
 
     assert "8 h 37 min" in prompt
     assert "no como cientos de minutos" in prompt
@@ -1061,27 +1142,33 @@ def test_codex_prompt_guides_few_stops_without_vehicle_profile():
     assert "Alicante a Bilbao, prefiero parar pocas veces" in prompt
 
 
-def test_codex_prompt_guides_hard_arrival_reserve_without_vehicle_profile():
-    prompt = codex_prompt("Voy de Zaragoza a Barcelona y quiero llegar con al menos 25%")
+def test_conversation_agent_prompt_guides_hard_arrival_reserve_without_vehicle_profile():
+    prompt = conversation_agent_prompt("Voy de Zaragoza a Barcelona y quiero llegar con al menos 25%")
 
     assert "pasa X como reserve_min_percent" in prompt
     assert "ese X% no se puede validar en chargers_only" in prompt
-    assert "antes de cualquier StationDetailCard/StationList" in prompt
+    assert "antes de cualquier StationPreviewCard/StationList" in prompt
     assert "Zaragoza a Barcelona con 25%" in prompt
 
 
-def test_codex_prompt_guides_granada_alhambra_weekend_destination_warning():
-    prompt = codex_prompt("Voy el finde a Granada y duermo cerca de la Alhambra")
+def test_conversation_agent_prompt_guides_granada_alhambra_weekend_destination_warning():
+    prompt = conversation_agent_prompt("Voy el finde a Granada y duermo cerca de la Alhambra")
 
+    assert "devuelve type=tool_call search_destination_chargers" in prompt
     assert "Granada como primera búsqueda aproximada" in prompt
     assert "PlaceDetailCard de Granada/Alhambra como aproximación" in prompt
     assert "si es finde" in prompt
     assert "disponibilidad, acceso y tarifas pueden cambiar" in prompt
+    assert "no como ubicación exacta del alojamiento" in prompt
     assert "pide hotel/zona/direccion exacta" in prompt
+    assert "AssistantMessage o RiskExplanationCard" in prompt
+    assert "no devuelvas solo un botón para buscar ni una respuesta final que diga 'buscaré'" in prompt
+    assert "No respondas con 'buscaré', 'voy a buscar' o 'puedo buscar'" in prompt
+    assert "no crees StationPreviewCard genéricos" in prompt
 
 
-def test_codex_prompt_guides_round_trip_missing_origin_as_clarifying_card():
-    prompt = codex_prompt("Voy a Córdoba el viernes y vuelvo el domingo, dónde cargo?")
+def test_conversation_agent_prompt_guides_round_trip_missing_origin_as_clarifying_card():
+    prompt = conversation_agent_prompt("Voy a Córdoba el viernes y vuelvo el domingo, dónde cargo?")
 
     assert "ida y vuelta" in prompt
     assert "no llames plan_route ni search_destination_chargers" in prompt
@@ -1090,13 +1177,13 @@ def test_codex_prompt_guides_round_trip_missing_origin_as_clarifying_card():
     assert "No uses la ciudad destino como origen" in prompt
 
 
-def test_codex_prompt_guides_hotel_without_charger_primary_destination_stop():
-    prompt = codex_prompt(
+def test_conversation_agent_prompt_guides_hotel_without_charger_primary_destination_stop():
+    prompt = conversation_agent_prompt(
         "Voy a un hotel sin cargador, necesito cargar durante la estancia. En Valencia centro"
     )
 
     assert "hotel no tiene cargador" in prompt
-    assert "StationDetailCard" in prompt
+    assert "StationPreviewCard" in prompt
     assert "StationList" in prompt
     assert "distancia, potencia, conectores y puestos de carga registrados" in prompt
     assert "no la presentes como disponibilidad en vivo ni como reserva" in prompt
@@ -1144,6 +1231,40 @@ def test_tool_call_grounding_allows_location_from_followup_history():
     assert issues == []
 
 
+def test_tool_call_grounding_rejects_generic_resolve_location_query():
+    issues = tool_call_argument_grounding_issues(
+        {
+            "type": "tool_call",
+            "tool": "resolve_location",
+            "args": {"query": "ubicación actual"},
+        },
+        current_message="Necesito cargar ya, estoy al 12%",
+        history_blocks=[],
+        tool_history=[],
+    )
+
+    assert issues
+    assert "resolve_location" in issues[0]
+    assert "consulta genérica" in issues[0]
+
+
+def test_tool_call_grounding_rejects_ungrounded_resolve_location_query():
+    issues = tool_call_argument_grounding_issues(
+        {
+            "type": "tool_call",
+            "tool": "resolve_location",
+            "args": {"query": "Valencia"},
+        },
+        current_message="Necesito cargar durante una estancia",
+        history_blocks=[],
+        tool_history=[],
+    )
+
+    assert issues
+    assert "Valencia" in issues[0]
+    assert "sin que aparezca" in issues[0]
+
+
 def test_tool_call_grounding_rejects_same_origin_destination_route():
     issues = tool_call_argument_grounding_issues(
         {
@@ -1164,8 +1285,8 @@ def test_tool_call_grounding_rejects_same_origin_destination_route():
     assert "Falta el origen real" in issues[0]
 
 
-def test_codex_prompt_guides_cheap_route_with_reserve_missing_context():
-    prompt = codex_prompt("Quiero la ruta más barata, pero sin bajar del 20%")
+def test_conversation_agent_prompt_guides_cheap_route_with_reserve_missing_context():
+    prompt = conversation_agent_prompt("Quiero la ruta más barata, pero sin bajar del 20%")
 
     assert "Rutas baratas, reservas duras" in prompt
     assert "pregunta en el mismo turno por origen, destino, batería actual y modelo/consumo/autonomía" in prompt
@@ -1173,8 +1294,8 @@ def test_codex_prompt_guides_cheap_route_with_reserve_missing_context():
     assert "si no hay datos de tarifas de proveedor, dilo" in prompt
 
 
-def test_codex_prompt_guides_price_preference_without_route_context():
-    prompt = codex_prompt("Evita cargadores caros si hay alternativas razonables")
+def test_conversation_agent_prompt_guides_price_preference_without_route_context():
+    prompt = conversation_agent_prompt("Evita cargadores caros si hay alternativas razonables")
 
     assert "Preferencias de precio" in prompt
     assert "pide origen/destino o ubicación" in prompt
@@ -1182,16 +1303,16 @@ def test_codex_prompt_guides_price_preference_without_route_context():
     assert "solo hay tarifas estimadas" in prompt
 
 
-def test_codex_prompt_guides_large_hub_preference_without_location_context():
-    prompt = codex_prompt("Prefiero hubs grandes aunque sean un poco más caros")
+def test_conversation_agent_prompt_guides_large_hub_preference_without_location_context():
+    prompt = conversation_agent_prompt("Prefiero hubs grandes aunque sean un poco más caros")
 
     assert "Preferencias de precio, hubs grandes o tamaño de parada" in prompt
     assert "no llames herramientas sin ruta/ubicación" in prompt
     assert "si la herramienta trae tarifas verificadas, compara tarifa/kWh" in prompt
 
 
-def test_codex_prompt_guides_model_and_departure_battery_without_vehicle_profile():
-    prompt = codex_prompt("Tengo un Tesla Model Y y salgo con 45%... Madrid a Valencia")
+def test_conversation_agent_prompt_guides_model_and_departure_battery_without_vehicle_profile():
+    prompt = conversation_agent_prompt("Tengo un Tesla Model Y y salgo con 45%... Madrid a Valencia")
 
     assert "un modelo comercial como Tesla Model Y y una batería de salida no son un perfil autorizado" in prompt
     assert "usa vehicle:null u omite vehicle" in prompt
@@ -1199,8 +1320,8 @@ def test_codex_prompt_guides_model_and_departure_battery_without_vehicle_profile
     assert "no calcular energía, autonomía ni llegada" in prompt
 
 
-def test_codex_prompt_guides_charge_before_or_after_without_context():
-    prompt = codex_prompt("¿Me conviene cargar antes de salir o al llegar?")
+def test_conversation_agent_prompt_guides_charge_before_or_after_without_context():
+    prompt = conversation_agent_prompt("¿Me conviene cargar antes de salir o al llegar?")
 
     assert "Cargar antes de salir vs al llegar" in prompt
     assert "Da una comparación conceptual breve" in prompt
@@ -2107,7 +2228,7 @@ def test_a2ui_contract_rejects_future_warning_after_alternatives():
         message="Voy de Madrid a Málaga mañana y salgo con 80%",
     )
 
-    assert any("antes de StationDetailCard/StationList" in issue for issue in issues)
+    assert any("antes de StationPreviewCard/StationList" in issue for issue in issues)
 
 
 def test_a2ui_contract_rejects_future_warning_after_recommended_stop():
@@ -2151,7 +2272,7 @@ def test_a2ui_contract_rejects_future_warning_after_recommended_stop():
         message="Voy de Madrid a Málaga mañana y salgo con 80%",
     )
 
-    assert any("antes de StationDetailCard/StationList" in issue for issue in issues)
+    assert any("antes de StationPreviewCard/StationList" in issue for issue in issues)
 
 
 def test_a2ui_contract_allows_future_route_with_volatility_warning():
@@ -2217,19 +2338,19 @@ def test_a2ui_contract_rejects_visible_amenity_proximity_copy():
     assert any("servicio está cerca" in issue for issue in issues)
 
 
-def test_decode_codex_json_accepts_stdout_when_output_file_is_empty():
-    payload = decode_codex_json("", '{"type":"tool_call","tool":"resolve_location","args":{"query":"Córdoba"}}')
+def test_decode_agent_json_accepts_stdout_when_output_file_is_empty():
+    payload = decode_agent_json("", '{"type":"tool_call","tool":"resolve_location","args":{"query":"Córdoba"}}')
 
     assert payload["type"] == "tool_call"
     assert payload["args"]["query"] == "Córdoba"
 
 
-def test_decode_codex_json_extracts_fenced_or_wrapped_json():
+def test_decode_agent_json_extracts_fenced_or_wrapped_json():
     fenced = '```json\n{"type":"final","blocks":[]}\n```'
     wrapped = 'Respuesta:\n{"type":"final","blocks":[]}\nFin.'
 
-    assert decode_codex_json(fenced)["type"] == "final"
-    assert decode_codex_json(wrapped)["blocks"] == []
+    assert decode_agent_json(fenced)["type"] == "final"
+    assert decode_agent_json(wrapped)["blocks"] == []
 
 
 def test_deepseek_decision_parser_accepts_native_tool_call():
@@ -2365,7 +2486,7 @@ def test_agent_trace_writes_jsonl_without_payloads_by_default(settings, tmp_path
     assert "response" not in payload
 
 
-def test_contextualized_prompt_summarizes_explicit_vehicle_facts_for_codex():
+def test_contextualized_prompt_summarizes_explicit_vehicle_facts_for_agent():
     prompt = contextualized_prompt(
         "Me equivoqué, estoy en Valencia centro",
         [
@@ -2501,18 +2622,17 @@ def test_conversation_message_preserves_urgent_charge_intent_for_location_follow
     )
     new_blocks = blocks[latest_user_index + 1 :]
     new_block_types = [block["type"] for block in new_blocks]
-    assert "StationDetailCard" in new_block_types
-    assert "StationList" in new_block_types
+    assert "StationPreviewCard" in new_block_types
     assert "ClarifyingQuestionCard" not in new_block_types
     assert "PositionRequestCard" not in new_block_types
-    urgent_block = next(block for block in new_blocks if block["type"] == "StationDetailCard")
+    urgent_block = next(block for block in new_blocks if block["type"] == "StationPreviewCard")
     assert urgent_block["props"]["name"] == station.name
     assert urgent_block["props"]["stationName"] == station.name
 
 
 @pytest.mark.django_db
-def test_codex_hotel_followup_with_known_city_can_search_from_location_hint(client, settings, monkeypatch):
-    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+def test_deepseek_hotel_followup_with_known_city_can_search_from_location_hint(client, settings, monkeypatch):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
     source = DataSource.objects.create(name="Authorized provider Córdoba", kind="ocpi", is_authorized=True)
     operator = Operator.objects.create(name="Córdoba Operator")
     station = Station.objects.create(
@@ -2530,7 +2650,7 @@ def test_codex_hotel_followup_with_known_city_can_search_from_location_hint(clie
     Connector.objects.create(evse=evse, connector_type="CCS2", max_power_kw=150)
     messages_seen = []
 
-    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+    def fake_deepseek_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
         tool_history = tool_history or []
         messages_seen.append(message)
         if "Hotel Meliá cordoba" not in message:
@@ -2599,7 +2719,7 @@ def test_codex_hotel_followup_with_known_city_can_search_from_location_hint(clie
             ],
         }
 
-    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+    monkeypatch.setattr("routing.agent.run_deepseek_decision", fake_deepseek_decision)
 
     first_response = client.post(
         "/api/conversation/message",
@@ -2651,7 +2771,7 @@ def test_local_conversation_uses_history_for_followup_after_urgent_recommendatio
         content_type="application/json",
     )
     assert location_response.status_code == 200
-    assert any(block["type"] == "StationDetailCard" for block in blocks_from_a2ui_response(location_response))
+    assert any(block["type"] == "StationPreviewCard" for block in blocks_from_a2ui_response(location_response))
 
     battery_response = client.post(
         "/api/conversation/message",
@@ -2668,20 +2788,19 @@ def test_local_conversation_uses_history_for_followup_after_urgent_recommendatio
     )
     new_blocks = blocks[latest_user_index + 1 :]
     new_block_types = [block["type"] for block in new_blocks]
-    assert "StationDetailCard" in new_block_types
-    assert "StationList" in new_block_types
+    assert "StationPreviewCard" in new_block_types
     assert "ClarifyingQuestionCard" not in new_block_types
 
-    urgent_block = next(block for block in new_blocks if block["type"] == "StationDetailCard")
+    urgent_block = next(block for block in new_blocks if block["type"] == "StationPreviewCard")
     assert urgent_block["props"]["name"] == station.name
     assert urgent_block["props"]["stationName"] == station.name
 
 
 @pytest.mark.django_db
-def test_codex_conversation_agent_interprets_vehicle_followup_from_available_transcript(
+def test_deepseek_conversation_agent_interprets_vehicle_followup_from_available_transcript(
     client, settings, monkeypatch
 ):
-    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
     captured_messages = []
     session = client.session
     session[ACTIVE_CONVERSATION_BLOCKS_KEY] = [
@@ -2715,7 +2834,7 @@ def test_codex_conversation_agent_interprets_vehicle_followup_from_available_tra
     ]
     session.save()
 
-    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+    def fake_deepseek_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
         captured_messages.append(message)
         blocks = [
             {
@@ -2746,7 +2865,7 @@ def test_codex_conversation_agent_interprets_vehicle_followup_from_available_tra
             "blocks": blocks,
         }
 
-    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+    monkeypatch.setattr("routing.agent.run_deepseek_decision", fake_deepseek_decision)
 
     response = client.post(
         "/api/conversation/message",
@@ -2768,8 +2887,8 @@ def test_codex_conversation_agent_interprets_vehicle_followup_from_available_tra
 
 
 @pytest.mark.django_db
-def test_codex_conversation_agent_does_not_repair_component_choice_from_urgent_history(client, settings, monkeypatch):
-    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+def test_deepseek_conversation_agent_does_not_repair_component_choice_from_urgent_history(client, settings, monkeypatch):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
     repair_requests = []
     session = client.session
     session[ACTIVE_CONVERSATION_BLOCKS_KEY] = [
@@ -2787,7 +2906,7 @@ def test_codex_conversation_agent_does_not_repair_component_choice_from_urgent_h
     ]
     session.save()
 
-    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+    def fake_deepseek_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
         if repair_issues:
             repair_requests.append(repair_issues)
         return {
@@ -2802,7 +2921,7 @@ def test_codex_conversation_agent_does_not_repair_component_choice_from_urgent_h
             ],
         }
 
-    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+    monkeypatch.setattr("routing.agent.run_deepseek_decision", fake_deepseek_decision)
 
     response = client.post(
         "/api/conversation/message",
@@ -2819,10 +2938,10 @@ def test_codex_conversation_agent_does_not_repair_component_choice_from_urgent_h
 
 
 @pytest.mark.django_db
-def test_codex_conversation_agent_executes_allowlisted_tool(client, settings, monkeypatch, real_station):
-    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+def test_deepseek_conversation_agent_executes_allowlisted_tool(client, settings, monkeypatch, real_station):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
 
-    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+    def fake_deepseek_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
         tool_history = tool_history or []
         if not tool_history:
             return {
@@ -2878,7 +2997,7 @@ def test_codex_conversation_agent_executes_allowlisted_tool(client, settings, mo
             ],
         }
 
-    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+    monkeypatch.setattr("routing.agent.run_deepseek_decision", fake_deepseek_decision)
 
     response = client.post(
         "/api/conversation/message",
@@ -2972,13 +3091,13 @@ def test_deepseek_conversation_agent_uses_same_tool_and_a2ui_validation_loop(
 
 
 @pytest.mark.django_db
-def test_codex_conversation_agent_rejects_unknown_tool_with_a2ui_risk(client, settings, monkeypatch):
-    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+def test_deepseek_conversation_agent_rejects_unknown_tool_with_a2ui_risk(client, settings, monkeypatch):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
 
-    def fake_codex_decision(message, tool_history=None):
+    def fake_deepseek_decision(message, tool_history=None):
         return {"type": "tool_call", "tool": "delete_everything", "args": {}}
 
-    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+    monkeypatch.setattr("routing.agent.run_deepseek_decision", fake_deepseek_decision)
 
     response = client.post(
         "/api/conversation/message",
@@ -2992,11 +3111,11 @@ def test_codex_conversation_agent_rejects_unknown_tool_with_a2ui_risk(client, se
 
 
 @pytest.mark.django_db
-def test_codex_allowed_tool_failure_returns_to_agent_for_contextual_final(client, settings, monkeypatch):
-    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+def test_deepseek_allowed_tool_failure_returns_to_agent_for_contextual_final(client, settings, monkeypatch):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
     calls = []
 
-    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+    def fake_deepseek_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
         tool_history = tool_history or []
         calls.append((len(tool_history), repair_issues or []))
         if not tool_history:
@@ -3019,7 +3138,7 @@ def test_codex_allowed_tool_failure_returns_to_agent_for_contextual_final(client
             ],
         }
 
-    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+    monkeypatch.setattr("routing.agent.run_deepseek_decision", fake_deepseek_decision)
 
     response = client.post(
         "/api/conversation/message",
@@ -3035,11 +3154,11 @@ def test_codex_allowed_tool_failure_returns_to_agent_for_contextual_final(client
 
 
 @pytest.mark.django_db
-def test_codex_station_list_requires_traced_station_data(client, settings, monkeypatch):
-    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+def test_deepseek_station_list_requires_traced_station_data(client, settings, monkeypatch):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
     repair_requests = []
 
-    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+    def fake_deepseek_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
         if repair_issues:
             repair_requests.append(repair_issues)
             return {
@@ -3059,7 +3178,7 @@ def test_codex_station_list_requires_traced_station_data(client, settings, monke
             "type": "final",
             "blocks": [
                 {
-                    "id": "place-from-codex",
+                    "id": "place-from-agent",
                     "type": "PlaceDetailCard",
                     "version": 1,
                     "props": {
@@ -3068,7 +3187,7 @@ def test_codex_station_list_requires_traced_station_data(client, settings, monke
                     },
                 },
                 {
-                    "id": "stops-from-codex",
+                    "id": "stops-from-agent",
                     "type": "StationList",
                     "version": 1,
                     "props": {"stations": [{"name": "Cargador real", "powerKw": 50, "distanceKm": 1.2}]},
@@ -3076,7 +3195,7 @@ def test_codex_station_list_requires_traced_station_data(client, settings, monke
             ],
         }
 
-    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+    monkeypatch.setattr("routing.agent.run_deepseek_decision", fake_deepseek_decision)
 
     response = client.post(
         "/api/conversation/message",
@@ -3094,8 +3213,8 @@ def test_codex_station_list_requires_traced_station_data(client, settings, monke
 
 
 @pytest.mark.django_db
-def test_codex_conversation_agent_allows_bounded_tool_chain(client, settings, monkeypatch, real_station):
-    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+def test_deepseek_conversation_agent_allows_bounded_tool_chain(client, settings, monkeypatch, real_station):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
     calls = []
     source = DataSource.objects.create(name="Authorized provider Valencia", kind="ocpi", is_authorized=True)
     operator = Operator.objects.create(name="Valencia Operator")
@@ -3118,7 +3237,7 @@ def test_codex_conversation_agent_allows_bounded_tool_chain(client, settings, mo
     )
     Connector.objects.create(evse=evse, connector_type="CCS2", max_power_kw=150)
 
-    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+    def fake_deepseek_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
         tool_history = tool_history or []
         calls.append(len(tool_history))
         if len(tool_history) == 0:
@@ -3155,7 +3274,7 @@ def test_codex_conversation_agent_allows_bounded_tool_chain(client, settings, mo
             ],
         }
 
-    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+    monkeypatch.setattr("routing.agent.run_deepseek_decision", fake_deepseek_decision)
 
     response = client.post(
         "/api/conversation/message",
@@ -3172,11 +3291,11 @@ def test_codex_conversation_agent_allows_bounded_tool_chain(client, settings, mo
 
 
 @pytest.mark.django_db
-def test_codex_conversation_agent_allows_agent_chosen_text_final_after_tool(client, settings, monkeypatch, real_station):
-    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+def test_deepseek_conversation_agent_allows_agent_chosen_text_final_after_tool(client, settings, monkeypatch, real_station):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
     repair_requests = []
 
-    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+    def fake_deepseek_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
         tool_history = tool_history or []
         if not tool_history:
             return {
@@ -3208,7 +3327,7 @@ def test_codex_conversation_agent_allows_agent_chosen_text_final_after_tool(clie
                 ],
             }
 
-    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+    monkeypatch.setattr("routing.agent.run_deepseek_decision", fake_deepseek_decision)
 
     response = client.post(
         "/api/conversation/message",
@@ -3225,11 +3344,11 @@ def test_codex_conversation_agent_allows_agent_chosen_text_final_after_tool(clie
 
 
 @pytest.mark.django_db
-def test_codex_conversation_agent_repairs_untraced_structured_station_data(client, settings, monkeypatch, real_station):
-    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+def test_deepseek_conversation_agent_repairs_untraced_structured_station_data(client, settings, monkeypatch, real_station):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
     repair_requests = []
 
-    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+    def fake_deepseek_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
         tool_history = tool_history or []
         if not tool_history:
             return {
@@ -3278,7 +3397,7 @@ def test_codex_conversation_agent_repairs_untraced_structured_station_data(clien
             ],
         }
 
-    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+    monkeypatch.setattr("routing.agent.run_deepseek_decision", fake_deepseek_decision)
 
     response = client.post(
         "/api/conversation/message",
@@ -3294,13 +3413,13 @@ def test_codex_conversation_agent_repairs_untraced_structured_station_data(clien
 
 
 @pytest.mark.django_db
-def test_codex_conversation_agent_repairs_generic_station_name_when_tool_has_station(
+def test_deepseek_conversation_agent_repairs_generic_station_name_when_tool_has_station(
     client, settings, monkeypatch, real_station
 ):
-    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
     repair_requests = []
 
-    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+    def fake_deepseek_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
         tool_history = tool_history or []
         if not tool_history:
             return {
@@ -3342,7 +3461,7 @@ def test_codex_conversation_agent_repairs_generic_station_name_when_tool_has_sta
             ],
         }
 
-    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+    monkeypatch.setattr("routing.agent.run_deepseek_decision", fake_deepseek_decision)
 
     response = client.post(
         "/api/conversation/message",
@@ -3359,13 +3478,13 @@ def test_codex_conversation_agent_repairs_generic_station_name_when_tool_has_sta
 
 
 @pytest.mark.django_db
-def test_codex_conversation_agent_does_not_force_user_battery_into_station_detail(
+def test_deepseek_conversation_agent_does_not_force_user_battery_into_station_detail(
     client, settings, monkeypatch, real_station
 ):
-    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
     repair_requests = []
 
-    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+    def fake_deepseek_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
         tool_history = tool_history or []
         if not tool_history:
             return {
@@ -3411,7 +3530,7 @@ def test_codex_conversation_agent_does_not_force_user_battery_into_station_detai
             ],
         }
 
-    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+    monkeypatch.setattr("routing.agent.run_deepseek_decision", fake_deepseek_decision)
 
     response = client.post(
         "/api/conversation/message",
@@ -3427,11 +3546,11 @@ def test_codex_conversation_agent_does_not_force_user_battery_into_station_detai
 
 
 @pytest.mark.django_db
-def test_codex_conversation_agent_repairs_vague_risk_copy(client, settings, monkeypatch):
-    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+def test_deepseek_conversation_agent_repairs_vague_risk_copy(client, settings, monkeypatch):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
     repair_requests = []
 
-    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+    def fake_deepseek_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
         if repair_issues:
             repair_requests.append(repair_issues)
             return {
@@ -3460,7 +3579,7 @@ def test_codex_conversation_agent_repairs_vague_risk_copy(client, settings, monk
             ],
         }
 
-    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+    monkeypatch.setattr("routing.agent.run_deepseek_decision", fake_deepseek_decision)
 
     response = client.post(
         "/api/conversation/message",
@@ -3476,11 +3595,11 @@ def test_codex_conversation_agent_repairs_vague_risk_copy(client, settings, monk
 
 
 @pytest.mark.django_db
-def test_codex_conversation_agent_repairs_unsupported_action_buttons(client, settings, monkeypatch):
-    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+def test_deepseek_conversation_agent_repairs_unsupported_action_buttons(client, settings, monkeypatch):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
     repair_requests = []
 
-    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+    def fake_deepseek_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
         if repair_issues:
             repair_requests.append(repair_issues)
             return {
@@ -3506,7 +3625,7 @@ def test_codex_conversation_agent_repairs_unsupported_action_buttons(client, set
             ],
         }
 
-    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+    monkeypatch.setattr("routing.agent.run_deepseek_decision", fake_deepseek_decision)
 
     response = client.post(
         "/api/conversation/message",
@@ -4493,13 +4612,13 @@ def test_a2ui_contract_allows_future_round_trip_clarifying_origin_without_volati
     assert issues == []
 
 @pytest.mark.django_db
-def test_codex_conversation_agent_stops_repeated_tool_call(client, settings, monkeypatch):
-    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+def test_deepseek_conversation_agent_stops_repeated_tool_call(client, settings, monkeypatch):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
 
-    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+    def fake_deepseek_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
         return {"type": "tool_call", "tool": "resolve_location", "args": {"query": "Valencia"}}
 
-    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+    monkeypatch.setattr("routing.agent.run_deepseek_decision", fake_deepseek_decision)
 
     response = client.post(
         "/api/conversation/message",
@@ -4513,8 +4632,8 @@ def test_codex_conversation_agent_stops_repeated_tool_call(client, settings, mon
 
 
 @pytest.mark.django_db
-def test_codex_conversation_agent_recovers_repeated_tool_call_with_final_retry(client, settings, monkeypatch):
-    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+def test_deepseek_conversation_agent_recovers_repeated_tool_call_with_final_retry(client, settings, monkeypatch):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
     calls = []
     trace_events = []
     repeated_args = {
@@ -4545,7 +4664,7 @@ def test_codex_conversation_agent_recovers_repeated_tool_call_with_final_retry(c
         assert tool_call.args == repeated_args
         return tool_result
 
-    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+    def fake_deepseek_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
         tool_history = tool_history or []
         calls.append((len(tool_history), repair_issues or []))
         if repair_issues:
@@ -4575,7 +4694,7 @@ def test_codex_conversation_agent_recovers_repeated_tool_call_with_final_retry(c
         trace_events.append(kwargs)
 
     monkeypatch.setattr("routing.agent.execute_conversation_tool", fake_execute_conversation_tool)
-    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+    monkeypatch.setattr("routing.agent.run_deepseek_decision", fake_deepseek_decision)
     monkeypatch.setattr("routing.agent.record_trace_event", fake_record_trace_event)
 
     response = client.post(
@@ -4597,17 +4716,17 @@ def test_codex_conversation_agent_recovers_repeated_tool_call_with_final_retry(c
 
 
 @pytest.mark.django_db
-def test_codex_conversation_agent_stops_at_tool_budget(client, settings, monkeypatch):
-    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
-    settings.KALMIO_CODEX_MAX_TOOL_CALLS = 1
+def test_deepseek_conversation_agent_stops_at_tool_budget(client, settings, monkeypatch):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
+    settings.KALMIO_DEEPSEEK_MAX_TOOL_CALLS = 1
 
-    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+    def fake_deepseek_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
         tool_history = tool_history or []
         if not tool_history:
             return {"type": "tool_call", "tool": "resolve_location", "args": {"query": "Valencia"}}
         return {"type": "tool_call", "tool": "resolve_location", "args": {"query": "Madrid"}}
 
-    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+    monkeypatch.setattr("routing.agent.run_deepseek_decision", fake_deepseek_decision)
 
     response = client.post(
         "/api/conversation/message",
@@ -4623,7 +4742,7 @@ def test_codex_conversation_agent_stops_at_tool_budget(client, settings, monkeyp
 @pytest.mark.django_db
 def test_local_conversation_agent_failure_uses_dev_fallback_without_technical_detail(client, monkeypatch):
     def failing_agent(message, history_blocks=None):
-        raise AgentResponseError("Codex local no devolvió JSON válido.")
+        raise AgentResponseError("El agente no devolvió JSON válido.")
 
     monkeypatch.setattr("routing.api.run_conversation_agent", failing_agent)
 
@@ -4636,7 +4755,7 @@ def test_local_conversation_agent_failure_uses_dev_fallback_without_technical_de
     assert response.status_code == 200
     blocks = blocks_from_a2ui_response(response)
     rendered_text = " ".join(str(block.get("props", {})) for block in blocks)
-    assert "Codex" not in rendered_text
+    assert "DeepSeek" not in rendered_text
     assert "JSON" not in rendered_text
     block_types = [block["type"] for block in blocks]
     assert "UserMessage" in block_types
@@ -4645,11 +4764,11 @@ def test_local_conversation_agent_failure_uses_dev_fallback_without_technical_de
 
 
 @pytest.mark.django_db
-def test_codex_conversation_agent_failure_uses_minimal_safe_fallback(client, settings, monkeypatch):
-    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+def test_deepseek_conversation_agent_failure_uses_minimal_safe_fallback(client, settings, monkeypatch):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
 
     def failing_agent(message, history_blocks=None):
-        raise AgentResponseError("Codex local no devolvió JSON válido.")
+        raise AgentResponseError("El agente no devolvió JSON válido.")
 
     monkeypatch.setattr("routing.api.run_conversation_agent", failing_agent)
 
@@ -4662,7 +4781,7 @@ def test_codex_conversation_agent_failure_uses_minimal_safe_fallback(client, set
     assert response.status_code == 200
     blocks = blocks_from_a2ui_response(response)
     rendered_text = " ".join(str(block.get("props", {})) for block in blocks)
-    assert "Codex" not in rendered_text
+    assert "DeepSeek" not in rendered_text
     assert "JSON" not in rendered_text
     block_types = [block["type"] for block in blocks]
     assert "UserMessage" in block_types
@@ -4673,11 +4792,11 @@ def test_codex_conversation_agent_failure_uses_minimal_safe_fallback(client, set
 
 
 @pytest.mark.django_db
-def test_codex_urgent_response_does_not_repair_component_choice_by_intent(client, settings, monkeypatch):
-    settings.KALMIO_CONVERSATION_AGENT_MODE = "codex"
+def test_deepseek_urgent_response_does_not_repair_component_choice_by_intent(client, settings, monkeypatch):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
     repair_requests = []
 
-    def fake_codex_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+    def fake_deepseek_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
         if repair_issues:
             repair_requests.append(repair_issues)
             return {"type": "final", "blocks": []}
@@ -4693,7 +4812,7 @@ def test_codex_urgent_response_does_not_repair_component_choice_by_intent(client
             ],
         }
 
-    monkeypatch.setattr("routing.agent.run_codex_decision", fake_codex_decision)
+    monkeypatch.setattr("routing.agent.run_deepseek_decision", fake_deepseek_decision)
 
     response = client.post(
         "/api/conversation/message",

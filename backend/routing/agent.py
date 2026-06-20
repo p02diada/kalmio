@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
-import tempfile
 import time
 from dataclasses import dataclass
 from typing import Any, Callable
@@ -112,11 +110,6 @@ def initial_blocks() -> list[dict]:
 
 def run_conversation_agent(message: str, history_blocks: list[dict] | None = None) -> list[dict]:
     mode = getattr(settings, "KALMIO_CONVERSATION_AGENT_MODE", "local")
-    if mode == "codex":
-        blocks = validate_blocks(run_codex_agent(message, history_blocks=history_blocks))
-        if not any(item.get("type") == "UserMessage" for item in blocks):
-            blocks.insert(0, block(f"user-{uuid4().hex[:10]}", "UserMessage", {"text": message.strip()}))
-        return blocks
     if mode == "deepseek":
         blocks = validate_blocks(run_deepseek_agent(message, history_blocks=history_blocks))
         if not any(item.get("type") == "UserMessage" for item in blocks):
@@ -217,16 +210,6 @@ def conversation_failure_blocks(message: str) -> list[dict]:
     ]
 
 
-def run_codex_agent(message: str, history_blocks: list[dict] | None = None) -> list[dict]:
-    with agent_trace_turn("codex"):
-        return run_provider_agent(
-            message,
-            history_blocks=history_blocks,
-            request_decision=request_codex_decision,
-            max_tool_calls=getattr(settings, "KALMIO_CODEX_MAX_TOOL_CALLS", 3),
-        )
-
-
 def run_deepseek_agent(message: str, history_blocks: list[dict] | None = None) -> list[dict]:
     with agent_trace_turn("deepseek"):
         return run_provider_agent(
@@ -250,7 +233,12 @@ def run_provider_agent(
     seen_calls: set[str] = set()
 
     for _ in range(max_tool_calls + 1):
-        decision = request_decision(decision_message, tool_history=tool_history)
+        try:
+            decision = request_decision(decision_message, tool_history=tool_history)
+        except AgentResponseError as exc:
+            if tool_history:
+                return fallback_from_tool_history(tool_history, str(exc), decision_message)
+            raise
         if decision["type"] == "final":
             return validated_or_repaired_final_blocks(
                 decision_message,
@@ -354,18 +342,21 @@ def final_or_fallback_after_blocked_tool_call(
         },
         request_payload=decision,
     )
-    final_decision = request_decision(
-        message,
-        tool_history=tool_history,
-        repair_issues=[
-            reason,
-            (
-                "No pidas otra herramienta en esta respuesta. Devuelve type=final usando solo el historial "
-                "de herramientas ya ejecutadas o explica claramente por qué esos datos no bastan."
-            ),
-        ],
-        candidate_blocks=[],
-    )
+    try:
+        final_decision = request_decision(
+            message,
+            tool_history=tool_history,
+            repair_issues=[
+                reason,
+                (
+                    "No pidas otra herramienta en esta respuesta. Devuelve type=final usando solo el historial "
+                    "de herramientas ya ejecutadas o explica claramente por qué esos datos no bastan."
+                ),
+            ],
+            candidate_blocks=[],
+        )
+    except AgentResponseError as exc:
+        return fallback_from_tool_history(tool_history, str(exc), message)
     if final_decision["type"] != "final":
         return fallback_from_tool_history(tool_history, reason, message)
     return validated_or_repaired_final_blocks(
@@ -384,18 +375,21 @@ def validated_or_repaired_final_blocks(
     history_blocks: list[dict] | None = None,
     request_decision: DecisionRequester | None = None,
 ) -> list[dict]:
-    request_decision = request_decision or request_codex_decision
+    request_decision = request_decision or request_deepseek_decision
     blocks = validate_blocks(candidate_blocks)
     issues = a2ui_contract_issues(blocks, tool_history, message, history_blocks=history_blocks)
     if not issues:
         return blocks
 
-    repair_decision = request_decision(
-        message,
-        tool_history=tool_history,
-        repair_issues=issues,
-        candidate_blocks=candidate_blocks,
-    )
+    try:
+        repair_decision = request_decision(
+            message,
+            tool_history=tool_history,
+            repair_issues=issues,
+            candidate_blocks=candidate_blocks,
+        )
+    except AgentResponseError as exc:
+        return fallback_from_tool_history(tool_history, str(exc), message)
     if repair_decision["type"] != "final":
         return fallback_from_tool_history(
             tool_history,
@@ -414,46 +408,13 @@ def validated_or_repaired_final_blocks(
     return repaired_blocks
 
 
-def run_codex_decision(
-    message: str,
-    tool_history: list[dict[str, Any]] | None = None,
-    repair_issues: list[str] | None = None,
-    candidate_blocks: list[dict] | None = None,
-) -> dict[str, Any]:
-    payload = call_codex_json(
-        codex_prompt(
-            message,
-            tool_history=tool_history or [],
-            repair_issues=repair_issues or [],
-            candidate_blocks=candidate_blocks or [],
-        )
-    )
-    return parse_codex_decision(payload)
-
-
-def request_codex_decision(
-    message: str,
-    tool_history: list[dict[str, Any]] | None = None,
-    repair_issues: list[str] | None = None,
-    candidate_blocks: list[dict] | None = None,
-) -> dict[str, Any]:
-    kwargs: dict[str, Any] = {}
-    if tool_history is not None:
-        kwargs["tool_history"] = tool_history
-    if repair_issues is not None:
-        kwargs["repair_issues"] = repair_issues
-    if candidate_blocks is not None:
-        kwargs["candidate_blocks"] = candidate_blocks
-    return run_codex_decision(message, **kwargs)
-
-
 def run_deepseek_decision(
     message: str,
     tool_history: list[dict[str, Any]] | None = None,
     repair_issues: list[str] | None = None,
     candidate_blocks: list[dict] | None = None,
 ) -> dict[str, Any]:
-    prompt = codex_prompt(
+    prompt = conversation_agent_prompt(
         message,
         tool_history=tool_history or [],
         repair_issues=repair_issues or [],
@@ -725,7 +686,7 @@ def parse_openai_compatible_decision(message: Any) -> dict[str, Any]:
     payload = try_decode_json_candidate(content)
     if not isinstance(payload, dict):
         raise AgentResponseError("DeepSeek no devolvió un objeto JSON válido.")
-    return parse_codex_decision(payload)
+    return parse_agent_decision(payload)
 
 
 def parse_tool_arguments(value: Any) -> dict[str, Any]:
@@ -764,6 +725,20 @@ def tool_call_argument_grounding_issues(
                 f"La herramienta plan_route usa la misma ubicación '{label or 'sin etiqueta'}' como origen y destino. "
                 "Falta el origen real del viaje; pregunta desde dónde sale antes de planificar ida/vuelta."
             )
+    elif tool == "resolve_location":
+        query = display_text(args.get("query"), "")
+        normalized_query = normalize(query)
+        if not query or location_query_is_generic(normalized_query):
+            issues.append(
+                f"La herramienta resolve_location usa la consulta genérica '{query or 'sin texto'}'. "
+                "Si no hay ciudad, zona, carretera concreta, POI o coordenadas, pregunta por ubicación actual manual; "
+                "no intentes resolver 'ubicación actual' ni frases de batería."
+            )
+        elif not location_query_is_grounded(normalized_query, grounding_text):
+            issues.append(
+                f"La herramienta resolve_location usa la consulta '{query}' sin que aparezca en el mensaje del usuario "
+                "o el historial útil. Usa solo ciudades, zonas o POIs aportados por el usuario."
+            )
     else:
         return []
 
@@ -777,6 +752,30 @@ def tool_call_argument_grounding_issues(
             "Pregunta por la ciudad/zona o usa solo ubicaciones aportadas/resueltas; no uses ejemplos del prompt como datos."
         )
     return issues
+
+
+def location_query_is_generic(normalized_query: str) -> bool:
+    generic_terms = {
+        "ubicacion actual",
+        "mi ubicacion",
+        "posicion actual",
+        "mi posicion",
+        "estoy aqui",
+        "aqui",
+        "zona actual",
+        "carretera",
+        "no conozco la zona",
+    }
+    if normalized_query in generic_terms:
+        return True
+    return bool(re.search(r"\bestoy\s+al\s+\d{1,3}\s*%?\b", normalized_query))
+
+
+def location_query_is_grounded(normalized_query: str, grounded_text: str) -> bool:
+    if normalized_query and normalized_query in grounded_text:
+        return True
+    tokens = location_label_tokens(normalized_query)
+    return bool(tokens) and all(token in grounded_text for token in tokens)
 
 
 def grounded_user_context_text(
@@ -886,7 +885,181 @@ def attr_or_key(value: Any, key: str, default: Any = None) -> Any:
     return getattr(value, key, default)
 
 
-def codex_prompt(
+def compact_tool_history_for_prompt(tool_history: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    compacted: list[dict[str, Any]] = []
+    for entry in tool_history:
+        if not isinstance(entry, dict):
+            continue
+        call = entry.get("call") if isinstance(entry.get("call"), dict) else {}
+        result = entry.get("result") if isinstance(entry.get("result"), dict) else {}
+        tool_name = display_text(call.get("tool") or result.get("tool"), "")
+        compacted.append(
+            {
+                "call": compact_prompt_value(call),
+                "result": compact_tool_result_for_prompt(result, tool_name),
+            }
+        )
+    return compacted
+
+
+def compact_tool_result_for_prompt(result: dict[str, Any], tool_name: str = "") -> dict[str, Any]:
+    tool_name = display_text(result.get("tool") or tool_name, "")
+    if not result:
+        return {}
+    if not result.get("ok"):
+        return {
+            "ok": result.get("ok"),
+            "tool": tool_name or result.get("tool"),
+            "error": result.get("error"),
+        }
+
+    if tool_name == "plan_route":
+        compact: dict[str, Any] = {}
+        for key in (
+            "ok",
+            "tool",
+            "planningLevel",
+            "origin",
+            "destination",
+            "distanceKm",
+            "durationMin",
+            "energyKwh",
+            "arrivalBattery",
+            "corridorRadiusKm",
+            "warnings",
+        ):
+            if key in result:
+                compact[key] = compact_prompt_value(result[key])
+        if isinstance(result.get("routeGeometry"), dict):
+            compact["routeGeometrySummary"] = route_geometry_summary_for_prompt(result["routeGeometry"])
+        if isinstance(result.get("recommendation"), dict):
+            compact["recommendation"] = compact_station_for_prompt(result["recommendation"])
+        if isinstance(result.get("alternatives"), list):
+            compact["alternatives"] = compact_station_list_for_prompt(result["alternatives"], limit=3)
+            compact["alternativeCount"] = len(result["alternatives"])
+        return compact
+
+    if tool_name == "search_destination_chargers":
+        compact = {}
+        for key in ("ok", "tool", "location", "warnings", "error"):
+            if key in result:
+                compact[key] = compact_prompt_value(result[key])
+        stops = result.get("stops")
+        if isinstance(stops, list):
+            compact["stops"] = compact_station_list_for_prompt(stops, limit=6)
+            compact["stopCount"] = len(stops)
+        return compact
+
+    if tool_name == "resolve_location":
+        compact = {}
+        for key in ("ok", "tool", "location", "precision", "error"):
+            if key in result:
+                compact[key] = compact_prompt_value(result[key])
+        return compact
+
+    return compact_prompt_value(result)
+
+
+def compact_station_list_for_prompt(stations: list[Any], *, limit: int) -> list[dict[str, Any]]:
+    return [compact_station_for_prompt(station) for station in stations[:limit] if isinstance(station, dict)]
+
+
+def compact_station_for_prompt(station: dict[str, Any]) -> dict[str, Any]:
+    compact = station_props_from_result(station)
+    for key in ("reliability", "confidence"):
+        if key in station and key not in compact:
+            compact[key] = station[key]
+    score_reasons = station.get("scoreReasons")
+    if isinstance(score_reasons, list) and score_reasons:
+        compact["scoreReasons"] = [str(reason) for reason in score_reasons[:5]]
+    return compact_prompt_value(compact)
+
+
+def compact_blocks_for_prompt(blocks: list[Any]) -> list[Any]:
+    compacted: list[Any] = []
+    for item in blocks:
+        if not isinstance(item, dict):
+            compacted.append(item)
+            continue
+        block_type = display_text(item.get("type"), "")
+        compacted.append(
+            {
+                key: compact_prompt_value(value)
+                for key, value in item.items()
+                if key != "props"
+            }
+            | {"props": compact_block_props_for_prompt(block_type, item.get("props"))}
+        )
+    return compacted
+
+
+def compact_block_props_for_prompt(block_type: str, props: Any) -> Any:
+    if not isinstance(props, dict):
+        return compact_prompt_value(props)
+    if block_type in STATION_CARD_TYPES:
+        return compact_station_for_prompt(props)
+    if block_type == "StationList":
+        compact = {key: compact_prompt_value(value) for key, value in props.items() if key != "stations"}
+        stations = props.get("stations")
+        if isinstance(stations, list):
+            compact["stations"] = compact_station_list_for_prompt(stations, limit=6)
+            compact["stationCount"] = len(stations)
+        return compact
+    if block_type == "MapPreviewCard":
+        compact = {}
+        for key, value in props.items():
+            if key == "routeGeometry" and isinstance(value, dict):
+                compact["routeGeometrySummary"] = route_geometry_summary_for_prompt(value)
+            elif key == "primaryStation" and isinstance(value, dict):
+                compact[key] = compact_station_for_prompt(value)
+            elif key == "stations" and isinstance(value, list):
+                compact[key] = compact_station_list_for_prompt(value, limit=6)
+                compact["stationCount"] = len(value)
+            else:
+                compact[key] = compact_prompt_value(value)
+        return compact
+    return compact_prompt_value(props)
+
+
+def compact_prompt_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        compact: dict[str, Any] = {}
+        for key, nested in value.items():
+            if key == "routeGeometry" and isinstance(nested, dict):
+                compact["routeGeometrySummary"] = route_geometry_summary_for_prompt(nested)
+            elif key == "coordinates" and looks_like_route_coordinates(nested):
+                compact["coordinatesSummary"] = {"pointCount": route_coordinate_point_count(nested)}
+            else:
+                compact[key] = compact_prompt_value(nested)
+        return compact
+    if isinstance(value, list):
+        return [compact_prompt_value(item) for item in value]
+    return value
+
+
+def looks_like_route_coordinates(value: Any) -> bool:
+    return isinstance(value, list) and route_coordinate_point_count(value) > 20
+
+
+def route_geometry_summary_for_prompt(route_geometry: dict[str, Any]) -> dict[str, Any]:
+    coordinates = route_geometry.get("coordinates")
+    summary: dict[str, Any] = {
+        "present": True,
+        "type": route_geometry.get("type"),
+        "pointCount": route_coordinate_point_count(coordinates),
+    }
+    return {key: value for key, value in summary.items() if value not in (None, "")}
+
+
+def route_coordinate_point_count(coordinates: Any) -> int:
+    if not isinstance(coordinates, list) or not coordinates:
+        return 0
+    if len(coordinates) >= 2 and all(isinstance(item, (int, float)) for item in coordinates[:2]):
+        return 1
+    return sum(route_coordinate_point_count(item) for item in coordinates)
+
+
+def conversation_agent_prompt(
     message: str,
     tool_history: list[dict[str, Any]] | None = None,
     repair_issues: list[str] | None = None,
@@ -895,6 +1068,8 @@ def codex_prompt(
     tool_history = tool_history or []
     repair_issues = repair_issues or []
     candidate_blocks = candidate_blocks or []
+    prompt_tool_history = compact_tool_history_for_prompt(tool_history)
+    prompt_candidate_blocks = compact_blocks_for_prompt(candidate_blocks)
     known_locations = "; ".join(
         f"{label}({lat:.4f},{lon:.4f})" for label, lat, lon in KNOWN_LOCATIONS.values()
     )
@@ -907,7 +1082,11 @@ def codex_prompt(
         "- plan_route: calcula ruta y paradas con proveedor y datos autorizados. Args: "
         '{"origin":{"label":"...","lat":0,"lon":0},"destination":{"label":"...","lat":0,"lon":0},'
         '"vehicle":null,"preferences":{"reserve_min_percent":20,"max_useful_power_kw":null},"corridor_radius_km":25}\n'
-        "Nunca llames herramientas con label vacío, lat/lon 0,0, placeholders o ubicaciones no dadas/resueltas; pregunta antes.\n"
+        "Si el mensaje trae origen y destino concretos y pide ruta, paradas, pocas paradas, parada rápida/barata/cómoda "
+        "o comparación de paradas, la primera decisión debe ser plan_route con vehicle:null cuando falte perfil completo; "
+        "pide autonomía/consumo/modelo después como límite de validación, no antes de llamar la herramienta.\n"
+        "Nunca llames herramientas con label vacío, lat/lon 0,0, placeholders o ubicaciones no dadas/resueltas; pregunta antes. "
+        "Nunca llames resolve_location con 'ubicación actual', 'mi ubicación', 'zona actual', porcentajes de batería o frases genéricas; resolve_location solo acepta ciudad, zona, carretera concreta o POI nombrado por el usuario.\n"
         "Ubicaciones internas conocidas para argumentos de herramienta, sin inventar otras coordenadas: "
         f"{known_locations}.\n"
     )
@@ -916,18 +1095,18 @@ def codex_prompt(
         "- Usa el historial útil, acepta correcciones naturales y no suenes como formulario.\n"
         "- Presenta las recomendaciones como paradas o lugares útiles para el viaje; usa name/stationName como punto de carga trazable y placeName solo si sale de herramienta o del usuario. No inventes lugares, servicios ni POIs.\n"
         "- En copy visible, expresa duraciones largas en horas y minutos (por ejemplo, 8 h 37 min), no como cientos de minutos. Evita la palabra técnica 'trazado/trazados': para el conductor usa 'según los datos disponibles', 'registrado', 'indicado', 'verificado' o 'autorizado' según el dato.\n"
-        "- Carga urgente sin ubicación: pide solo ubicación actual, ciudad/zona o coordenadas. No pidas destino para una carga urgente. No llames resolve_location con frases que no son ubicaciones concretas, como 'no conozco la zona', 'estoy en carretera', 'tengo poca batería' o 'voy con niños'; pregunta el dato mínimo primero.\n"
+        "- Carga urgente sin ubicación: pide solo ubicación actual, ciudad/zona o coordenadas. No pidas destino para una carga urgente. No llames resolve_location con frases que no son ubicaciones concretas, como 'ubicación actual', 'mi ubicación', 'estoy al 12%', 'no conozco la zona', 'estoy en carretera', 'tengo poca batería' o 'voy con niños'; pregunta el dato mínimo primero.\n"
         "- Tras una urgencia, una ciudad/zona/coordenadas es continuación de la urgencia; usa herramientas si hay ubicación suficiente.\n"
         "- Si el usuario corrige la ubicación, descarta la anterior, conserva batería, conector y preferencias si siguen teniendo sentido y busca con la nueva.\n"
         "- Si pregunta por un fallo anterior, no contradigas bloques ya validados; explica validación, cobertura, aproximación o datos autorizados.\n"
         "- Calle/POI/zona: intenta resolver la parte conocida con resolve_location. Si no puedes ubicar esa calle exacta, dilo y ofrece ciudad aproximada o coordenadas; no inventes coordenadas.\n"
-        "- Ruta sin consumo/modelo: puedes usar plan_route para explorar contexto de ruta y paradas de carga, pero no inventes autonomía, energía ni llegada. Si plan_route devuelve planningLevel=chargers_only, dilo. Usa RouteSummaryCard para distancia/duración de la herramienta, StationPreviewCard y StationList para estaciones autorizadas cuando sean útiles, y RiskExplanationCard para explicar que no puedes validar batería de llegada ni reserva sin consumo/perfil. No repitas la duración en prosa si ya está en RouteSummaryCard; evita frases como '4 horas' y deja el dato en la tarjeta o usa formato '4 h'. Mantén el AssistantMessage inicial en una frase corta y muestra la parada principal antes del aviso largo para que aparezca pronto en móvil; orden recomendado: RouteSummaryCard, StationPreviewCard, RiskExplanationCard y después StationList. Si el usuario pregunta si 'le da', 'llega sin cargar' o 'puede llegar sin cargar' y hay origen/destino pero faltan batería actual, autonomía, modelo o consumo, puedes llamar plan_route para mostrar distancia/duración; no respondas sí/no, no afirmes que llega, pide esos datos críticos, y no muestres StationPreviewCard/StationList como recomendación principal salvo que el usuario pida paradas de respaldo o plan B. Si el usuario prefiere parar pocas veces pero faltan autonomía/consumo/modelo, di antes de las paradas que no puedes garantizar ni optimizar pocas paradas sin esos datos; presenta cualquier estación solo como punto de carga autorizado en el corredor, no como plan optimizado. Si el usuario dice que sale con X%, ese X% es batería de salida, no de llegada ni reserva; no escribas 'llegas con X%'. Si el usuario pide no llegar justo sin dar un porcentaje de reserva, no digas que indicó 20%; si usas reserve_min_percent por defecto, llámalo margen conservador por defecto. No digas asegurar/garantizar margen en chargers_only ni 'te ayudará a recuperar margen'; di que cargar ahí puede ayudar a recuperar margen operativo no validado. Si el viaje es futuro (mañana, fecha concreta, finde, viernes/domingo), añade en el AssistantMessage inicial o en el primer RiskExplanationCard, antes de cualquier StationPreviewCard o StationList, una advertencia visible: disponibilidad, acceso y tarifas pueden cambiar antes del viaje.\n"
+        "- Ruta sin consumo/modelo: puedes usar plan_route para explorar contexto de ruta y paradas de carga, pero no inventes autonomía, energía ni llegada. Si plan_route devuelve planningLevel=chargers_only, dilo. Usa RouteSummaryCard para distancia/duración de la herramienta y solo después de plan_route; no calcules ni inventes distancia/duración sin herramienta. StationPreviewCard y StationList sirven para estaciones autorizadas cuando sean útiles, y RiskExplanationCard para explicar que no puedes validar batería de llegada ni reserva sin consumo/perfil. No repitas la duración en prosa si ya está en RouteSummaryCard; evita frases como '4 horas' y deja el dato en la tarjeta o usa formato '4 h'. Mantén el AssistantMessage inicial en una frase corta y muestra la parada principal antes del aviso largo para que aparezca pronto en móvil; orden recomendado: RouteSummaryCard, StationPreviewCard, RiskExplanationCard y después StationList. Si el usuario pregunta si 'le da', 'llega sin cargar' o 'puede llegar sin cargar' y hay origen/destino pero faltan batería actual, autonomía, modelo o consumo, debes llamar plan_route para mostrar distancia/duración de proveedor; no respondas sí/no, no afirmes que llega, pide esos datos críticos, y no muestres StationPreviewCard/StationList como recomendación principal salvo que el usuario pida paradas de respaldo o plan B. Si el usuario prefiere parar pocas veces y ya hay origen/destino, debes llamar plan_route; si faltan autonomía/consumo/modelo, di antes de las paradas que no puedes garantizar ni optimizar pocas paradas sin esos datos; presenta cualquier estación solo como punto de carga autorizado en el corredor, no como plan optimizado. Si el usuario dice que sale con X%, ese X% es batería de salida, no de llegada ni reserva; no escribas 'llegas con X%'. Si el usuario pide no llegar justo sin dar un porcentaje de reserva, no digas que indicó 20%; si usas reserve_min_percent por defecto, llámalo margen conservador por defecto. No digas asegurar/garantizar margen en chargers_only ni 'te ayudará a recuperar margen'; di que cargar ahí puede ayudar a recuperar margen operativo no validado. Si el viaje es futuro (mañana, fecha concreta, finde, viernes/domingo), añade en el AssistantMessage inicial o en el primer RiskExplanationCard, antes de cualquier StationPreviewCard o StationList, una advertencia visible: disponibilidad, acceso y tarifas pueden cambiar antes del viaje.\n"
         "- Perfil de vehículo: un modelo comercial como Tesla Model Y y una batería de salida no son un perfil autorizado de consumo/autonomía. Para plan_route, usa vehicle:null u omite vehicle salvo que el usuario haya dado explícitamente batería, capacidad útil kWh, consumo kWh/100 km, conector y potencia máxima. No rellenes campos desconocidos con null, ceros o defaults. Puedes mencionar modelo y batería en el copy, pero no calcular energía, autonomía ni llegada con ellos.\n"
-        "- Hotel/destino/estancia: si hay ciudad/POI suficiente y el usuario necesita cargar durante la estancia, llama search_destination_chargers directamente; no devuelvas solo un botón para buscar. Una ciudad conocida ya es ubicación suficiente para una búsqueda aproximada; no esperes hotel/zona exacta para la primera búsqueda, puedes pedir refinamiento después de mostrar resultados. Si el usuario da un POI/hotel dentro de una ciudad conocida, usa primero la ciudad/zona como aproximación verificable salvo que tengas coordenadas exactas autorizadas del POI; evita empezar por un punto muy estrecho que pueda ocultar cargadores urbanos útiles. No lo conviertas en ruta salvo que pidan origen-destino. Si muestras resultados de destino/estancia, incluye un PlaceDetailCard como ancla de la ubicación usada, con precision='approximate' y needsConfirmation=true cuando sea aproximación. Si el usuario dijo que el hotel no tiene cargador y la herramienta devuelve varias paradas, elige una parada primaria con StationPreviewCard usando solo distancia, potencia, conectores y puestos de carga registrados, y usa ActionButtons para navegar, refinar o pedir más opciones; no la presentes como disponibilidad en vivo ni como reserva. Reserva StationList para cuando el usuario pida ver/comparar opciones, haya empate real, baja confianza o alternativas materialmente útiles que cambien la decisión.\n"
-        "- Si buscas por ciudad aproximada porque el hotel/POI exacto no está resuelto, la respuesta visible debe decirlo: usa la ciudad como aproximación, no presentes el hotel exacto como ubicación validada, y pide dirección, zona exacta o coordenadas para refinar.\n"
+        "- Hotel/destino/estancia: si hay ciudad/POI suficiente y el usuario necesita cargar durante la estancia, llama search_destination_chargers directamente; no devuelvas solo un botón para buscar ni una respuesta final que diga 'buscaré'. Una ciudad conocida ya es ubicación suficiente para una búsqueda aproximada; no esperes hotel/zona exacta para la primera búsqueda, puedes pedir refinamiento después de mostrar resultados. Si tienes una ciudad conocida pero no tienes coordenadas exactas del hotel/POI, la primera decisión debe ser type=tool_call search_destination_chargers con la ciudad como location approximate, no type=final. Si el usuario da un POI/hotel dentro de una ciudad conocida, usa primero la ciudad/zona como aproximación verificable salvo que tengas coordenadas exactas autorizadas del POI; evita empezar por un punto muy estrecho que pueda ocultar cargadores urbanos útiles. No lo conviertas en ruta salvo que pidan origen-destino. Si muestras resultados de destino/estancia, incluye un PlaceDetailCard como ancla de la ubicación usada, con precision='approximate' y needsConfirmation=true cuando sea aproximación. Si el usuario dijo que el hotel no tiene cargador y la herramienta devuelve varias paradas, elige una parada primaria con StationPreviewCard usando solo distancia, potencia, conectores y puestos de carga registrados, y usa ActionButtons para navegar, refinar o pedir más opciones; no la presentes como disponibilidad en vivo ni como reserva. Reserva StationList para cuando el usuario pida ver/comparar opciones, haya empate real, baja confianza o alternativas materialmente útiles que cambien la decisión.\n"
+        "- Si buscas por ciudad aproximada porque el hotel/POI exacto no está resuelto, la respuesta visible debe decirlo en AssistantMessage o RiskExplanationCard: usa la ciudad como aproximación, no como ubicación exacta del hotel/POI, y pide dirección, zona exacta o coordenadas para refinar.\n"
         "- Si el usuario menciona ida y vuelta, volver, regreso o fechas de salida/vuelta, reconoce contexto de viaje redondo. Si falta origen para planificar ida/vuelta, pregunta por el origen antes de pedir hotel/zona y no llames plan_route ni search_destination_chargers todavia. Usa ClarifyingQuestionCard con field origen/salida cuando falte el origen. No uses la ciudad destino como origen.\n"
-        "- Si resolve_location recibe un hotel, calle o POI pero solo devuelve una ciudad/zona, no afirmes que conoces el lugar exacto; di que usas esa ciudad/zona como aproximación o pide coordenadas/dirección exacta.\n"
-        "- Si search_destination_chargers devuelve stops, trátalos como estaciones: usa StationPreviewCard para una estación concreta o StationList para varias, con nombres y métricas exactas trazables. No uses placeholders cuando hay estaciones.\n"
+        "- Si resolve_location recibe un hotel, calle o POI pero solo devuelve una ciudad/zona, no afirmes que conoces el lugar exacto; no presentes el hotel exacto como ubicación validada; di que usas esa ciudad/zona como aproximación o pide coordenadas/dirección exacta.\n"
+        "- Si search_destination_chargers devuelve stops, trátalos como estaciones: usa StationPreviewCard para una estación concreta o StationList para varias, con nombres y métricas exactas trazables. No uses placeholders cuando hay estaciones. Antes de llamar una herramienta, no crees StationPreviewCard genéricos como 'Cargador en Granada', potencia 0, distancia 0 o coordenadas iguales a la ciudad: pide herramienta o pregunta el dato mínimo.\n"
         "- En móvil, no satures la primera respuesta con todas las alternativas si hay una estación primaria clara. Por defecto, no muestres StationList en esa primera respuesta: prefiere StationPreviewCard para la recomendación, RiskExplanationCard si aporta seguridad, y ActionButtons para navegar, pedir más opciones o ajustar la búsqueda. Para pedir más opciones, usa ActionButtons con event.name='show_more_options' y un context trazable de la búsqueda o estación cuando exista; para navegación usa functionCall.openUrl si hay lat/lon trazables. Usa StationList cuando el usuario pida comparar/más opciones, cuando haya empate real, baja confianza o alternativas materialmente útiles que cambien la decisión. Si muestras StationPreviewCard y StationList juntos, no repitas la estación primaria dentro de StationList.\n"
         "- No uses superlativos globales como 'el más rápido en la ciudad' o 'el mejor de Córdoba' salvo que la herramienta lo demuestre. Acota a 'entre estas opciones' o 'según los datos disponibles' cuando compares potencia/distancia.\n"
         "- Si ya hay stops con potencia/distancia/disponibilidad y el usuario pide comparar potencia, alternativas o más opciones, responde con esos resultados previos; no repitas la misma búsqueda sin cambiar ubicación, radio, conector o criterio material.\n"
@@ -962,7 +1141,7 @@ def codex_prompt(
         "'Paseo de la Victoria de Córdoba' -> si solo resuelves Córdoba, explica la aproximación; "
         "'Voy a dormir en Valencia, busca cargadores cerca del hotel' -> llama search_destination_chargers con Valencia como aproximación y explica que el hotel exacto refina; "
         "'Valencia centro' tras hotel sin cargador -> PlaceDetailCard + StationPreviewCard + ActionButtons + RiskExplanationCard si falta hotel exacto, usando una parada primaria y dejando que el usuario pida alternativas; "
-        "'Voy a Granada y duermo cerca de la Alhambra' -> usa Granada como primera búsqueda aproximada para no esconder cargadores urbanos si no tienes coordenadas exactas autorizadas del alojamiento; si es finde, antes de paradas di que disponibilidad, acceso y tarifas pueden cambiar, muestra PlaceDetailCard de Granada/Alhambra como aproximación y pide hotel/zona/direccion exacta para refinar; "
+        "'Voy a Granada y duermo cerca de la Alhambra' -> devuelve type=tool_call search_destination_chargers; usa Granada como primera búsqueda aproximada para no esconder cargadores urbanos si no tienes coordenadas exactas autorizadas del alojamiento; en la respuesta final posterior a la herramienta, si es finde, antes de paradas di que disponibilidad, acceso y tarifas pueden cambiar, di que usas Granada como aproximación y no como ubicación exacta del alojamiento, muestra PlaceDetailCard de Granada/Alhambra como aproximación y pide hotel/zona/direccion exacta para refinar; "
         "'Me voy 3 días a Córdoba y me quedo en el hotel Meliá' -> llama search_destination_chargers con Córdoba como aproximación, no ActionButtons; "
         "'Voy una semana a Cádiz y necesito cargar durante la estancia' -> llama search_destination_chargers con Cádiz como aproximación; usa PlaceDetailCard para la ubicación y RiskExplanationCard/AssistantMessage para explicar la incertidumbre de estancia, no preguntes primero por hotel/zona; "
         "'Quiero la ruta más barata, pero sin bajar del 20%' sin origen/destino -> no llames plan_route, pregunta origen, destino y datos de vehículo/batería; "
@@ -1008,8 +1187,10 @@ def codex_prompt(
         "No inventes disponibilidad, precios, estaciones, coordenadas ni estado del vehículo. "
         "No uses ActionButtons para sustituir una herramienta de búsqueda cuando ya tienes ciudad/POI suficiente. "
         "No llames plan_route con coordenadas vacías o 0,0; si faltan origen/destino reales, usa ClarifyingQuestionCard o AssistantMessage. "
+        "No devuelvas RouteSummaryCard ni distancia/duración de ruta si no tienes resultado de plan_route. "
         "No afirmes paradas/puntos de carga disponibles/encontrados ni incluyas listas vacías como resultado si no llamaste una herramienta de búsqueda/ruta. "
         "No afirmes paradas, puntos de carga o rutas si no vienen de herramientas, datos autorizados o texto explícito del usuario. "
+        "No respondas con 'buscaré', 'voy a buscar' o 'puedo buscar' cuando ya tienes ciudad/POI suficiente para usar una herramienta; en ese caso devuelve type=tool_call. "
         "Si faltan datos críticos, pregunta. Si el proveedor o los datos autorizados no permiten responder, falla de forma explícita. "
         "Puedes pedir otra herramienta si falta un dato necesario, pero no repitas una llamada ya hecha con los mismos argumentos. "
         "Elige los bloques A2UI que aporten claridad al usuario según la conversación completa. "
@@ -1027,9 +1208,12 @@ def codex_prompt(
             "Problemas detectados:\n"
             f"{json.dumps(repair_issues, ensure_ascii=False)}\n"
             "Usa solo datos del historial de herramientas; no inventes estaciones, precios, disponibilidad, coordenadas ni estado del vehículo.\n"
+            "Si el historial ya contiene estaciones trazables de herramienta, no elimines todas las StationPreviewCard/StationList "
+            "solo porque falte una advertencia de servicios, precio, disponibilidad o margen: conserva al menos una estación "
+            "válida y añade el aviso visible que falta.\n"
             f"Usuario: {message}\n"
-            f"Historial de herramientas: {json.dumps(tool_history, ensure_ascii=False)}\n"
-            f"Bloques rechazados: {json.dumps(candidate_blocks, ensure_ascii=False)}\n"
+            f"Historial de herramientas compactado: {json.dumps(prompt_tool_history, ensure_ascii=False)}\n"
+            f"Bloques rechazados compactados: {json.dumps(prompt_candidate_blocks, ensure_ascii=False)}\n"
             f"{station_result_instructions}"
             f"{service_result_instructions}"
             f"{behavior_instructions}"
@@ -1041,7 +1225,7 @@ def codex_prompt(
             "Eres el agente conversacional de Kalmio para planificación EV. Ya se ejecutaron estas herramientas "
             "internas de Django. Decide si necesitas otra herramienta permitida o si ya puedes devolver type=final con A2UI.\n"
             f"Usuario: {message}\n"
-            f"Historial de herramientas: {json.dumps(tool_history, ensure_ascii=False)}\n"
+            f"Historial de herramientas compactado: {json.dumps(prompt_tool_history, ensure_ascii=False)}\n"
             f"{tool_instructions}"
             f"{station_result_instructions}"
             f"{service_result_instructions}"
@@ -1100,103 +1284,12 @@ def requested_service_result_prompt(message: str, tool_history: list[dict[str, A
     )
 
 
-def call_codex_json(prompt: str) -> dict[str, Any]:
-    prompt = (
-        "Responde únicamente con un objeto JSON válido. No incluyas markdown ni explicaciones fuera del JSON.\n"
-        f"{prompt}"
-    )
-    started = time.perf_counter()
-    codex_model = getattr(settings, "KALMIO_CODEX_MODEL", "gpt-5.4-mini")
-    try:
-        with tempfile.NamedTemporaryFile("r+", suffix=".json") as output:
-            result = subprocess.run(
-                [
-                    getattr(settings, "KALMIO_CODEX_COMMAND", "codex"),
-                    "--ask-for-approval",
-                    "never",
-                    "exec",
-                    "--ephemeral",
-                    "--sandbox",
-                    "read-only",
-                    "-m",
-                    codex_model,
-                    "-o",
-                    output.name,
-                    prompt,
-                ],
-                cwd=settings.BASE_DIR.parent,
-                text=True,
-                capture_output=True,
-                timeout=getattr(settings, "KALMIO_CODEX_TIMEOUT_SECONDS", 20),
-            )
-            output.seek(0)
-            raw_output = output.read().strip()
-            stdout_output = result.stdout.strip()
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        record_trace_event(
-            event="llm_api_call",
-            name="codex.exec",
-            status="error",
-            provider="codex",
-            model=codex_model,
-            duration_ms=elapsed_ms(started),
-            metadata={"promptChars": len(prompt)},
-            request_payload={"prompt": prompt},
-            error=str(exc),
-        )
-        raise AgentResponseError(f"Codex local no disponible: {exc}") from exc
-
-    if result.returncode != 0:
-        detail = result.stderr.strip() or result.stdout.strip() or "sin detalle"
-        record_trace_event(
-            event="llm_api_call",
-            name="codex.exec",
-            status="error",
-            provider="codex",
-            model=codex_model,
-            duration_ms=elapsed_ms(started),
-            metadata={"promptChars": len(prompt), "returnCode": result.returncode},
-            request_payload={"prompt": prompt},
-            response_payload={"stdout": stdout_output, "stderr": result.stderr.strip()},
-            error=detail,
-        )
-        raise AgentResponseError(f"Codex local falló: {detail}")
-
-    payload = decode_codex_json(raw_output, stdout_output)
-    if not isinstance(payload, dict):
-        record_trace_event(
-            event="llm_api_call",
-            name="codex.exec",
-            status="error",
-            provider="codex",
-            model=codex_model,
-            duration_ms=elapsed_ms(started),
-            metadata={"promptChars": len(prompt), "returnCode": result.returncode},
-            request_payload={"prompt": prompt},
-            response_payload={"rawOutput": raw_output, "stdout": stdout_output},
-            error="Codex local no devolvió un objeto JSON.",
-        )
-        raise AgentResponseError("Codex local no devolvió un objeto JSON.")
-    record_trace_event(
-        event="llm_api_call",
-        name="codex.exec",
-        status="ok",
-        provider="codex",
-        model=codex_model,
-        duration_ms=elapsed_ms(started),
-        metadata={"promptChars": len(prompt), "returnCode": result.returncode},
-        request_payload={"prompt": prompt},
-        response_payload=payload,
-    )
-    return payload
-
-
-def decode_codex_json(raw_output: str, stdout_output: str = "") -> Any:
+def decode_agent_json(raw_output: str, stdout_output: str = "") -> Any:
     for candidate in (raw_output, stdout_output):
         payload = try_decode_json_candidate(candidate)
         if payload is not None:
             return payload
-    raise AgentResponseError("Codex local no devolvió JSON válido.")
+    raise AgentResponseError("El agente no devolvió JSON válido.")
 
 
 def try_decode_json_candidate(candidate: str) -> Any | None:
@@ -1264,14 +1357,14 @@ def first_json_object(text: str) -> str | None:
     return None
 
 
-def parse_codex_decision(payload: dict[str, Any]) -> dict[str, Any]:
+def parse_agent_decision(payload: dict[str, Any]) -> dict[str, Any]:
     decision_type = str(payload.get("type") or payload.get("kind") or payload.get("action") or "").strip()
     if not decision_type and isinstance(payload.get("blocks"), list):
         decision_type = "final"
     if decision_type in {"final", "ask"}:
         blocks = payload.get("blocks")
         if not isinstance(blocks, list):
-            raise AgentResponseError("Codex local no devolvió bloques para la respuesta final.")
+            raise AgentResponseError("El agente no devolvió bloques para la respuesta final.")
         misplaced_tool_call = tool_call_from_misplaced_block(blocks)
         if misplaced_tool_call:
             return misplaced_tool_call
@@ -1281,9 +1374,9 @@ def parse_codex_decision(payload: dict[str, Any]) -> dict[str, Any]:
         tool = str(tool_payload.get("tool") or tool_payload.get("name") or "").strip()
         args = tool_payload.get("args") if isinstance(tool_payload.get("args"), dict) else {}
         if not tool:
-            raise AgentResponseError("Codex pidió una herramienta sin nombre.")
+            raise AgentResponseError("El agente pidió una herramienta sin nombre.")
         return {"type": "tool_call", "tool": tool, "args": args}
-    raise AgentResponseError("Codex local devolvió una decisión no soportada.")
+    raise AgentResponseError("El agente devolvió una decisión no soportada.")
 
 
 def tool_call_from_misplaced_block(blocks: list[Any]) -> dict[str, Any] | None:
@@ -1485,6 +1578,24 @@ def blocks_from_tool_result(tool_result: dict[str, Any], message: str = "") -> l
 
 def fallback_from_tool_history(tool_history: list[dict[str, Any]], reason: str, message: str = "") -> list[dict]:
     latest_result = latest_tool_result(tool_history)
+    if latest_result and latest_result.get("ok"):
+        return [
+            block(
+                f"assistant-{uuid4().hex[:10]}",
+                "AssistantMessage",
+                {
+                    "text": (
+                        "Muestro solo datos validados por las herramientas disponibles y marco lo que no puedo confirmar."
+                    )
+                },
+            ),
+            *blocks_from_tool_result(latest_result, message),
+            block(
+                f"risk-{uuid4().hex[:10]}",
+                "RiskExplanationCard",
+                {"level": "medio", "text": user_facing_failure_text(reason)},
+            ),
+        ]
     level = "alto" if latest_result and not latest_result.get("ok") else "medio"
     return [
         block(
@@ -1509,6 +1620,11 @@ def user_facing_failure_text(reason: str) -> str:
     normalized = normalize(reason)
     if "herramienta no permitida" in normalized:
         return "No puedo hacer esa acción desde el chat. Puedo ayudarte a calcular una ruta, buscar paradas con puntos de carga autorizados o pedir los datos que falten."
+    if "un solo conector" in normalized or "un solo puesto" in normalized or "multi-puesto" in normalized:
+        return (
+            "He usado solo puntos de carga autorizados y priorizo estaciones con más de un puesto registrado cuando el dato existe. "
+            "Confirma acceso final, conectores físicos y disponibilidad antes de depender de ellas."
+        )
     if "proveedor" in normalized or "ruta" in normalized:
         return "No he podido validar la ruta ahora mismo. Reinténtalo con origen y destino concretos, o busca primero una parada de carga cerca de una ciudad."
     if "datos" in normalized or "cargadores" in normalized:
@@ -1588,7 +1704,7 @@ def a2ui_contract_issues(
     issues.extend(departure_battery_copy_contract_issues(blocks, user_context))
     issues.extend(future_trip_volatility_copy_contract_issues(blocks, user_context))
     issues.extend(cheap_route_reserve_context_contract_issues(blocks, user_context))
-    issues.extend(price_preference_context_contract_issues(blocks, user_context))
+    issues.extend(price_preference_context_contract_issues(blocks, user_context, tool_history))
     issues.extend(minimum_charge_context_contract_issues(blocks, user_context))
     issues.extend(single_connector_preference_contract_issues(blocks, tool_history, user_context))
     return dedupe_preserve_order(issues)
@@ -1873,7 +1989,11 @@ def night_safety_risk_order_contract_issues(blocks: list[dict], message: str) ->
     if not user_message_mentions_night_safety(message):
         return []
     if not any(block.get("type") in STATION_CARD_TYPES or block.get("type") == "StationList" for block in blocks):
-        return []
+        return [
+            "El usuario pidió servicios como baños/cafetería/restaurante y la herramienta encontró cargadores, "
+            "pero esos servicios no están trazados. La respuesta debe mostrar StationPreviewCard o StationList "
+            "con los cargadores encontrados y decir que esos servicios no están verificados."
+        ]
     first_alternatives = first_block_index(blocks, "StationList")
     if first_alternatives is None:
         return []
@@ -2041,6 +2161,13 @@ def single_connector_preference_contract_issues(
         return []
 
     issues: list[str] = []
+    has_station_block = any(block.get("type") in STATION_CARD_TYPES or block.get("type") == "StationList" for block in blocks)
+    if not has_station_block:
+        issues.append(
+            "El usuario pidio evitar cargadores con un solo conector/puesto y la herramienta encontro cargadores. "
+            "La respuesta debe mostrar StationPreviewCard o StationList con estaciones trazables y explicar puestos/conectores registrados."
+        )
+
     primary = first_block_props(blocks, "StationPreviewCard") or first_block_props(blocks, "StationDetailCard")
     primary_source = station_candidate_for_block(primary, candidates)
     primary_count = traced_evse_or_connector_count(primary_source or primary)
@@ -2066,6 +2193,14 @@ def single_connector_preference_contract_issues(
         issues.append(
             "La respuesta presenta availableEvses como conteo de conectores. Debe decir puestos de carga registrados "
             "o puntos de carga importados, y reservar 'conectores' para connectorTypes."
+        )
+    if not any(
+        visible_text_has_term(visible_text, term)
+        for term in ("puesto", "puestos", "conector", "conectores", "confirma", "confirmar")
+    ):
+        issues.append(
+            "El usuario pidio evitar cargadores con un solo conector/puesto. La respuesta visible debe reconocer "
+            "esa preferencia hablando de puestos de carga registrados o conectores físicos, y pedir confirmar acceso/datos finales."
         )
     return issues
 
@@ -2487,15 +2622,22 @@ def cheap_route_with_reserve_request(normalized_message: str) -> bool:
     return any(term in normalized_message for term in ("sin bajar", "reserva", "20%", "20 %", "20 por ciento"))
 
 
-def price_preference_context_contract_issues(blocks: list[dict], message: str) -> list[str]:
+def price_preference_context_contract_issues(
+    blocks: list[dict],
+    message: str,
+    tool_history: list[dict[str, Any]],
+) -> list[str]:
     normalized_message = normalize(message)
     if not price_preference_request(normalized_message):
         return []
     visible_text = normalize(" ".join(block_visible_text(block) for block in blocks))
     if not visible_text:
         return []
+    has_tool_context = price_preference_has_tool_context(tool_history)
     missing: list[str] = []
-    if not any(term in visible_text for term in ("origen", "destino", "ubicacion", "desde donde", "adonde", "a donde")):
+    if not has_tool_context and not any(
+        term in visible_text for term in ("origen", "destino", "ubicacion", "desde donde", "adonde", "a donde")
+    ):
         missing.append("ruta o ubicación")
     if not any(term in visible_text for term in ("tarifa", "tarifas", "precio", "precios", "coste", "costes")):
         missing.append("limitación de tarifas/precios")
@@ -2509,6 +2651,17 @@ def price_preference_context_contract_issues(blocks: list[dict], message: str) -
 
 def price_preference_request(normalized_message: str) -> bool:
     return any(term in normalized_message for term in ("caro", "caros", "barato", "barata", "precio", "tarifa", "coste"))
+
+
+def price_preference_has_tool_context(tool_history: list[dict[str, Any]]) -> bool:
+    result = latest_station_search_result(tool_history)
+    if not result or not result.get("ok"):
+        return False
+    if result.get("origin") and result.get("destination"):
+        return True
+    if result.get("location"):
+        return True
+    return bool(station_search_result_stops(result))
 
 
 def minimum_charge_context_contract_issues(blocks: list[dict], message: str) -> list[str]:
@@ -2717,6 +2870,10 @@ def has_approximation_disclaimer(normalized_text: str) -> bool:
             "no puedo ubicar",
             "no he podido ubicar",
             "no tengo la ubicacion exacta",
+            "no tengo la direccion exacta",
+            "no tengo coordenadas exactas",
+            "no esta resuelto",
+            "no esta geolocalizado",
             "sin ubicacion exacta",
         )
     )

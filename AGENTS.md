@@ -24,12 +24,12 @@ What the backend can and should do:
 - Validate A2UI allowlists, prop structure, action support, and data traceability before anything reaches the frontend.
 - Normalize harmless prop variants from the agent when the meaning is clear and still safe.
 - Ask the agent for one repair when blocks violate catalog, action, or data-traceability contracts.
-- Fail explicitly and minimally when tools, Codex, provider routing, or authorized charger data cannot produce a reliable answer.
+- Fail explicitly and minimally when tools, DeepSeek, provider routing, or authorized charger data cannot produce a reliable answer.
 
 What must not be done:
 
 - Do not build regex, keyword, or parser logic as the primary way to understand user intent in the agentic path.
-- Do not make Django decide conversational intent or component choice in Codex mode.
+- Do not make Django decide conversational intent or component choice in DeepSeek mode.
 - Do not encode rules such as "urgent means `UrgentChargeCard`" or "hotel means `DestinationChargingCard`" as backend repair logic.
 - Do not silently convert a text answer into richer UI because the backend thinks a component would be better.
 - Do not fabricate or infer availability, prices, stations, coordinates, route metrics, charger access, or vehicle state.
@@ -52,8 +52,9 @@ Backend: Django, Django Ninja, Django ORM, GeoDjango, Postgres/PostGIS, provider
 ## Agent Runtime Rules
 
 - Use local mode only for automated unit tests and e2e test runs.
-- When developing, inspecting the app manually, or starting a dev server to review behavior or UI, run through Codex mode.
-- Prefer the smallest, lowest-cost Codex model that can handle the task, and minimize token usage by reading, generating, and retaining only relevant context. For routine local coding tasks, use `gpt-5.4-mini` unless the task clearly requires a stronger model.
+- When developing, inspecting the app manually, or starting a dev server to review behavior or UI, run through DeepSeek mode.
+- Prefer the smallest, lowest-cost DeepSeek model that can handle the task, and minimize token usage by reading, generating, and retaining only relevant context.
+- Do not send full tool payloads to the agent prompt when they are not useful for reasoning. Compact long outputs such as route geometry, coordinate arrays, provider traces, raw station lists, and repeated UI blocks into factual summaries that preserve decisions, uncertainty, traceability, and user-relevant values.
 
 ## Phase Rules
 
@@ -92,7 +93,7 @@ Backend: Django, Django Ninja, Django ORM, GeoDjango, Postgres/PostGIS, provider
 - Fail explicitly when provider-backed routing or authorized charger data is unavailable.
 - The agent should interpret natural conversation and follow-ups from the full useful conversation context; do not add regex/intent parsers as the primary way to understand user phrasing.
 - Backend code may validate structured arguments, enforce safety constraints, and execute approved tools, but should not become the conversational reasoning layer.
-- In Codex mode, the backend must not use parsed intent to force tools or components.
+- In DeepSeek mode, the backend must not use parsed intent to force tools or components.
 - If a response cannot be validated, prefer a minimal honest fallback over backend-authored recommendations.
 
 ## Design Rules

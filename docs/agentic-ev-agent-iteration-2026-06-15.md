@@ -1,6 +1,6 @@
-# Agentic EV Codex Iteration - 2026-06-15
+# Agentic EV Agent Iteration - 2026-06-15
 
-Manual runs used `KALMIO_CONVERSATION_AGENT_MODE=codex` with the local Codex CLI and authorized charger data from the development SQLite database.
+Manual runs used a now-removed local LLM runtime and authorized charger data from the development SQLite database.
 
 ## Initial Findings
 
@@ -13,17 +13,16 @@ Manual runs used `KALMIO_CONVERSATION_AGENT_MODE=codex` with the local Codex CLI
 Probable causes:
 
 - Prompt lacked concrete correction/follow-up examples.
-- Allowed tool failures were cut off by backend fallback before Codex could explain them.
+- Allowed tool failures were cut off by backend fallback before the legacy LLM runtime could explain them.
 - Location resolution did not normalize accents.
-- Codex emitted station-name prop variants for `StationDetailCard`, but the normalizer did not consistently map them to the station identity expected by validation.
-- Useful vehicle facts from earlier user text were not summarized compactly for Codex.
+- The legacy LLM runtime emitted station-name prop variants for `StationDetailCard`, but the normalizer did not consistently map them to the station identity expected by validation.
+- Useful vehicle facts from earlier user text were not summarized compactly for the agent.
 
 ## Changes Made
 
-- Updated Codex defaults to `gpt-5.4-mini` and timeout to 60 seconds.
 - Added EV-specific prompt examples for urgent charging, corrections, POI approximations, routes without consumption, and hotel charging.
 - Added compact history summary for explicit battery and connector facts.
-- Let failed allowlisted tools return to Codex for a contextual final answer; unknown tools still use safe backend fallback.
+- Let failed allowlisted tools return to the agent for a contextual final answer; unknown tools still use safe backend fallback.
 - Normalized accented location queries in `resolve_location`.
 - Normalized `StationDetailCard` variants: `name`, `stationName`, and `chargerName`.
 - Added repair issue when `StationDetailCard.name`/`stationName` stays generic despite traced station results.
@@ -100,7 +99,7 @@ Evaluation: passes. It does not convert the request into a route and stays hones
 
 ## Second Iteration: Expanded EV Matrix
 
-Manual runs were continued in Codex mode after the first commit. The goal of this pass was not just to pass tests: the final responses had to sound useful for a real driver with low battery and avoid backend-authored intent routing.
+Manual runs were continued in the legacy LLM runtime after the first commit. The goal of this pass was not just to pass tests: the final responses had to sound useful for a real driver with low battery and avoid backend-authored intent routing.
 
 ### Additional Findings
 
@@ -112,7 +111,7 @@ Manual runs were continued in Codex mode after the first commit. The goal of thi
 
 ### Additional Changes
 
-- Expanded Codex prompt examples for low battery, plan B, corridor driving, future trips, cost limits, hard reserve constraints, stay planning, comfort/services and vehicle preferences.
+- Expanded conversation-agent prompt examples for low battery, plan B, corridor driving, future trips, cost limits, hard reserve constraints, stay planning, comfort/services and vehicle preferences.
 - Added known development locations for the expanded matrix; this is still a bounded resolver, not arbitrary geocoding.
 - Exposed traced charger facts from tools: amenities, address, reliability, connector/EVSE counts and scoring reasons.
 - Added `preferences.max_useful_power_kw` to route planning. The agent can pass it when the driver states a maximum useful charge rate; backend scoring then avoids over-weighting power above that cap.
