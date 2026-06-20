@@ -119,6 +119,11 @@ select {
     background: var(--color-surface);
   }
 
+  .a2ui-review-main {
+    min-height: 100svh;
+    padding: 1rem 1rem 2rem;
+  }
+
   .app-frame:has(.chat-page),
   .app-shell:has(.chat-page) {
     height: 100svh;

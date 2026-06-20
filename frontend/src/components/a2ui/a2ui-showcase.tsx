@@ -43,8 +43,8 @@ const scenarios: ExperienceScenario[] = [
       }),
       block('urgent-station', 'StationDetailCard', {
         title: 'Estación cercana',
-        stationName: 'Punto de muestra Zaragoza',
-        address: 'Salida 245, entorno urbano',
+        stationName: 'Punto de muestra Zaragoza salida 245',
+        address: 'Salida 245, entorno urbano con acceso por vía de servicio',
         distanceKm: 7.6,
         powerKw: 150,
         availableEvses: 2,
@@ -101,7 +101,7 @@ const scenarios: ExperienceScenario[] = [
         stationName: 'Punto de muestra La Plana',
         address: 'Área de servicio La Plana',
         takeaway: 'Mejor equilibrio entre margen, desvío y servicios.',
-        why: 'Está dentro del corredor, tiene CCS2 y reduce el riesgo de llegar con batería baja.',
+        why: 'Queda cerca de la ruta, tiene CCS2 y reduce el riesgo de llegar con batería baja.',
         powerKw: 150,
         pricePerKwhEur: 0.39,
         currency: 'EUR',
@@ -109,6 +109,7 @@ const scenarios: ExperienceScenario[] = [
         distanceKm: 118,
         detourMin: 6,
         availableEvses: 4,
+        totalEvses: 8,
         connectorTypes: ['CCS2'],
         amenities: ['RESTAURANT', 'TOILETS', 'WIFI', 'PARKING_LOT'],
       }),
@@ -121,6 +122,7 @@ const scenarios: ExperienceScenario[] = [
           lon: -0.997,
           powerKw: 150,
           availableEvses: 4,
+          totalEvses: 8,
           connectorTypes: ['CCS2'],
         },
         stations: [
@@ -130,6 +132,7 @@ const scenarios: ExperienceScenario[] = [
             lon: -1.268,
             powerKw: 100,
             availableEvses: 2,
+            totalEvses: 4,
             connectorTypes: ['CCS2'],
           },
           {
@@ -137,6 +140,7 @@ const scenarios: ExperienceScenario[] = [
             lat: 40.421,
             lon: -1.094,
             powerKw: 60,
+            availableEvses: 1,
             totalEvses: 3,
             connectorTypes: ['TYPE2'],
           },
@@ -167,6 +171,7 @@ const scenarios: ExperienceScenario[] = [
             distanceKm: 92,
             detourMin: 4,
             availableEvses: 2,
+            totalEvses: 4,
             connectorTypes: ['CCS2'],
             amenities: ['CAFE', 'TOILETS'],
           },
@@ -176,6 +181,7 @@ const scenarios: ExperienceScenario[] = [
             powerKw: 60,
             distanceKm: 147,
             detourMin: 9,
+            availableEvses: 1,
             totalEvses: 3,
             connectorTypes: ['TYPE2'],
             amenities: ['SUPERMARKET', 'PARKING_LOT'],
@@ -306,6 +312,7 @@ function componentFocus(type: string) {
 
 export function A2UIShowcasePage() {
   const [viewMode, setViewMode] = useState<'components' | 'scenarios'>('scenarios')
+  const [reviewLayout, setReviewLayout] = useState<'detail' | 'mobile-grid'>('detail')
   const [showTechnical, setShowTechnical] = useState(false)
   const [lastAction, setLastAction] = useState<string | null>(null)
   const blockCount = useMemo(
@@ -315,7 +322,7 @@ export function A2UIShowcasePage() {
 
   return (
     <section className="flex flex-col gap-5 pb-4">
-      <div className="sticky top-0 z-10 -mx-6 border-b border-border bg-surface/95 px-6 py-3 backdrop-blur md:-mx-14 md:px-14">
+      <div className="sticky top-0 z-10 -mx-4 border-b border-border bg-surface/95 px-4 py-3 backdrop-blur">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="font-mono text-xs leading-4 text-muted-foreground">Revisión de respuestas</p>
@@ -327,25 +334,47 @@ export function A2UIShowcasePage() {
         </div>
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex rounded-full bg-muted p-1" aria-label="Modo de revisión">
-            <Button
-              type="button"
-              variant={viewMode === 'components' ? 'default' : 'ghost'}
-              size="sm"
-              className="h-8 rounded-full px-3"
-              onClick={() => setViewMode('components')}
-            >
-              Componentes
-            </Button>
-            <Button
-              type="button"
-              variant={viewMode === 'scenarios' ? 'default' : 'ghost'}
-              size="sm"
-              className="h-8 rounded-full px-3"
-              onClick={() => setViewMode('scenarios')}
-            >
-              Escenarios
-            </Button>
+          <div className="flex flex-wrap gap-2">
+            <div className="flex rounded-full bg-muted p-1" aria-label="Modo de revisión">
+              <Button
+                type="button"
+                variant={viewMode === 'components' ? 'default' : 'ghost'}
+                size="sm"
+                className="h-8 rounded-full px-3"
+                onClick={() => setViewMode('components')}
+              >
+                Componentes
+              </Button>
+              <Button
+                type="button"
+                variant={viewMode === 'scenarios' ? 'default' : 'ghost'}
+                size="sm"
+                className="h-8 rounded-full px-3"
+                onClick={() => setViewMode('scenarios')}
+              >
+                Escenarios
+              </Button>
+            </div>
+            <div className="flex rounded-full bg-muted p-1" aria-label="Presentación">
+              <Button
+                type="button"
+                variant={reviewLayout === 'detail' ? 'default' : 'ghost'}
+                size="sm"
+                className="h-8 rounded-full px-3"
+                onClick={() => setReviewLayout('detail')}
+              >
+                Detalle
+              </Button>
+              <Button
+                type="button"
+                variant={reviewLayout === 'mobile-grid' ? 'default' : 'ghost'}
+                size="sm"
+                className="h-8 rounded-full px-3"
+                onClick={() => setReviewLayout('mobile-grid')}
+              >
+                Galería M
+              </Button>
+            </div>
           </div>
           <label className="flex min-w-0 items-center gap-2 text-xs leading-5 text-muted-foreground">
             <Switch
@@ -379,7 +408,17 @@ export function A2UIShowcasePage() {
         ))}
       </div>
 
-      {viewMode === 'components' ? (
+      {reviewLayout === 'mobile-grid' ? (
+        <MobileGridReview
+          items={viewMode === 'components' ? componentCases : scenarios}
+          mode={viewMode}
+          showTechnical={showTechnical}
+          onChipClick={(value) => setLastAction(`chip:${value}`)}
+          onActionEvent={(name) => setLastAction(`event:${name}`)}
+          onPositionSubmit={(value) => setLastAction(`position:${value}`)}
+          onManualPositionRequest={() => setLastAction('manual-position')}
+        />
+      ) : viewMode === 'components' ? (
         <div className="flex flex-col gap-7">
           {componentCases.map((item) => (
             <article id={item.id} key={item.id} className="scroll-mt-28 space-y-3 border-t border-border pt-5">
@@ -469,6 +508,79 @@ export function A2UIShowcasePage() {
         </div>
       ) : null}
     </section>
+  )
+}
+
+type ShowcaseActions = {
+  onChipClick: (value: string) => void
+  onActionEvent: (name: string) => void
+  onPositionSubmit: (value: string) => void
+  onManualPositionRequest: () => void
+}
+
+type ComponentCase = (typeof componentCases)[number]
+
+function MobileGridReview({
+  items,
+  mode,
+  showTechnical,
+  onChipClick,
+  onActionEvent,
+  onPositionSubmit,
+  onManualPositionRequest,
+}: {
+  items: ComponentCase[] | ExperienceScenario[]
+  mode: 'components' | 'scenarios'
+  showTechnical: boolean
+} & ShowcaseActions) {
+  return (
+    <div className="mr-auto grid w-full max-w-[82.25rem] grid-cols-[repeat(auto-fit,minmax(20rem,1fr))] items-start gap-3 pb-2">
+      {items.map((item) => {
+        const isComponent = mode === 'components'
+        const title = isComponent ? (item as ComponentCase).type : (item as ExperienceScenario).title
+        const subtitle = isComponent ? (item as ComponentCase).scenarioTitle : 'Escenario completo'
+        const focus = item.focus
+        const blocks = isComponent ? [(item as ComponentCase).block] : (item as ExperienceScenario).blocks
+
+        return (
+          <article id={item.id} key={item.id} className="scroll-mt-28 rounded-lg border border-border bg-surface">
+            <div className="border-b border-border bg-muted px-3 py-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate font-mono text-[0.68rem] leading-4 text-muted-foreground">
+                    {subtitle}
+                  </p>
+                  <h2 className="truncate text-sm font-semibold leading-5 tracking-normal">{title}</h2>
+                </div>
+                <Badge variant="secondary" className="shrink-0 font-mono text-[0.68rem]">
+                  M
+                </Badge>
+              </div>
+              <p className="mt-1 line-clamp-2 text-xs leading-5 text-body">{focus}</p>
+              {showTechnical ? (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {blocks.map((blockItem) => (
+                    <Badge key={blockItem.id} variant="secondary" className="font-mono text-[0.62rem]">
+                      {blockItem.type}
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="mx-auto w-full max-w-[23.4375rem] bg-background px-3 py-3">
+              <A2UIRenderer
+                blocks={blocks}
+                onChipClick={onChipClick}
+                onActionEvent={onActionEvent}
+                onPositionSubmit={onPositionSubmit}
+                onManualPositionRequest={onManualPositionRequest}
+              />
+            </div>
+          </article>
+        )
+      })}
+    </div>
   )
 }
 

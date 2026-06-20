@@ -133,6 +133,17 @@ const navItems = [
 function AppShell() {
   const pathname = useRouterState({ select: (state) => state.location.pathname })
 
+  if (pathname === '/a2ui') {
+    return (
+      <div className="app-frame">
+        <main className="a2ui-review-main">
+          <Outlet />
+        </main>
+        <Toaster richColors position="top-center" />
+      </div>
+    )
+  }
+
   return (
     <SidebarProvider className="app-frame">
       <DesktopSidebar pathname={pathname} />

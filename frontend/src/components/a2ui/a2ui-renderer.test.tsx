@@ -117,7 +117,9 @@ describe('A2UIRenderer', () => {
 
     expect(screen.getByText('Lugar resuelto')).toBeInTheDocument()
     expect(screen.getByText('Córdoba')).toBeInTheDocument()
-    expect(screen.getByText('37.88820, -4.77940')).toBeInTheDocument()
+    expect(screen.getByText('Ubicación por confirmar.')).toBeInTheDocument()
+    expect(screen.getByText(/la búsqueda depende de esta zona/i)).toBeInTheDocument()
+    expect(screen.queryByText('37.88820, -4.77940')).not.toBeInTheDocument()
     expect(screen.queryByText(/\[object Object\]/i)).not.toBeInTheDocument()
   })
 
@@ -197,7 +199,7 @@ describe('A2UIRenderer', () => {
     expect(screen.getByText('Almansa HPC')).toBeInTheDocument()
     expect(screen.getByText('1.2 km')).toBeInTheDocument()
     expect(screen.getByText('0.49 €/kWh')).toBeInTheDocument()
-    expect(screen.getByText('2 puestos')).toBeInTheDocument()
+    expect(screen.getByText('2 disponibles')).toBeInTheDocument()
     expect(screen.getByText('CCS2')).toBeInTheDocument()
   })
 
@@ -237,6 +239,38 @@ describe('A2UIRenderer', () => {
     expect(screen.queryByText('12%')).not.toBeInTheDocument()
     expect(screen.getByText(stationName)).toHaveClass('break-words')
     expect(screen.getByText('Margen bajo: confirma acceso y disponibilidad antes de depender de esta estación.')).toBeInTheDocument()
+  })
+
+  it('keeps station detail text readable with long labels and compact mobile widths', () => {
+    const stationName = 'Punto-de-carga-ultrarrapida-Zaragoza-salida-245-sin-espacios'
+
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'urgent-long',
+            type: 'StationDetailCard',
+            version: 1,
+            props: {
+              title: 'Estación cercana con confirmación pendiente',
+              stationName,
+              address: 'Salida 245, entorno urbano, acceso por via de servicio con descripcion larga',
+              distanceKm: 1234567.8,
+              powerKw: 350,
+              availableEvses: 123456,
+              connectorTypes: ['CCS2', 'TYPE2-SUPER-LONG-LABEL'],
+            },
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText(stationName)).toHaveClass('[overflow-wrap:anywhere]')
+    expect(screen.getByText('Potencia máx.').closest('.grid')).toHaveClass('grid-cols-[repeat(auto-fit,minmax(min(7rem,100%),1fr))]')
+    expect(screen.getByText('Potencia máx.')).toHaveClass('whitespace-normal')
+    expect(screen.getByText('Potencia máx.')).not.toHaveClass('truncate')
+    expect(screen.getByText('1234567.8 km')).toHaveClass('[overflow-wrap:anywhere]')
+    expect(screen.getByText('TYPE2-SUPER-LONG-LABEL')).toHaveClass('[overflow-wrap:anywhere]')
   })
 
   it('renders station recommendations with traceable station details', () => {
@@ -286,8 +320,8 @@ describe('A2UIRenderer', () => {
     expect(screen.getByText('Almansa HPC')).toBeInTheDocument()
     expect(screen.getByText(/Área de servicio Almansa/)).toBeInTheDocument()
     expect(screen.getAllByText('Puestos').length).toBeGreaterThan(0)
-    expect(screen.getByText('2 puestos')).toBeInTheDocument()
-    expect(screen.getByText('Conectores registrados')).toBeInTheDocument()
+    expect(screen.getByText('2 disponibles')).toBeInTheDocument()
+    expect(screen.getAllByText('Conectores').length).toBeGreaterThan(0)
     expect(screen.getByText('TYPE2')).toBeInTheDocument()
     expect(screen.getByText('Otras estaciones viables')).toBeInTheDocument()
     expect(screen.getByText('1 alternativa')).toBeInTheDocument()
@@ -295,8 +329,8 @@ describe('A2UIRenderer', () => {
     expect(screen.getAllByText('Precio').length).toBeGreaterThan(0)
     expect(screen.getAllByText('0.59 €/kWh').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Puestos').length).toBeGreaterThan(0)
-    expect(screen.getByText('3 puestos')).toBeInTheDocument()
-    expect(screen.getByText('Conectores')).toBeInTheDocument()
+    expect(screen.getByText('3 disponibles')).toBeInTheDocument()
+    expect(screen.getAllByText('Conectores').length).toBeGreaterThan(1)
     expect(screen.getAllByText('CCS2').length).toBeGreaterThan(0)
   })
 
@@ -439,6 +473,8 @@ describe('A2UIRenderer', () => {
       element.getAttribute('aria-label') === 'Ver Punto de muestra La Plana'
     ))
     expect(expandedPrimaryMarker?.textContent).toContain('2/5')
+    expect(expandedPrimaryMarker?.querySelector('.a2ui-map-marker-label')).toHaveTextContent('2/5')
+    expect(expandedPrimaryMarker?.querySelector('.a2ui-map-marker-label')).not.toHaveTextContent('puestos')
 
     fireEvent.click(expandedPrimaryMarker as HTMLElement)
 
@@ -446,7 +482,7 @@ describe('A2UIRenderer', () => {
     expect(screen.getAllByText('Punto de muestra La Plana').length).toBeGreaterThan(1)
     expect(screen.getByText('Parada principal')).toBeInTheDocument()
     expect(screen.getByText('180 kW')).toBeInTheDocument()
-    expect(screen.getByText('2/5 puestos')).toBeInTheDocument()
+    expect(screen.getByText('2/5 disponibles')).toBeInTheDocument()
     expect(screen.getByText('CCS2')).toBeInTheDocument()
   })
 
@@ -593,6 +629,7 @@ describe('A2UIRenderer', () => {
     )
 
     expect(screen.getByText('Datos a confirmar')).toBeInTheDocument()
+    expect(screen.queryByText('Nivel: medio')).not.toBeInTheDocument()
     expect(screen.queryByText('Riesgo a confirmar')).not.toBeInTheDocument()
   })
 
@@ -706,6 +743,38 @@ describe('A2UIRenderer', () => {
     expect(onActionEvent).toHaveBeenCalledWith('refine_search', { radiusKm: 80 }, 'actions')
   })
 
+  it('keeps secondary action buttons compact under a primary decision', () => {
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'actions',
+            type: 'ActionButtons',
+            version: 1,
+            props: {
+              actions: [
+                {
+                  label: 'Confirmar esta parada',
+                  priority: 'primary',
+                  event: { name: 'confirm_stop' },
+                },
+                {
+                  label: 'Buscar otra cercana',
+                  event: { name: 'find_alternative_stop' },
+                },
+              ],
+            },
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Confirmar esta parada' })).toHaveClass('w-full', 'font-bold')
+    expect(screen.getByRole('button', { name: 'Buscar otra cercana' })).toHaveClass('w-auto', 'text-body')
+    expect(screen.getByRole('button', { name: 'Buscar otra cercana' })).not.toHaveClass('border')
+    expect(screen.getByRole('button', { name: 'Buscar otra cercana' })).not.toHaveClass('w-full')
+  })
+
   it('requests browser location through an allowlisted location block', () => {
     const getCurrentPosition = vi.fn((success: PositionCallback) => {
       success({
@@ -746,6 +815,14 @@ describe('A2UIRenderer', () => {
         onPositionSubmit={onPositionSubmit}
       />,
     )
+
+    expect(screen.getByText(/también puedes escribir ciudad/i)).toBeInTheDocument()
+    expect(screen.getByText(/las coordenadas sirven si ya las tienes/i)).toBeInTheDocument()
+    expect(screen.queryByText('latitud')).not.toBeInTheDocument()
+    expect(screen.queryByText('longitud')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Usar mi ubicación' })).toHaveClass('w-full', 'font-semibold')
+    expect(screen.getByRole('button', { name: 'Escribir ubicación' })).toHaveClass('w-auto', 'text-body')
+    expect(screen.getByRole('button', { name: 'Escribir ubicación' })).not.toHaveClass('border')
 
     fireEvent.click(screen.getByRole('button', { name: 'Usar mi ubicación' }))
 

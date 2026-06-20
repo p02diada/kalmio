@@ -170,11 +170,11 @@ function A2UICard({
               </span>
             ) : null}
             <div className="min-w-0">
-              <CardTitle className={cn('break-words text-sm font-semibold leading-5 tracking-tight text-foreground', titleClassName)}>
+              <CardTitle className={cn('break-words text-sm font-semibold leading-5 tracking-tight text-foreground [overflow-wrap:anywhere]', titleClassName)}>
                 {title}
               </CardTitle>
               {subtitle ? (
-                <p className="mt-0.5 break-words text-caption font-medium leading-4 text-muted-foreground">
+                <p className="mt-0.5 break-words text-caption font-medium leading-4 text-muted-foreground [overflow-wrap:anywhere]">
                   {subtitle}
                 </p>
               ) : null}
@@ -288,6 +288,7 @@ function PositionRequestCard({
 }) {
   const [status, setStatus] = useState<'idle' | 'pending' | 'unsupported' | 'failed' | 'manual'>('idle')
   const manualFields = strings(block.props.manualFields)
+  const manualHint = manualLocationHint(manualFields)
 
   const requestLocation = () => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
@@ -317,32 +318,24 @@ function PositionRequestCard({
   const statusMessage = {
     idle: '',
     pending: 'Pidiendo permiso de ubicación...',
-    unsupported: 'Este navegador no permite compartir ubicación aquí. Escribe ciudad o coordenadas.',
-    failed: 'No pude acceder a tu ubicación. Puedes escribir ciudad o coordenadas.',
-    manual: 'Escribe una ciudad o coordenadas en el mensaje para continuar.',
+    unsupported: 'Este navegador no permite compartir ubicación aquí. Escribe una ciudad, carretera o punto cercano.',
+    failed: 'No pude acceder a tu ubicación. Puedes escribir una ciudad, carretera o punto cercano.',
+    manual: 'Escribe una ciudad, carretera o punto cercano en el mensaje para continuar.',
   }[status]
 
   return (
     <A2UICard icon={MapPinned} tone="assistant" title={text(block.props.title)} subtitle="Tu posición se usa solo para resolver esta búsqueda.">
       <p className="text-sm leading-6 text-body">{text(block.props.body)}</p>
-      {manualFields.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
-          {manualFields.map((field) => (
-            <Badge key={field} variant="secondary">
-              {field}
-            </Badge>
-          ))}
-        </div>
-      ) : null}
-      <div className="grid gap-2 sm:grid-cols-2">
+      {manualHint ? <p className="text-xs leading-5 text-muted-foreground">{manualHint}</p> : null}
+      <div className="flex min-w-0 max-w-full flex-col items-start gap-2">
         <Button type="button" className="h-auto min-h-11 w-full whitespace-normal font-semibold leading-5" onClick={requestLocation} disabled={status === 'pending'}>
           <Navigation className="size-4" aria-hidden="true" />
           {status === 'pending' ? 'Solicitando...' : 'Usar mi ubicación'}
         </Button>
         <Button
           type="button"
-          variant="outline"
-          className="h-auto min-h-11 w-full whitespace-normal leading-5"
+          variant="ghost"
+          className="h-auto min-h-11 w-auto max-w-full whitespace-normal px-2.5 leading-5 text-body hover:text-foreground"
           onClick={() => {
             setStatus('manual')
             onManualPositionRequest?.()
@@ -359,7 +352,6 @@ function PositionRequestCard({
 function PlaceDetailCard({ block }: { block: A2UIBlock }) {
   const needsConfirmation = bool(block.props.needsConfirmation)
   const precision = text(block.props.precision, 'approximate') === 'exact' ? 'Precisa' : 'Aproximada'
-  const coordinates = coordinatePair(block.props.lat, block.props.lon)
 
   return (
     <A2UICard
@@ -370,27 +362,18 @@ function PlaceDetailCard({ block }: { block: A2UIBlock }) {
       contentClassName="flex flex-col gap-3"
     >
       <p className="text-sm leading-6 text-body">{text(block.props.context, 'Lugar usado para la búsqueda.')}</p>
-      <div className="grid grid-cols-2 gap-2 text-sm">
+      <div className="text-sm">
         <div>
           <span className="block text-caption font-medium text-muted-foreground">Precisión</span>
           <span className="block text-compact font-semibold tracking-tight">{precision}</span>
         </div>
-        {needsConfirmation ? (
-          <div>
-            <span className="block text-caption font-medium text-muted-foreground">Estado</span>
-            <span className="block text-compact font-semibold tracking-tight">Por confirmar</span>
-          </div>
-        ) : null}
       </div>
       {needsConfirmation ? (
-        <Badge variant="secondary" className="w-fit">
-          Confirma el lugar final
-        </Badge>
+        <div className="rounded-md border border-warning bg-warning-soft px-3 py-2 text-sm leading-5 text-foreground">
+          <span className="font-semibold">Ubicación por confirmar.</span>{' '}
+          Ajusta el punto si no es donde estás; la búsqueda depende de esta zona.
+        </div>
       ) : null}
-      <details className="text-xs leading-5 text-muted-foreground">
-        <summary className="cursor-pointer font-medium text-body">Coordenadas usadas</summary>
-        <span className="mt-1 block break-words font-mono">{coordinates}</span>
-      </details>
     </A2UICard>
   )
 }
@@ -492,7 +475,7 @@ function StationDetailCard({ block }: { block: A2UIBlock }) {
     <A2UICard
       icon={BatteryCharging}
       tone="primary"
-      title={<span className="break-words">{station || 'Estación por confirmar'}</span>}
+      title={<span className="break-words [overflow-wrap:anywhere]">{station || 'Estación por confirmar'}</span>}
       subtitle={compactParts([title, address]).join(' · ')}
       titleClassName="text-base"
     >
@@ -509,13 +492,13 @@ function StationDetailCard({ block }: { block: A2UIBlock }) {
       {connectors.length > 0 ? (
         <div className="border-t border-border pt-3">
           <span className="block text-caption font-medium text-muted-foreground">
-            Conectores registrados
+            Conectores
           </span>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {connectors.map((connector) => (
               <span
                 key={connector}
-                className="rounded-full bg-primary px-2 py-1 text-caption font-semibold leading-none text-primary-foreground"
+                className="max-w-full rounded-full bg-primary px-2 py-1 text-caption font-semibold leading-4 text-primary-foreground [overflow-wrap:anywhere]"
               >
                 {connector}
               </span>
@@ -532,7 +515,7 @@ function StationDetailCard({ block }: { block: A2UIBlock }) {
             {amenities.map((amenity) => (
               <span
                 key={amenity}
-                className="rounded-full bg-muted px-2 py-1 text-caption font-semibold leading-none text-foreground"
+                className="max-w-full rounded-full bg-muted px-2 py-1 text-caption font-semibold leading-4 text-foreground [overflow-wrap:anywhere]"
               >
                 {amenity}
               </span>
@@ -592,11 +575,11 @@ function MetricGrid({ rows }: { rows: Array<[string, string]> }) {
 
 function MetricGridRows({ rows, inverted = false }: { rows: Array<[string, string]>; inverted?: boolean }) {
   return (
-    <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(7rem,100%),1fr))] gap-2 text-sm">
       {rows.map(([label, value]) => (
         <div key={label} className="min-w-0 rounded-md bg-muted px-2.5 py-2">
-          <span className={cn('block truncate text-caption font-medium', inverted ? 'text-primary-foreground/70' : 'text-muted-foreground')}>{label}</span>
-          <span className={cn('block break-words text-compact font-semibold tracking-tight', inverted ? 'text-primary-foreground' : 'text-foreground')}>{value}</span>
+          <span className={`block whitespace-normal text-caption font-medium leading-4 [overflow-wrap:anywhere] ${inverted ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{label}</span>
+          <span className={`block break-words text-compact font-semibold leading-5 tracking-tight [overflow-wrap:anywhere] ${inverted ? 'text-primary-foreground' : 'text-foreground'}`}>{value}</span>
         </div>
       ))}
     </div>
@@ -653,7 +636,7 @@ function StationListItem({ station, index }: { station: Record<string, unknown>;
             </div>
           </div>
           {metrics.length > 0 ? (
-            <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+            <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(min(7rem,100%),1fr))] gap-1.5">
               {metrics.map(([label, value]) => (
                 <StationMetric key={label} label={label} value={value} />
               ))}
@@ -674,8 +657,8 @@ function StationListItem({ station, index }: { station: Record<string, unknown>;
 function StationMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-sm bg-surface px-2 py-1.5">
-      <span className="block text-caption font-medium leading-4 text-muted-foreground">{label}</span>
-      <span className="block truncate text-compact font-semibold leading-5 tracking-tight text-foreground">{value}</span>
+      <span className="block whitespace-normal text-caption font-medium leading-4 text-muted-foreground [overflow-wrap:anywhere]">{label}</span>
+      <span className="block break-words text-compact font-semibold leading-5 tracking-tight text-foreground [overflow-wrap:anywhere]">{value}</span>
     </div>
   )
 }
@@ -685,7 +668,7 @@ function StationTagList({ label, values, strong = false }: { label: string; valu
     <div className="flex min-w-0 flex-wrap items-center gap-1.5">
       <span className="text-caption font-medium leading-4 text-muted-foreground">{label}</span>
       {values.map((value) => (
-        <Badge key={value} variant={strong ? 'default' : 'secondary'} className="rounded-full">
+        <Badge key={value} variant={strong ? 'default' : 'secondary'} className="max-w-full whitespace-normal rounded-full text-left leading-4 [overflow-wrap:anywhere]">
           {value}
         </Badge>
       ))}
@@ -701,7 +684,7 @@ function RiskBand({ level, body }: { level: string; body: string }) {
   const tone: A2UICardTone = high ? 'error' : low ? 'route' : 'warning'
 
   return (
-    <A2UICard icon={AlertTriangle} tone={tone} title={title} subtitle={level ? `Nivel: ${level}` : undefined}>
+    <A2UICard icon={AlertTriangle} tone={tone} title={title}>
       <p className="text-sm leading-6 text-body">
         {body || 'Hay incertidumbre que debes confirmar antes de depender de este resultado.'}
       </p>
@@ -775,7 +758,6 @@ function MapPreviewCard({ block }: { block: A2UIBlock }) {
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <Badge variant="secondary">{geometryLabel}</Badge>
           {stationCount > 0 ? <Badge variant="secondary">{stationCount} estaciones</Badge> : null}
-          {mapData.corridorRadiusKm !== null ? <Badge variant="secondary">Corredor {formatNumber(mapData.corridorRadiusKm)} km</Badge> : null}
         </div>
       </A2UICard>
       {expandedMap}
@@ -1057,7 +1039,7 @@ function stationMapPoint(item: Record<string, unknown>, kind: 'primary' | 'stati
     detourLabel: isKnownNumber(item.detourMin) ? metric(item.detourMin, 'min') : '',
     priceLabel: stationPrice(item) === 'No disponible' ? '' : stationPrice(item),
     connectorLabels: connectorLabels(item.connectorTypes),
-    roleLabel: kind === 'primary' ? 'Parada principal' : 'Alternativa del corredor',
+    roleLabel: kind === 'primary' ? 'Parada principal' : 'Alternativa cerca de la ruta',
   }
 }
 
@@ -1230,35 +1212,77 @@ function ActionButtons({
   sourceComponentId: string
   onActionEvent?: (name: string, context?: Record<string, unknown>, sourceComponentId?: string) => void
 }) {
-  return (
-    <div className="grid min-w-0 max-w-full gap-2 sm:grid-cols-2">
-      {actions.map((action, index) => {
-        const target = actionTarget(action)
-        const isDisabled = bool(action.disabled) || target === null
-        const isPrimary = text(action.priority, '') === 'primary'
+  const actionItems = actions.map((action, index) => {
+    const target = actionTarget(action)
+    const isDisabled = bool(action.disabled) || target === null
+    const isPrimary = text(action.priority, '') === 'primary'
 
-        return (
-          <div key={`${text(action.label)}-${index}`} className={cn('flex min-w-0 flex-col gap-1', isPrimary && actions.length > 1 && 'sm:col-span-2')}>
-            <Button
-              type="button"
-              disabled={isDisabled}
-              variant={isPrimary ? 'default' : 'outline'}
-              className={cn(
-                'h-auto min-h-11 w-full min-w-0 whitespace-normal break-words px-3 py-2 text-left leading-5',
-                isPrimary && 'font-bold',
-              )}
-              onClick={() => handleAction(target, onActionEvent, sourceComponentId)}
-            >
-              {text(action.label)}
-            </Button>
-            {(isDisabled && text(action.reason, '')) || (!bool(action.disabled) && target === null) ? (
-              <p className="max-w-full text-xs leading-5 text-muted-foreground">
-                {text(action.reason, '') || 'Esta acción no está disponible en este contexto.'}
-              </p>
-            ) : null}
-          </div>
-        )
-      })}
+    return { action, index, target, isDisabled, isPrimary }
+  })
+  const primaryActions = actionItems.filter((item) => item.isPrimary)
+  const supportingActions = actionItems.filter((item) => !item.isPrimary)
+
+  return (
+    <div className="flex min-w-0 max-w-full flex-col gap-2">
+      {primaryActions.map((item) => (
+        <ActionButtonItem
+          key={`${text(item.action.label)}-${item.index}`}
+          item={item}
+          sourceComponentId={sourceComponentId}
+          onActionEvent={onActionEvent}
+        />
+      ))}
+      {supportingActions.length > 0 ? (
+        <div className="flex min-w-0 max-w-full flex-wrap items-start gap-2">
+          {supportingActions.map((item) => (
+            <ActionButtonItem
+              key={`${text(item.action.label)}-${item.index}`}
+              item={item}
+              sourceComponentId={sourceComponentId}
+              onActionEvent={onActionEvent}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function ActionButtonItem({
+  item,
+  sourceComponentId,
+  onActionEvent,
+}: {
+  item: {
+    action: Record<string, unknown>
+    index: number
+    target: ActionTarget | null
+    isDisabled: boolean
+    isPrimary: boolean
+  }
+  sourceComponentId: string
+  onActionEvent?: (name: string, context?: Record<string, unknown>, sourceComponentId?: string) => void
+}) {
+  const unavailableReason = text(item.action.reason, '') || 'Esta acción no está disponible en este contexto.'
+  const shouldExplainUnavailable = Boolean((item.isDisabled && text(item.action.reason, '')) || (!bool(item.action.disabled) && item.target === null))
+
+  return (
+    <div className={cn('flex min-w-0 max-w-full flex-col gap-1', item.isPrimary ? 'w-full' : 'flex-none')}>
+      <Button
+        type="button"
+        disabled={item.isDisabled}
+        variant={item.isPrimary ? 'default' : 'ghost'}
+        className={cn(
+          'h-auto min-h-11 min-w-0 max-w-full whitespace-normal break-words px-3 py-2 leading-5 [text-wrap:balance]',
+          item.isPrimary ? 'w-full font-bold' : 'w-auto px-2.5 text-body hover:text-foreground',
+        )}
+        onClick={() => handleAction(item.target, onActionEvent, sourceComponentId)}
+      >
+        {text(item.action.label)}
+      </Button>
+      {shouldExplainUnavailable ? (
+        <p className="max-w-[18rem] text-xs leading-5 text-muted-foreground">{unavailableReason}</p>
+      ) : null}
     </div>
   )
 }
@@ -1364,11 +1388,11 @@ function stationLabel(value: Record<string, unknown>) {
 function stationCapacity(item: Record<string, unknown>) {
   const evseRatio = stationEvseRatio(item)
   if (evseRatio) {
-    return `${evseRatio} puestos`
+    return `${evseRatio} disponibles`
   }
   const evses = knownNumber(item.availableEvses)
   if (evses !== null) {
-    return `${formatNumber(evses)} puestos`
+    return `${formatNumber(evses)} disponibles`
   }
   const totalEvses = stationTotalEvses(item)
   if (totalEvses !== null) {
@@ -1392,6 +1416,33 @@ function stationTotalEvses(item: Record<string, unknown>) {
 
 function connectorLabels(value: unknown) {
   return strings(value).map((item) => item.toUpperCase())
+}
+
+function manualLocationHint(fields: string[]) {
+  if (fields.length === 0) {
+    return ''
+  }
+  const normalized = fields.map((field) => field.trim()).filter(Boolean)
+  const coordinatePattern = /coord|lat|lon/i
+  const primaryFields = normalized.filter((field) => !coordinatePattern.test(field))
+  const coordinateFields = normalized.length > primaryFields.length
+  const visibleFields = (primaryFields.length > 0 ? primaryFields : ['ciudad', 'carretera o punto cercano']).map(sentenceCaseInline)
+  const hint = `También puedes escribir ${spanishList(visibleFields)}.`
+  return coordinateFields ? `${hint} Las coordenadas sirven si ya las tienes.` : hint
+}
+
+function sentenceCaseInline(value: string) {
+  return value ? `${value[0]?.toLocaleLowerCase('es-ES')}${value.slice(1)}` : value
+}
+
+function spanishList(values: string[]) {
+  if (values.length <= 1) {
+    return values[0] ?? ''
+  }
+  if (values.length === 2) {
+    return `${values[0]} o ${values[1]}`
+  }
+  return `${values.slice(0, -1).join(', ')} o ${values[values.length - 1]}`
 }
 
 function pricePerKwh(value: unknown, currency: unknown = 'EUR') {
@@ -1582,15 +1633,6 @@ function duration(durationText: unknown, durationMin: unknown) {
   const hours = Math.floor(rounded / 60)
   const remaining = rounded % 60
   return remaining > 0 ? `${hours} h ${remaining} min` : `${hours} h`
-}
-
-function coordinatePair(lat: unknown, lon: unknown) {
-  const latitude = knownNumber(lat)
-  const longitude = knownNumber(lon)
-  if (latitude === null || longitude === null) {
-    return 'No disponible'
-  }
-  return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
 }
 
 function isKnownNumber(value: unknown, options: { zeroUnknown?: boolean } = {}) {
