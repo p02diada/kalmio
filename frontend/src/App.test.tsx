@@ -203,6 +203,110 @@ describe('App', () => {
     expect(screen.queryByText(/JSON válido/i)).not.toBeInTheDocument()
   })
 
+  it('scrolls new agent results to the primary recommendation instead of the last alternative', async () => {
+    document.cookie = 'csrftoken=test-token'
+    const scrollIntoView = vi.fn(function (this: HTMLElement, _options?: boolean | ScrollIntoViewOptions) {})
+    Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    })
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = input.toString()
+      if (url.includes('/api/conversation/messages')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify(conversationBody([
+                {
+                  id: 'assistant-initial',
+                  type: 'AssistantMessage',
+                  version: 1,
+                  props: { text: 'Cuéntame qué necesitas.' },
+                },
+              ])),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        )
+      }
+      if (url.includes('/api/auth/csrf')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ detail: 'csrf cookie set', csrf_token: 'test-token' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+      }
+      if (url.includes('/api/conversation/message')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify(conversationBody([
+                {
+                  id: 'user-1',
+                  type: 'UserMessage',
+                  version: 1,
+                  props: { text: 'Estoy en Córdoba con un 18%' },
+                },
+                {
+                  id: 'assistant-1',
+                  type: 'AssistantMessage',
+                  version: 1,
+                  props: { text: 'Te dejo una opción principal y una alternativa útil.' },
+                },
+                {
+                  id: 'recommended-station',
+                  type: 'StationPreviewCard',
+                  version: 1,
+                  props: {
+                    stationName: 'BALLENOIL-ES336090-COLON',
+                    powerKw: 150,
+                    distanceKm: 0.8,
+                    availableEvses: 2,
+                    totalEvses: 4,
+                    connectorTypes: ['CCS2'],
+                  },
+                },
+                {
+                  id: 'alternatives',
+                  type: 'StationList',
+                  version: 1,
+                  props: {
+                    stations: [
+                      {
+                        stationName: 'Parking Calle Sevilla Nº5 - Córdoba',
+                        powerKw: 22,
+                        distanceKm: 1.2,
+                        availableEvses: 1,
+                        totalEvses: 2,
+                      },
+                    ],
+                  },
+                },
+              ])),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        )
+      }
+      return Promise.reject(new Error(`Unexpected request: ${url}`))
+    })
+
+    render(<App />)
+    fireEvent.click((await screen.findAllByRole('link', { name: /Chat/i }))[0])
+    expect(await screen.findByText('Cuéntame qué necesitas.')).toBeInTheDocument()
+    scrollIntoView.mockClear()
+
+    fireEvent.change(await screen.findByLabelText('Mensaje para Kalmio'), {
+      target: { value: 'Estoy en Córdoba con un 18%' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+
+    expect(await screen.findByText('BALLENOIL-ES336090-COLON')).toBeInTheDocument()
+    expect(screen.getByText('Parking Calle Sevilla Nº5 - Córdoba')).toBeInTheDocument()
+    await waitFor(() => {
+      const target = scrollIntoView.mock.contexts.at(-1) as HTMLElement | undefined
+      expect(target?.dataset.a2uiBlockId).toBe('recommended-station')
+    })
+    expect(scrollIntoView.mock.calls.at(-1)?.[0]).toMatchObject({ block: 'start' })
+  })
+
   it('shows the user message immediately while the backend agent is still responding', async () => {
     document.cookie = 'csrftoken=test-token'
     let resolveMessage: (response: Response) => void = () => {}

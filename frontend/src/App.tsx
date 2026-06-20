@@ -27,7 +27,7 @@ import {
   Zap,
   type LucideIcon,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 
 import { A2UIRenderer } from '@/components/a2ui/a2ui-renderer'
 import { A2UIShowcasePage } from '@/components/a2ui/a2ui-showcase'
@@ -114,6 +114,18 @@ const conversationPhases = [
   'Comprobando ruta o ubicación',
   'Buscando paradas con carga autorizada',
   'Validando riesgo y próximos pasos',
+] as const
+
+const chatScrollPriority = [
+  'StationPreviewCard',
+  'StationDetailCard',
+  'RouteSummaryCard',
+  'PlaceDetailCard',
+  'ClarifyingQuestionCard',
+  'RiskExplanationCard',
+  'ActionButtons',
+  'StationList',
+  'AssistantMessage',
 ] as const
 
 const navItems = [
@@ -434,18 +446,21 @@ function ChatPage() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const latestRef = useRef<HTMLDivElement>(null)
   const composerRef = useRef<HTMLTextAreaElement>(null)
+  const previousBlockIdsRef = useRef<Set<string>>(new Set())
   const messagesQuery = useQuery({
     queryKey: conversationMessagesQueryKey,
     queryFn: getConversationMessages,
   })
-  const renderedBlocks = messagesQuery.data
-    ? pendingUserBlock
-      ? [...messagesQuery.data.blocks, pendingUserBlock]
-      : messagesQuery.data.blocks
-    : pendingUserBlock
-      ? [pendingUserBlock]
-      : []
+  const renderedBlocks = useMemo(() => {
+    if (messagesQuery.data) {
+      return pendingUserBlock
+        ? [...messagesQuery.data.blocks, pendingUserBlock]
+        : messagesQuery.data.blocks
+    }
+    return pendingUserBlock ? [pendingUserBlock] : []
+  }, [messagesQuery.data, pendingUserBlock])
   const blockCount = renderedBlocks.length
+  const blockSignature = renderedBlocks.map((block) => `${block.id}:${block.type}`).join('|')
   const sendMutation = useMutation({
     mutationFn: sendConversationMessage,
     onSuccess: (data) => {
@@ -549,19 +564,25 @@ function ChatPage() {
   }, [isSending])
 
   useEffect(() => {
+    const previousBlockIds = previousBlockIdsRef.current
+    const newBlocks = renderedBlocks.filter((block) => !previousBlockIds.has(block.id))
+    const scrollTargetBlockId = selectChatScrollTarget(newBlocks, isSending)
+    previousBlockIdsRef.current = new Set(renderedBlocks.map((block) => block.id))
+
     if (!blockCount && !isSending && !error) {
       return
     }
     const frame = window.requestAnimationFrame(() => {
-      if (typeof latestRef.current?.scrollIntoView === 'function') {
-        latestRef.current.scrollIntoView({ block: 'end', behavior: 'smooth' })
+      const target = scrollTargetBlockId ? findA2UIBlockElement(scrollRef.current, scrollTargetBlockId) : latestRef.current
+      if (typeof target?.scrollIntoView === 'function') {
+        target.scrollIntoView({ block: scrollTargetBlockId ? 'start' : 'end', behavior: 'smooth' })
       }
       if (!isSending) {
         composerRef.current?.focus({ preventScroll: true })
       }
     })
     return () => window.cancelAnimationFrame(frame)
-  }, [blockCount, isSending, error])
+  }, [blockCount, blockSignature, isSending, error, renderedBlocks])
 
   return (
     <section className="chat-page">
@@ -612,6 +633,31 @@ function ChatPage() {
       </form>
     </section>
   )
+}
+
+function selectChatScrollTarget(blocks: A2UIBlock[], isSending: boolean) {
+  if (blocks.length === 0) {
+    return null
+  }
+  if (isSending && blocks.every((block) => block.type === 'UserMessage')) {
+    return blocks.at(-1)?.id ?? null
+  }
+  for (const blockType of chatScrollPriority) {
+    const match = blocks.find((block) => block.type === blockType)
+    if (match) {
+      return match.id
+    }
+  }
+  return blocks.find((block) => block.type !== 'UserMessage')?.id ?? blocks.at(-1)?.id ?? null
+}
+
+function findA2UIBlockElement(container: HTMLElement | null, blockId: string) {
+  if (!container) {
+    return null
+  }
+  return Array.from(container.querySelectorAll<HTMLElement>('[data-a2ui-block-id]')).find(
+    (element) => element.dataset.a2uiBlockId === blockId,
+  ) ?? null
 }
 
 function ChatEmptyState() {

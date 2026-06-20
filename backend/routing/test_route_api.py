@@ -482,6 +482,71 @@ def test_alternative_stops_list_normalizes_station_name_variant():
     }
 
 
+def test_station_list_dedupes_primary_station_already_rendered():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "primary",
+                "type": "StationPreviewCard",
+                "version": 1,
+                "props": {
+                    "name": "BALLENOIL-ES336090-COLON",
+                    "lat": 37.8882,
+                    "lon": -4.7794,
+                    "powerKw": 150,
+                },
+            },
+            {
+                "id": "alternatives",
+                "type": "StationList",
+                "version": 1,
+                "props": {
+                    "stations": [
+                        {
+                            "stationName": "BALLENOIL-ES336090-COLON",
+                            "lat": 37.8882,
+                            "lon": -4.7794,
+                            "powerKw": 150,
+                        },
+                        {
+                            "stationName": "Parking Calle Sevilla Nº5 - Córdoba",
+                            "lat": 37.883857,
+                            "lon": -4.780831,
+                            "powerKw": 22,
+                        },
+                    ]
+                },
+            },
+        ]
+    )
+
+    station_list = next(block for block in blocks if block["type"] == "StationList")
+    assert [station["name"] for station in station_list["props"]["stations"]] == [
+        "Parking Calle Sevilla Nº5 - Córdoba"
+    ]
+
+
+def test_station_list_removed_when_only_primary_station_is_repeated():
+    blocks = validate_blocks(
+        [
+            {
+                "id": "primary",
+                "type": "StationPreviewCard",
+                "version": 1,
+                "props": {"name": "BALLENOIL-ES336090-COLON", "powerKw": 150},
+            },
+            {
+                "id": "alternatives",
+                "type": "StationList",
+                "version": 1,
+                "props": {"stations": [{"stationName": "BALLENOIL-ES336090-COLON", "powerKw": 150}]},
+            },
+        ]
+    )
+
+    assert [block["type"] for block in blocks] == ["StationPreviewCard"]
+
+
 def test_action_buttons_adds_label_for_open_url_function_call():
     blocks = validate_blocks(
         [
@@ -673,7 +738,7 @@ def test_codex_prompt_guides_followups_without_backend_intent_mapping():
     assert "no puedes ubicar esa calle exacta" in prompt
     assert "sin perfil de vehículo" in prompt
     assert "planningLevel=chargers_only" in prompt
-    assert "PlaceDetailCard + StationDetailCard + StationList" in prompt
+    assert "PlaceDetailCard + StationPreviewCard + ActionButtons" in prompt
     assert "preferences.max_useful_power_kw" in prompt
     assert "No presentes la potencia superior como ventaja" in prompt
     assert "llama search_destination_chargers directamente" in prompt
@@ -684,6 +749,11 @@ def test_codex_prompt_guides_followups_without_backend_intent_mapping():
     assert "usa primero la ciudad/zona como aproximación verificable" in prompt
     assert "incluye un PlaceDetailCard como ancla" in prompt
     assert "no presentes el hotel exacto como ubicación validada" in prompt
+    assert "no satures la primera respuesta" in prompt
+    assert "no muestres StationList en esa primera respuesta" in prompt
+    assert "event.name='show_more_options'" in prompt
+    assert "pedir más opciones" in prompt
+    assert "no repitas la estación primaria dentro de StationList" in prompt
     assert "no ActionButtons" in prompt
     assert "tool_call no es un componente A2UI" in prompt
     assert "nunca debe aparecer dentro de blocks" in prompt

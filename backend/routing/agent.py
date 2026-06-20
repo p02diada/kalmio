@@ -923,13 +923,14 @@ def codex_prompt(
         "- Calle/POI/zona: intenta resolver la parte conocida con resolve_location. Si no puedes ubicar esa calle exacta, dilo y ofrece ciudad aproximada o coordenadas; no inventes coordenadas.\n"
         "- Ruta sin consumo/modelo: puedes usar plan_route para explorar contexto de ruta y paradas de carga, pero no inventes autonomía, energía ni llegada. Si plan_route devuelve planningLevel=chargers_only, dilo. Usa RouteSummaryCard para distancia/duración de la herramienta, StationPreviewCard y StationList para estaciones autorizadas cuando sean útiles, y RiskExplanationCard para explicar que no puedes validar batería de llegada ni reserva sin consumo/perfil. No repitas la duración en prosa si ya está en RouteSummaryCard; evita frases como '4 horas' y deja el dato en la tarjeta o usa formato '4 h'. Mantén el AssistantMessage inicial en una frase corta y muestra la parada principal antes del aviso largo para que aparezca pronto en móvil; orden recomendado: RouteSummaryCard, StationPreviewCard, RiskExplanationCard y después StationList. Si el usuario pregunta si 'le da', 'llega sin cargar' o 'puede llegar sin cargar' y hay origen/destino pero faltan batería actual, autonomía, modelo o consumo, puedes llamar plan_route para mostrar distancia/duración; no respondas sí/no, no afirmes que llega, pide esos datos críticos, y no muestres StationPreviewCard/StationList como recomendación principal salvo que el usuario pida paradas de respaldo o plan B. Si el usuario prefiere parar pocas veces pero faltan autonomía/consumo/modelo, di antes de las paradas que no puedes garantizar ni optimizar pocas paradas sin esos datos; presenta cualquier estación solo como punto de carga autorizado en el corredor, no como plan optimizado. Si el usuario dice que sale con X%, ese X% es batería de salida, no de llegada ni reserva; no escribas 'llegas con X%'. Si el usuario pide no llegar justo sin dar un porcentaje de reserva, no digas que indicó 20%; si usas reserve_min_percent por defecto, llámalo margen conservador por defecto. No digas asegurar/garantizar margen en chargers_only ni 'te ayudará a recuperar margen'; di que cargar ahí puede ayudar a recuperar margen operativo no validado. Si el viaje es futuro (mañana, fecha concreta, finde, viernes/domingo), añade en el AssistantMessage inicial o en el primer RiskExplanationCard, antes de cualquier StationPreviewCard o StationList, una advertencia visible: disponibilidad, acceso y tarifas pueden cambiar antes del viaje.\n"
         "- Perfil de vehículo: un modelo comercial como Tesla Model Y y una batería de salida no son un perfil autorizado de consumo/autonomía. Para plan_route, usa vehicle:null u omite vehicle salvo que el usuario haya dado explícitamente batería, capacidad útil kWh, consumo kWh/100 km, conector y potencia máxima. No rellenes campos desconocidos con null, ceros o defaults. Puedes mencionar modelo y batería en el copy, pero no calcular energía, autonomía ni llegada con ellos.\n"
-        "- Hotel/destino/estancia: si hay ciudad/POI suficiente y el usuario necesita cargar durante la estancia, llama search_destination_chargers directamente; no devuelvas solo un botón para buscar. Una ciudad conocida ya es ubicación suficiente para una búsqueda aproximada; no esperes hotel/zona exacta para la primera búsqueda, puedes pedir refinamiento después de mostrar resultados. Si el usuario da un POI/hotel dentro de una ciudad conocida, usa primero la ciudad/zona como aproximación verificable salvo que tengas coordenadas exactas autorizadas del POI; evita empezar por un punto muy estrecho que pueda ocultar cargadores urbanos útiles. No lo conviertas en ruta salvo que pidan origen-destino. Si muestras resultados de destino/estancia, incluye un PlaceDetailCard como ancla de la ubicación usada, con precision='approximate' y needsConfirmation=true cuando sea aproximación. Si el usuario dijo que el hotel no tiene cargador y la herramienta devuelve varias paradas, elige una parada primaria con StationPreviewCard usando solo distancia, potencia, conectores y puestos de carga registrados, y pon el resto como StationList; no la presentes como disponibilidad en vivo ni como reserva.\n"
+        "- Hotel/destino/estancia: si hay ciudad/POI suficiente y el usuario necesita cargar durante la estancia, llama search_destination_chargers directamente; no devuelvas solo un botón para buscar. Una ciudad conocida ya es ubicación suficiente para una búsqueda aproximada; no esperes hotel/zona exacta para la primera búsqueda, puedes pedir refinamiento después de mostrar resultados. Si el usuario da un POI/hotel dentro de una ciudad conocida, usa primero la ciudad/zona como aproximación verificable salvo que tengas coordenadas exactas autorizadas del POI; evita empezar por un punto muy estrecho que pueda ocultar cargadores urbanos útiles. No lo conviertas en ruta salvo que pidan origen-destino. Si muestras resultados de destino/estancia, incluye un PlaceDetailCard como ancla de la ubicación usada, con precision='approximate' y needsConfirmation=true cuando sea aproximación. Si el usuario dijo que el hotel no tiene cargador y la herramienta devuelve varias paradas, elige una parada primaria con StationPreviewCard usando solo distancia, potencia, conectores y puestos de carga registrados, y usa ActionButtons para navegar, refinar o pedir más opciones; no la presentes como disponibilidad en vivo ni como reserva. Reserva StationList para cuando el usuario pida ver/comparar opciones, haya empate real, baja confianza o alternativas materialmente útiles que cambien la decisión.\n"
         "- Si buscas por ciudad aproximada porque el hotel/POI exacto no está resuelto, la respuesta visible debe decirlo: usa la ciudad como aproximación, no presentes el hotel exacto como ubicación validada, y pide dirección, zona exacta o coordenadas para refinar.\n"
         "- Si el usuario menciona ida y vuelta, volver, regreso o fechas de salida/vuelta, reconoce contexto de viaje redondo. Si falta origen para planificar ida/vuelta, pregunta por el origen antes de pedir hotel/zona y no llames plan_route ni search_destination_chargers todavia. Usa ClarifyingQuestionCard con field origen/salida cuando falte el origen. No uses la ciudad destino como origen.\n"
         "- Si resolve_location recibe un hotel, calle o POI pero solo devuelve una ciudad/zona, no afirmes que conoces el lugar exacto; di que usas esa ciudad/zona como aproximación o pide coordenadas/dirección exacta.\n"
         "- Si search_destination_chargers devuelve stops, trátalos como estaciones: usa StationPreviewCard para una estación concreta o StationList para varias, con nombres y métricas exactas trazables. No uses placeholders cuando hay estaciones.\n"
+        "- En móvil, no satures la primera respuesta con todas las alternativas si hay una estación primaria clara. Por defecto, no muestres StationList en esa primera respuesta: prefiere StationPreviewCard para la recomendación, RiskExplanationCard si aporta seguridad, y ActionButtons para navegar, pedir más opciones o ajustar la búsqueda. Para pedir más opciones, usa ActionButtons con event.name='show_more_options' y un context trazable de la búsqueda o estación cuando exista; para navegación usa functionCall.openUrl si hay lat/lon trazables. Usa StationList cuando el usuario pida comparar/más opciones, cuando haya empate real, baja confianza o alternativas materialmente útiles que cambien la decisión. Si muestras StationPreviewCard y StationList juntos, no repitas la estación primaria dentro de StationList.\n"
         "- No uses superlativos globales como 'el más rápido en la ciudad' o 'el mejor de Córdoba' salvo que la herramienta lo demuestre. Acota a 'entre estas opciones' o 'según los datos disponibles' cuando compares potencia/distancia.\n"
-        "- Si ya hay stops con potencia/distancia/disponibilidad y el usuario pide comparar potencia o alternativas, responde con esos resultados; no repitas la misma búsqueda sin cambiar ubicación, radio, conector o criterio material.\n"
+        "- Si ya hay stops con potencia/distancia/disponibilidad y el usuario pide comparar potencia, alternativas o más opciones, responde con esos resultados previos; no repitas la misma búsqueda sin cambiar ubicación, radio, conector o criterio material.\n"
         "- Si una herramienta permitida falla, explica el fallo en contexto y pide una acción mínima; no fabriques datos.\n"
         "- Batería baja: pocas opciones, riesgo explícito, y ActionButtons de navegación con functionCall.openUrl cuando la estación recomendada tiene lat/lon trazables. Puedes mencionar la batería en texto de riesgo si aporta contexto, pero no la uses como métrica principal de StationPreviewCard. "
         "Si el usuario dice poca batería sin porcentaje explícito, no inventes un número; explica la batería baja en RiskExplanationCard o AssistantMessage. "
@@ -960,7 +961,7 @@ def codex_prompt(
         "Ejemplos críticos por analogía, no reglas rígidas: 'Necesito cargar ya' -> pide ubicación, no destino; 'En Córdoba' tras urgencia -> busca Córdoba; "
         "'Paseo de la Victoria de Córdoba' -> si solo resuelves Córdoba, explica la aproximación; "
         "'Voy a dormir en Valencia, busca cargadores cerca del hotel' -> llama search_destination_chargers con Valencia como aproximación y explica que el hotel exacto refina; "
-        "'Valencia centro' tras hotel sin cargador -> PlaceDetailCard + StationPreviewCard + StationList + RiskExplanationCard si falta hotel exacto, usando una parada primaria y alternativas de la herramienta; "
+        "'Valencia centro' tras hotel sin cargador -> PlaceDetailCard + StationPreviewCard + ActionButtons + RiskExplanationCard si falta hotel exacto, usando una parada primaria y dejando que el usuario pida alternativas; "
         "'Voy a Granada y duermo cerca de la Alhambra' -> usa Granada como primera búsqueda aproximada para no esconder cargadores urbanos si no tienes coordenadas exactas autorizadas del alojamiento; si es finde, antes de paradas di que disponibilidad, acceso y tarifas pueden cambiar, muestra PlaceDetailCard de Granada/Alhambra como aproximación y pide hotel/zona/direccion exacta para refinar; "
         "'Me voy 3 días a Córdoba y me quedo en el hotel Meliá' -> llama search_destination_chargers con Córdoba como aproximación, no ActionButtons; "
         "'Voy una semana a Cádiz y necesito cargar durante la estancia' -> llama search_destination_chargers con Cádiz como aproximación; usa PlaceDetailCard para la ubicación y RiskExplanationCard/AssistantMessage para explicar la incertidumbre de estancia, no preguntes primero por hotel/zona; "
@@ -4031,7 +4032,55 @@ def validate_blocks(blocks: list[dict]) -> list[dict]:
             }
         )
         valid.extend(extra_blocks_from_props(block_type, original_props, index))
-    return valid
+    return dedupe_station_list_blocks(valid)
+
+
+def dedupe_station_list_blocks(blocks: list[dict]) -> list[dict]:
+    seen_primary_stations: set[str] = set()
+    cleaned: list[dict] = []
+    for item in blocks:
+        block_type = item.get("type")
+        props = item.get("props") if isinstance(item.get("props"), dict) else {}
+        if block_type in STATION_CARD_TYPES:
+            seen_primary_stations.update(station_identities(props))
+            cleaned.append(item)
+            continue
+        if block_type != "StationList":
+            cleaned.append(item)
+            continue
+
+        stations = props.get("stations")
+        if not isinstance(stations, list):
+            cleaned.append(item)
+            continue
+
+        list_seen: set[str] = set()
+        normalized_stations = []
+        for station in stations:
+            identities = station_identities(station)
+            if identities and (identities & seen_primary_stations or identities & list_seen):
+                continue
+            list_seen.update(identities)
+            normalized_stations.append(station)
+
+        if not normalized_stations and stations:
+            continue
+        cleaned.append({**item, "props": {**props, "stations": normalized_stations}})
+    return cleaned
+
+
+def station_identities(station: Any) -> set[str]:
+    if not isinstance(station, dict):
+        return set()
+    name = normalize(display_text(station.get("name") or station.get("stationName"), ""))
+    if not name:
+        return set()
+    identities = {name}
+    lat = optional_float(station.get("lat"))
+    lon = optional_float(station.get("lon"))
+    if lat is not None and lon is not None:
+        identities.add(f"{name}@{lat:.5f},{lon:.5f}")
+    return identities
 
 
 def normalize_block_props(block_type: str, props: dict) -> dict:

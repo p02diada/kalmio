@@ -79,7 +79,9 @@ export function A2UIRenderer({
   return (
     <div className="flex min-w-0 max-w-full flex-col gap-3">
       {blocks.map((block) => (
-        <A2UIBoundary key={block.id} block={block} actions={actions} />
+        <div key={block.id} data-a2ui-block-id={block.id} data-a2ui-block-type={block.type}>
+          <A2UIBoundary block={block} actions={actions} />
+        </div>
       ))}
     </div>
   )
