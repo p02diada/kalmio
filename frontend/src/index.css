@@ -18,6 +18,9 @@
   --color-muted-foreground: oklch(45% 0.029 245);
   --color-border: oklch(88.4% 0.023 240);
   --color-border-strong: oklch(61% 0.038 245);
+  --color-input: var(--color-border);
+  --color-ring: var(--color-primary);
+  --color-destructive: var(--color-error);
   --color-primary: oklch(31% 0.09 250);
   --color-primary-foreground: oklch(99% 0.003 250);
   --color-primary-soft: oklch(92.2% 0.04 250);
@@ -85,6 +88,11 @@ select {
 :focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
+}
+
+input:focus-visible,
+textarea:focus-visible {
+  outline: none;
 }
 
 ::selection {
