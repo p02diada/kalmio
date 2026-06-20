@@ -10,7 +10,6 @@ import {
   useRouterState,
 } from '@tanstack/react-router'
 import {
-  Activity,
   AlertTriangle,
   ArrowUp,
   BatteryCharging,
@@ -19,12 +18,12 @@ import {
   ClipboardList,
   Home,
   Loader2,
+  Menu,
   MapPinned,
   MessageCircle,
   Navigation,
+  Plus,
   RotateCcw,
-  Settings,
-  UserRound,
   Zap,
   type LucideIcon,
 } from 'lucide-react'
@@ -35,15 +34,12 @@ import { A2UIShowcasePage } from '@/components/a2ui/a2ui-showcase'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
-import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
-import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -54,16 +50,17 @@ import {
   SidebarMenuItem,
   SidebarProvider,
 } from '@/components/ui/sidebar'
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
 import { Toaster } from '@/components/ui/sonner'
-import {
-  authQueryKey,
-  getCurrentUser,
-  login,
-  logout,
-  register,
-  type AuthCredentials,
-} from '@/lib/api/auth'
 import {
   clearConversation,
   conversationMessagesQueryKey,
@@ -72,17 +69,10 @@ import {
   sendConversationMessage,
 } from '@/lib/api/conversation'
 import type { A2UIBlock } from '@/lib/a2ui/types'
-import { listRoutePlans, type RoutePlanResponse } from '@/lib/api/route-plan'
 import { cn } from '@/lib/utils'
 
 const queryClient = new QueryClient()
-const routePlansQueryKey = ['route-plans'] as const
 const pendingPromptKey = 'kalmio.pendingPrompt'
-
-const defaultAuthForm: AuthCredentials = {
-  email: '',
-  password: '',
-}
 
 const quickPrompts = [
   {
@@ -129,8 +119,7 @@ const conversationPhases = [
 const navItems = [
   { to: '/', icon: Home, label: 'Inicio' },
   { to: '/chat', icon: MessageCircle, label: 'Chat' },
-  { to: '/activity', icon: Activity, label: 'Planes' },
-  { to: '/settings', icon: Settings, label: 'Cuenta' },
+  { to: '/history', icon: ClipboardList, label: 'Historial' },
 ] as const
 
 function AppShell() {
@@ -151,17 +140,10 @@ function AppShell() {
     <SidebarProvider className="app-frame">
       <DesktopSidebar pathname={pathname} />
       <SidebarInset className="app-shell">
+        <MobileTopBar pathname={pathname} />
         <div className="app-main">
           <Outlet />
         </div>
-
-        <nav className="mobile-bottom-nav" aria-label="Navegación principal">
-          <div className="mx-auto grid max-w-app-width grid-cols-4 gap-1">
-            {navItems.map((item) => (
-              <MobileNavItem key={item.to} {...item} isActive={isActivePath(pathname, item.to)} />
-            ))}
-          </div>
-        </nav>
       </SidebarInset>
       <Toaster richColors position="top-center" />
     </SidebarProvider>
@@ -169,6 +151,8 @@ function AppShell() {
 }
 
 function DesktopSidebar({ pathname }: { pathname: string }) {
+  const startNewChat = useStartNewChat()
+
   return (
     <Sidebar collapsible="icon" className="hidden md:flex">
       <SidebarHeader>
@@ -187,25 +171,104 @@ function DesktopSidebar({ pathname }: { pathname: string }) {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        <Button type="button" variant="outline" className="mx-2 justify-start" onClick={startNewChat}>
+          <Plus data-icon="inline-start" aria-hidden="true" />
+          Nuevo chat
+        </Button>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Viaje</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.slice(0, 3).map((item) => (
+              {navItems.map((item) => (
                 <DesktopNavItem key={item.to} {...item} isActive={isActivePath(pathname, item.to)} />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
-        <SidebarMenu>
-          <DesktopNavItem {...navItems[3]} isActive={isActivePath(pathname, navItems[3].to)} />
-        </SidebarMenu>
-      </SidebarFooter>
     </Sidebar>
+  )
+}
+
+function MobileTopBar({ pathname }: { pathname: string }) {
+  const startNewChat = useStartNewChat()
+  const showNewChat = pathname.startsWith('/chat')
+
+  return (
+    <header className="mobile-top-bar">
+      <div className="mobile-top-actions mobile-top-actions-left">
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button type="button" variant="ghost" size="icon" className="liquid-icon-button" aria-label="Abrir menú">
+              <Menu aria-hidden="true" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="mobile-menu-sheet">
+            <SheetHeader className="mobile-menu-header">
+              <SheetTitle className="flex min-w-0 items-center gap-2 text-base">
+                <span className="grid size-8 place-items-center rounded-md bg-primary text-primary-foreground">
+                  <MapPinned aria-hidden="true" />
+                </span>
+                <span className="font-semibold">Kalmio</span>
+              </SheetTitle>
+              <SheetDescription className="sr-only">
+                Navegación principal de Kalmio.
+              </SheetDescription>
+            </SheetHeader>
+
+            <div className="mobile-menu-section">
+              <nav className="flex flex-col" aria-label="Navegación principal">
+                {navItems.map((item) => (
+                  <MobileMenuItem key={item.to} {...item} isActive={isActivePath(pathname, item.to)} />
+                ))}
+              </nav>
+            </div>
+
+          </SheetContent>
+        </Sheet>
+      </div>
+
+      {showNewChat ? (
+        <div className="mobile-top-actions mobile-top-actions-right">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="liquid-icon-button"
+            aria-label="Nuevo chat"
+            onClick={startNewChat}
+          >
+            <Plus aria-hidden="true" />
+          </Button>
+        </div>
+      ) : null}
+    </header>
+  )
+}
+
+function MobileMenuItem({
+  to,
+  icon: Icon,
+  label,
+  isActive,
+}: {
+  to: string
+  icon: LucideIcon
+  label: string
+  isActive: boolean
+}) {
+  return (
+    <SheetClose asChild>
+      <Link
+        to={to}
+        className={cn('mobile-menu-link', isActive && 'mobile-menu-link-active')}
+      >
+        <Icon aria-hidden="true" />
+        <span>{label}</span>
+      </Link>
+    </SheetClose>
   )
 }
 
@@ -232,30 +295,23 @@ function DesktopNavItem({
   )
 }
 
-function MobileNavItem({
-  to,
-  icon: Icon,
-  label,
-  isActive,
-}: {
-  to: string
-  icon: LucideIcon
-  label: string
-  isActive: boolean
-}) {
-  return (
-    <Link
-      to={to}
-      className={cn('app-nav-item', isActive && 'app-nav-item-active')}
-    >
-      <Icon className="size-4" aria-hidden="true" />
-      <span>{label}</span>
-    </Link>
-  )
-}
-
 function isActivePath(pathname: string, to: string) {
   return to === '/' ? pathname === '/' : pathname.startsWith(to)
+}
+
+function useStartNewChat() {
+  const navigate = useNavigate()
+
+  return useCallback(() => {
+    sessionStorage.removeItem(pendingPromptKey)
+    queryClient.removeQueries({ queryKey: conversationMessagesQueryKey })
+    navigate({ to: '/chat' })
+    void clearConversation()
+      .catch(() => undefined)
+      .finally(() => {
+        queryClient.invalidateQueries({ queryKey: conversationMessagesQueryKey })
+      })
+  }, [navigate])
 }
 
 function HomePage() {
@@ -567,47 +623,26 @@ function ChatEmptyState() {
   )
 }
 
-function ActivityPage() {
-  const authQuery = useQuery({ queryKey: authQueryKey, queryFn: getCurrentUser })
-  const plansQuery = useQuery({
-    queryKey: routePlansQueryKey,
-    queryFn: listRoutePlans,
-    enabled: authQuery.data?.authenticated === true,
-  })
-
+function HistoryPage() {
   return (
-    <section className="space-y-4">
-      <PageHeading title="Planes" text="Historial guardado de planes EV completos para tu cuenta." />
-      {authQuery.isPending || (authQuery.data?.authenticated && plansQuery.isPending) ? <ConversationSkeleton /> : null}
-      {!authQuery.isPending && !authQuery.data?.authenticated ? (
-        <AccountRequiredCard text="Inicia sesión para consultar planes guardados. La conversación anónima vive solo en la sesión actual." />
-      ) : null}
-      {plansQuery.error ? <InlineError message={plansQuery.error instanceof Error ? plansQuery.error.message : 'No se pudo cargar el historial.'} /> : null}
-      {plansQuery.data && plansQuery.data.length > 0 ? <RoutePlanHistory plans={plansQuery.data} /> : null}
-      {plansQuery.data && plansQuery.data.length === 0 ? (
-        <Card>
-          <CardContent className="flex items-start gap-3 p-4">
-            <span className="grid size-9 shrink-0 place-items-center rounded-md bg-muted text-foreground">
-              <ClipboardList className="size-5" aria-hidden="true" />
-            </span>
-            <div className="space-y-1">
-              <h2 className="font-bold">Todavía no hay planes guardados</h2>
-              <p className="text-sm leading-6 text-muted-foreground">
-                El agente puede explorar paradas de carga sin cuenta. El guardado queda reservado para planes EV completos.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
-    </section>
-  )
-}
-
-function SettingsPage() {
-  return (
-    <section className="space-y-4">
-      <PageHeading title="Cuenta" text="Sesión para consultar tus planes guardados cuando existan." />
-      <AccountPanel />
+    <section className="flex flex-col gap-4">
+      <PageHeading title="Historial" text="Sesiones de chat para continuar decisiones de carga sin repetir contexto." />
+      <Card>
+        <CardContent className="flex items-start gap-3 p-4">
+          <span className="grid size-9 shrink-0 place-items-center rounded-md bg-muted text-foreground">
+            <ClipboardList className="size-5" aria-hidden="true" />
+          </span>
+          <div className="flex flex-col gap-2">
+            <h2 className="font-semibold text-foreground">Todavía no hay sesiones guardadas</h2>
+            <p className="text-sm leading-6 text-muted-foreground">
+              Ahora puedes continuar la conversación activa. Cuando el historial persistente esté disponible, cada chat aparecerá aquí con su último estado.
+            </p>
+            <Button asChild variant="outline" className="w-fit">
+              <Link to="/chat">Abrir chat</Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </section>
   )
 }
@@ -980,157 +1015,6 @@ function ThemeDecisionPreview() {
   )
 }
 
-function RoutePlanHistory({ plans }: { plans: RoutePlanResponse[] }) {
-  return (
-    <div className="space-y-3">
-      {plans.map((plan) => (
-        <Card key={plan.id ?? `${plan.origin_label}-${plan.destination_label}-${plan.created_at}`}>
-          <CardContent className="space-y-3 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="font-semibold">
-                  {plan.origin_label} {'->'} {plan.destination_label}
-                </h2>
-                <p className="text-xs leading-5 text-muted-foreground">
-                  {plan.created_at ? new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(plan.created_at)) : 'Sin fecha'}
-                </p>
-              </div>
-              <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium text-foreground">
-                {plan.arrival_battery_percent !== null ? `${plan.arrival_battery_percent}%` : 'Exploración'}
-              </span>
-            </div>
-            <MetricRows
-              rows={[
-                ['Parada', plan.recommendation.name],
-                ['Ruta', `${plan.distance_km} km · ${plan.duration_min} min`],
-                ['Energía', plan.energy_kwh !== null ? `${plan.energy_kwh} kWh` : 'No calculada'],
-              ]}
-            />
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  )
-}
-
-function AccountPanel() {
-  const authQuery = useQuery({ queryKey: authQueryKey, queryFn: getCurrentUser })
-  const [mode, setMode] = useState<'login' | 'register'>('login')
-  const [form, setForm] = useState<AuthCredentials>(defaultAuthForm)
-  const [error, setError] = useState<string | null>(null)
-  const submitMutation = useMutation({
-    mutationFn: () => (mode === 'login' ? login(form) : register(form)),
-    onMutate: () => setError(null),
-    onSuccess: (user) => {
-      queryClient.setQueryData(authQueryKey, user)
-      queryClient.invalidateQueries({ queryKey: routePlansQueryKey })
-      setForm(defaultAuthForm)
-    },
-    onError: (mutationError) => {
-      setError(mutationError instanceof Error ? mutationError.message : 'No se pudo completar la autenticación.')
-    },
-  })
-  const logoutMutation = useMutation({
-    mutationFn: logout,
-    onSuccess: (user) => {
-      queryClient.setQueryData(authQueryKey, user)
-      queryClient.removeQueries({ queryKey: routePlansQueryKey })
-    },
-    onError: (mutationError) => {
-      setError(mutationError instanceof Error ? mutationError.message : 'No se pudo cerrar sesión.')
-    },
-  })
-
-  if (authQuery.isPending) {
-    return <ConversationSkeleton />
-  }
-
-  if (authQuery.data?.authenticated) {
-    return (
-      <Card className="bg-muted">
-        <CardContent className="space-y-4 p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-foreground">Sesión activa</p>
-              <p className="text-sm leading-6 text-foreground">{authQuery.data.email}</p>
-            </div>
-            <Button type="button" variant="secondary" size="sm" onClick={() => logoutMutation.mutate()} disabled={logoutMutation.isPending}>
-              Cerrar sesión
-            </Button>
-          </div>
-          {error ? <InlineError message={error} /> : null}
-        </CardContent>
-      </Card>
-    )
-  }
-
-  return (
-    <Card>
-      <CardContent className="space-y-4 pt-6">
-        <div className="grid grid-cols-2 gap-2 rounded-md bg-muted p-1">
-          <Button type="button" variant={mode === 'login' ? 'default' : 'ghost'} onClick={() => setMode('login')}>
-            Entrar
-          </Button>
-          <Button type="button" variant={mode === 'register' ? 'default' : 'ghost'} onClick={() => setMode('register')}>
-            Crear cuenta
-          </Button>
-        </div>
-        <form
-          className="space-y-4"
-          onSubmit={(event) => {
-            event.preventDefault()
-            submitMutation.mutate()
-          }}
-        >
-          <div className="space-y-2">
-            <Label htmlFor="account-email">Email</Label>
-            <Input
-              id="account-email"
-              type="email"
-              autoComplete="email"
-              value={form.email}
-              onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="account-password">Contraseña</Label>
-            <Input
-              id="account-password"
-              type="password"
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              value={form.password}
-              onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
-            />
-          </div>
-          {error ? <InlineError message={error} /> : null}
-          <Button type="submit" className="w-full" disabled={submitMutation.isPending}>
-            {submitMutation.isPending ? 'Procesando...' : mode === 'login' ? 'Entrar' : 'Crear cuenta'}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
-  )
-}
-
-function AccountRequiredCard({ text }: { text: string }) {
-  return (
-    <Card className="bg-muted">
-      <CardContent className="flex items-start gap-3 p-4">
-        <span className="grid size-9 shrink-0 place-items-center rounded-md bg-surface text-foreground">
-          <UserRound className="size-5" aria-hidden="true" />
-        </span>
-        <div className="space-y-2">
-          <h2 className="font-semibold text-foreground">Cuenta requerida</h2>
-          <p className="text-sm leading-6 text-foreground">{text}</p>
-          <Link className="text-sm font-semibold text-link underline-offset-4 hover:underline" to="/settings">
-            Ir a Cuenta
-          </Link>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
 function ConversationProgress({ phaseIndex }: { phaseIndex: number }) {
   const progress = ((phaseIndex + 1) / conversationPhases.length) * 100
 
@@ -1183,19 +1067,6 @@ function ConversationSkeleton() {
   )
 }
 
-function MetricRows({ rows }: { rows: Array<[string, string]> }) {
-  return (
-    <dl className="grid gap-2 text-sm">
-      {rows.map(([label, value]) => (
-        <div key={label} className="flex items-center justify-between gap-3">
-          <dt className="text-muted-foreground">{label}</dt>
-          <dd className="text-right font-medium">{value}</dd>
-        </div>
-      ))}
-    </dl>
-  )
-}
-
 function PageHeading({ title, text }: { title: string; text: string }) {
   return (
     <div className="space-y-2">
@@ -1221,16 +1092,10 @@ const chatRoute = createRoute({
   component: ChatPage,
 })
 
-const activityRoute = createRoute({
+const historyRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/activity',
-  component: ActivityPage,
-})
-
-const settingsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/settings',
-  component: SettingsPage,
+  path: '/history',
+  component: HistoryPage,
 })
 
 const a2uiRoute = createRoute({
@@ -1248,8 +1113,7 @@ const designSystemRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   chatRoute,
-  activityRoute,
-  settingsRoute,
+  historyRoute,
   a2uiRoute,
   designSystemRoute,
 ])
