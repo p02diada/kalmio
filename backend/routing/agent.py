@@ -912,75 +912,76 @@ def codex_prompt(
         "Comportamiento EV esperado:\n"
         "- Usa el historial útil, acepta correcciones naturales y no suenes como formulario.\n"
         "- Presenta las recomendaciones como paradas o lugares útiles para el viaje; usa name/stationName como punto de carga trazable y placeName solo si sale de herramienta o del usuario. No inventes lugares, servicios ni POIs.\n"
-        "- En copy visible, expresa duraciones largas en horas y minutos (por ejemplo, 8 h 37 min), no como cientos de minutos.\n"
-        "- Carga urgente sin ubicación: pide solo ubicación actual, ciudad/zona o coordenadas. No pidas destino para una carga urgente.\n"
+        "- En copy visible, expresa duraciones largas en horas y minutos (por ejemplo, 8 h 37 min), no como cientos de minutos. Evita la palabra técnica 'trazado/trazados': para el conductor usa 'según los datos disponibles', 'registrado', 'indicado', 'verificado' o 'autorizado' según el dato.\n"
+        "- Carga urgente sin ubicación: pide solo ubicación actual, ciudad/zona o coordenadas. No pidas destino para una carga urgente. No llames resolve_location con frases que no son ubicaciones concretas, como 'no conozco la zona', 'estoy en carretera', 'tengo poca batería' o 'voy con niños'; pregunta el dato mínimo primero.\n"
         "- Tras una urgencia, una ciudad/zona/coordenadas es continuación de la urgencia; usa herramientas si hay ubicación suficiente.\n"
         "- Si el usuario corrige la ubicación, descarta la anterior, conserva batería, conector y preferencias si siguen teniendo sentido y busca con la nueva.\n"
         "- Si pregunta por un fallo anterior, no contradigas bloques ya validados; explica validación, cobertura, aproximación o datos autorizados.\n"
         "- Calle/POI/zona: intenta resolver la parte conocida con resolve_location. Si no puedes ubicar esa calle exacta, dilo y ofrece ciudad aproximada o coordenadas; no inventes coordenadas.\n"
-        "- Ruta sin consumo/modelo: puedes usar plan_route para explorar contexto de ruta y paradas de carga, pero no inventes autonomía, energía ni llegada. Si plan_route devuelve planningLevel=chargers_only, dilo. Usa RouteSummaryCard para distancia/duración trazadas, StationDetailCard y StationList para estaciones trazadas cuando sean útiles, y RiskExplanationCard para explicar que no puedes validar batería de llegada ni reserva sin consumo/perfil. No repitas la duración en prosa si ya está en RouteSummaryCard; evita frases como '4 horas' y deja el dato en la tarjeta o usa formato '4 h'. Mantén el AssistantMessage inicial en una frase corta y muestra la parada principal antes del aviso largo para que aparezca pronto en móvil; orden recomendado: RouteSummaryCard, StationDetailCard, RiskExplanationCard y después StationList. Si el usuario pregunta si 'le da', 'llega sin cargar' o 'puede llegar sin cargar' y hay origen/destino pero faltan batería actual, autonomía, modelo o consumo, puedes llamar plan_route para mostrar distancia/duración; no respondas sí/no, no afirmes que llega, pide esos datos críticos, y no muestres StationDetailCard/StationList como recomendación principal salvo que el usuario pida paradas de respaldo o plan B. Si el usuario prefiere parar pocas veces pero faltan autonomía/consumo/modelo, di antes de las paradas que no puedes garantizar ni optimizar pocas paradas sin esos datos; presenta cualquier estación solo como punto de carga trazado en el corredor, no como plan optimizado. Si el usuario dice que sale con X%, ese X% es batería de salida, no de llegada ni reserva; no escribas 'llegas con X%'. Si el usuario pide no llegar justo sin dar un porcentaje de reserva, no digas que indicó 20%; si usas reserve_min_percent por defecto, llámalo margen conservador por defecto. No digas asegurar/garantizar margen en chargers_only ni 'te ayudará a recuperar margen'; di que cargar ahí puede ayudar a recuperar margen operativo no validado. Si el viaje es futuro (mañana, fecha concreta, finde, viernes/domingo), añade en el AssistantMessage inicial o en el primer RiskExplanationCard, antes de cualquier StationDetailCard o StationList, una advertencia visible: disponibilidad, acceso y tarifas pueden cambiar antes del viaje.\n"
+        "- Ruta sin consumo/modelo: puedes usar plan_route para explorar contexto de ruta y paradas de carga, pero no inventes autonomía, energía ni llegada. Si plan_route devuelve planningLevel=chargers_only, dilo. Usa RouteSummaryCard para distancia/duración de la herramienta, StationDetailCard y StationList para estaciones autorizadas cuando sean útiles, y RiskExplanationCard para explicar que no puedes validar batería de llegada ni reserva sin consumo/perfil. No repitas la duración en prosa si ya está en RouteSummaryCard; evita frases como '4 horas' y deja el dato en la tarjeta o usa formato '4 h'. Mantén el AssistantMessage inicial en una frase corta y muestra la parada principal antes del aviso largo para que aparezca pronto en móvil; orden recomendado: RouteSummaryCard, StationDetailCard, RiskExplanationCard y después StationList. Si el usuario pregunta si 'le da', 'llega sin cargar' o 'puede llegar sin cargar' y hay origen/destino pero faltan batería actual, autonomía, modelo o consumo, puedes llamar plan_route para mostrar distancia/duración; no respondas sí/no, no afirmes que llega, pide esos datos críticos, y no muestres StationDetailCard/StationList como recomendación principal salvo que el usuario pida paradas de respaldo o plan B. Si el usuario prefiere parar pocas veces pero faltan autonomía/consumo/modelo, di antes de las paradas que no puedes garantizar ni optimizar pocas paradas sin esos datos; presenta cualquier estación solo como punto de carga autorizado en el corredor, no como plan optimizado. Si el usuario dice que sale con X%, ese X% es batería de salida, no de llegada ni reserva; no escribas 'llegas con X%'. Si el usuario pide no llegar justo sin dar un porcentaje de reserva, no digas que indicó 20%; si usas reserve_min_percent por defecto, llámalo margen conservador por defecto. No digas asegurar/garantizar margen en chargers_only ni 'te ayudará a recuperar margen'; di que cargar ahí puede ayudar a recuperar margen operativo no validado. Si el viaje es futuro (mañana, fecha concreta, finde, viernes/domingo), añade en el AssistantMessage inicial o en el primer RiskExplanationCard, antes de cualquier StationDetailCard o StationList, una advertencia visible: disponibilidad, acceso y tarifas pueden cambiar antes del viaje.\n"
         "- Perfil de vehículo: un modelo comercial como Tesla Model Y y una batería de salida no son un perfil autorizado de consumo/autonomía. Para plan_route, usa vehicle:null u omite vehicle salvo que el usuario haya dado explícitamente batería, capacidad útil kWh, consumo kWh/100 km, conector y potencia máxima. No rellenes campos desconocidos con null, ceros o defaults. Puedes mencionar modelo y batería en el copy, pero no calcular energía, autonomía ni llegada con ellos.\n"
-        "- Hotel/destino/estancia: si hay ciudad/POI suficiente y el usuario necesita cargar durante la estancia, llama search_destination_chargers directamente; no devuelvas solo un botón para buscar. Una ciudad conocida ya es ubicación suficiente para una búsqueda aproximada; no esperes hotel/zona exacta para la primera búsqueda, puedes pedir refinamiento después de mostrar resultados trazados. No lo conviertas en ruta salvo que pidan origen-destino. Si el usuario dijo que el hotel no tiene cargador y la herramienta devuelve varias paradas, elige una parada primaria con StationDetailCard usando solo distancia, potencia, conectores y EVSEs trazados, y pon el resto como StationList; no la presentes como disponibilidad en vivo ni como reserva.\n"
+        "- Hotel/destino/estancia: si hay ciudad/POI suficiente y el usuario necesita cargar durante la estancia, llama search_destination_chargers directamente; no devuelvas solo un botón para buscar. Una ciudad conocida ya es ubicación suficiente para una búsqueda aproximada; no esperes hotel/zona exacta para la primera búsqueda, puedes pedir refinamiento después de mostrar resultados. Si el usuario da un POI/hotel dentro de una ciudad conocida, usa primero la ciudad/zona como aproximación verificable salvo que tengas coordenadas exactas autorizadas del POI; evita empezar por un punto muy estrecho que pueda ocultar cargadores urbanos útiles. No lo conviertas en ruta salvo que pidan origen-destino. Si muestras resultados de destino/estancia, incluye un PlaceDetailCard como ancla de la ubicación usada, con precision='approximate' y needsConfirmation=true cuando sea aproximación. Si el usuario dijo que el hotel no tiene cargador y la herramienta devuelve varias paradas, elige una parada primaria con StationDetailCard usando solo distancia, potencia, conectores y puestos de carga registrados, y pon el resto como StationList; no la presentes como disponibilidad en vivo ni como reserva.\n"
         "- Si buscas por ciudad aproximada porque el hotel/POI exacto no está resuelto, la respuesta visible debe decirlo: usa la ciudad como aproximación, no presentes el hotel exacto como ubicación validada, y pide dirección, zona exacta o coordenadas para refinar.\n"
         "- Si el usuario menciona ida y vuelta, volver, regreso o fechas de salida/vuelta, reconoce contexto de viaje redondo. Si falta origen para planificar ida/vuelta, pregunta por el origen antes de pedir hotel/zona y no llames plan_route ni search_destination_chargers todavia. Usa ClarifyingQuestionCard con field origen/salida cuando falte el origen. No uses la ciudad destino como origen.\n"
         "- Si resolve_location recibe un hotel, calle o POI pero solo devuelve una ciudad/zona, no afirmes que conoces el lugar exacto; di que usas esa ciudad/zona como aproximación o pide coordenadas/dirección exacta.\n"
         "- Si search_destination_chargers devuelve stops, trátalos como estaciones: usa StationDetailCard para una estación concreta o StationList para varias, con nombres y métricas exactas trazables. No uses placeholders cuando hay estaciones.\n"
-        "- No uses superlativos globales como 'el más rápido en la ciudad' o 'el mejor de Córdoba' salvo que la herramienta lo demuestre. Acota a 'de los resultados trazados' o 'entre estas opciones' cuando compares potencia/distancia.\n"
+        "- No uses superlativos globales como 'el más rápido en la ciudad' o 'el mejor de Córdoba' salvo que la herramienta lo demuestre. Acota a 'entre estas opciones' o 'según los datos disponibles' cuando compares potencia/distancia.\n"
         "- Si ya hay stops con potencia/distancia/disponibilidad y el usuario pide comparar potencia o alternativas, responde con esos resultados; no repitas la misma búsqueda sin cambiar ubicación, radio, conector o criterio material.\n"
         "- Si una herramienta permitida falla, explica el fallo en contexto y pide una acción mínima; no fabriques datos.\n"
         "- Batería baja: pocas opciones, riesgo explícito, y ActionButtons de navegación con functionCall.openUrl cuando la estación recomendada tiene lat/lon trazables. Puedes mencionar la batería en texto de riesgo si aporta contexto, pero no la uses como métrica principal de StationDetailCard. "
         "Si el usuario dice poca batería sin porcentaje explícito, no inventes un número; explica la batería baja en RiskExplanationCard o AssistantMessage. "
-        "Trata esa situación como urgente. Orden exacto recomendado si hay coordenadas trazadas: StationDetailCard, RiskExplanationCard si hace falta, ActionButtons, y solo después StationList; nunca pongas StationList antes de ActionButtons en este caso. "
-        "Con batería <=10%, prioriza una sola estación primaria, muestra el riesgo de margen muy bajo inmediatamente junto a esa estación como frase visible para el conductor, y deja solo 1-2 alternativas trazadas después. "
+        "Trata esa situación como urgente. Orden exacto recomendado si hay coordenadas de herramienta: StationDetailCard, RiskExplanationCard si hace falta, ActionButtons, y solo después StationList; nunca pongas StationList antes de ActionButtons en este caso. "
+        "Con batería <=10%, prioriza una sola estación primaria, muestra el riesgo de margen muy bajo inmediatamente junto a esa estación como frase visible para el conductor, y deja solo 1-2 alternativas adicionales después. "
         "Si la estación primaria tiene lat/lon trazables, ActionButtons con functionCall.openUrl es obligatorio y debe ir antes de cualquier StationList; no lo sustituyas por texto. "
         "Pon RiskExplanationCard antes de las alternativas.\n"
-        "- No describas availableEvses, connector counts o EVSEs importados como 'libres', 'disponibles en vivo' u ocupación actual. Di 'EVSEs/conectores trazados' y recuerda confirmar disponibilidad si hace falta. Si el dato disponible es availableEvses, llámalo EVSEs trazados; usa 'conectores' solo cuando tengas connectorCount o connectorTypes trazados. Si el usuario pide evitar cargadores con un solo conector/EVSE, prioriza estaciones con más de 1 EVSE/conector trazado cuando la herramienta lo soporte y explica el dato sin afirmar ocupación en vivo.\n"
+        "- No describas availableEvses, totalEvses o puestos importados como 'libres', 'disponibles en vivo' u ocupación actual. En copy visible para conductores di 'puestos de carga registrados' o 'puestos'; evita la sigla técnica EVSE salvo en nombres de campos internos. Si tienes availableEvses y totalEvses, puedes mostrarlo como ratio de puestos disponibles/total, por ejemplo '4/10 puestos', sin llamarlo disponibilidad en vivo. Usa 'conectores' solo para connectorTypes como CCS2 o Type2. Si el usuario pide evitar cargadores con un solo conector/EVSE, prioriza estaciones con más de 1 puesto registrado cuando la herramienta lo soporte y explica el dato sin afirmar ocupación en vivo.\n"
         "- Punto de carga ocupado: si el historial deja claro cuál era la parada primaria anterior, no la repitas como plan B. "
         "En la respuesta visible, nombra la parada descartada y deja claro que no debe seguir siendo el plan principal. "
-        "Reutiliza exactamente alternativas trazadas previas con sus nombres, distancias, potencia y coordenadas; no cambies métricas ni inventes coordenadas. "
+        "Reutiliza exactamente alternativas previas de la herramienta con sus nombres, distancias, potencia y coordenadas; no cambies métricas ni inventes coordenadas. "
+        "Si un dato como precio, dirección exacta o puestos de carga no estaba en la alternativa previa, omítelo en vez de completarlo. "
         "Si usas navegación para una alternativa previa, usa su lat/lon exactos. Si no hay alternativas previas suficientes, vuelve a buscar con la ubicación previa o pide el dato mínimo que falte. "
         "Recuerda que la disponibilidad en vivo puede cambiar.\n"
         "- En carretera y poco desvío: pide carretera, zona actual/coordenadas y destino si faltan; no lo reduzcas a búsqueda urbana arbitraria. "
         "Cuando no haya ubicación suficiente, prefiere ClarifyingQuestionCard con una pregunta breve sobre carretera/zona actual/destino y campos carretera_o_zona_actual, destino y coordenadas. "
         "Usa PositionRequestCard solo si basta con posición actual/manual del conductor; no muestres campos genéricos de ciudad si el usuario ya dijo que está en carretera y quiere poco desvío.\n"
-        "- Si el coche carga máximo a X kW, pasa X como preferences.max_useful_power_kw; si recomiendas un cargador de más potencia, di antes de la primera parada que el coche no aprovechará más de 100 kW cuando X=100 y no presentes la potencia superior como ventaja. No digas que has filtrado o excluido paradas por potencia si todavía muestras una estación por encima de ese máximo útil; di que esa potencia superior no se premia ni cambia lo que el coche puede aprovechar.\n"
+        "- Si el coche carga máximo a X kW, pasa X como preferences.max_useful_power_kw; si recomiendas un cargador de más potencia, di antes de la primera parada una frase explícita como: 'Tu coche no aprovechará más de X kW; la potencia superior no se premia en esta elección'. No basta con decir que no necesita ultrarrápidos. No presentes la potencia superior como ventaja. No digas que has filtrado o excluido paradas por potencia si todavía muestras una estación por encima de ese máximo útil; di que esa potencia superior no se premia ni cambia lo que el coche puede aprovechar.\n"
         "- Restricción dura de llegada: sin perfil de vehículo no la presentes como cumplida; pide modelo/consumo/autonomía. Si la herramienta devuelve arrivalBattery:null o energyKwh:null, no los sustituyas por estimaciones ni por frases de certeza. Si el usuario pide llegar con al menos X%, pasa X como reserve_min_percent y di antes de cualquier StationDetailCard/StationList que ese X% no se puede validar en chargers_only sin consumo/perfil.\n"
-        "- Preferencias de precio, hubs grandes o tamaño de parada: trátalas como preferencia de decisión sobre paradas, no como comparación de hardware. Si falta ruta o ubicación, no llames herramientas con ubicaciones vacías; pide origen/destino o ubicación actual. Usa pricePerKwhEur/currency solo cuando venga trazado de herramienta y priceIsEstimated no sea true. Puedes usar CostComparisonCard para comparar tarifas por kWh entre estaciones trazadas; no calcules coste total de una sesión si no hay energía/cantidad de carga trazada. Si no hay tarifas de proveedor o solo hay tarifas estimadas, dilo sin mostrar precio. Si los datos pueden estar desactualizados, usa RiskExplanationCard; no lo conviertas en una tarifa estimada visible. No conviertas una preferencia de precio en una ruta arriesgada.\n"
-        "- Cargar antes de salir vs al llegar: si faltan datos, no calcules. Da una comparación conceptual breve: cargar antes reduce riesgo si sales bajo, la ruta es larga o no conoces carga en destino; cargar al llegar puede tener sentido si llegas con margen y hay punto trazado en destino. Luego pide origen, destino, batería actual y modelo/consumo/autonomía.\n"
-        "- Viajes futuros: di visiblemente antes de mostrar paradas que disponibilidad, acceso y tarifas pueden cambiar antes del viaje. En reparaciones A2UI, no elimines esa advertencia; debe conservar las tres palabras disponibilidad, acceso y tarifas antes de cualquier lista de paradas. Niños/comodidad: si la herramienta trae amenities en la parada primaria, debes mencionarlos brevemente por nombre en la respuesta visible como servicios trazados o comodidad potencial despues del riesgo principal; no digas que están cerca, disponibles, son seguros, ideales, perfectos o aptos para niños salvo que el dato venga explícitamente trazado.\n"
-        "- Preferencias de servicios como baños, cafetería, restaurante o comer: si faltan ruta o ubicación, pregunta por ubicación/ruta. Si el siguiente turno aporta ciudad, zona o coordenadas, conserva esa preferencia y llama search_destination_chargers con esa ubicación; no vuelvas a preguntar qué necesita. Si la búsqueda devuelve amenities vacíos o no incluye esos servicios, muestra los cargadores trazados y di visiblemente que baños/cafetería/restaurante no están verificados en esos resultados.\n"
-        "- Preferencias de desvío controlado por comodidad: usa route tooling si hay ruta. Si la herramienta trae detourMin y amenities, presenta la parada primaria como punto trazado dentro o cerca del margen pedido y menciona servicios trazados como comodidad potencial; no digas 'buenos servicios', 'más cómodo' ni que el sitio es cómodo si la herramienta solo trae amenities. No introduzcas preferencias de pocas paradas salvo que el usuario las pida. Si muestras alternativas, conserva el desvío trazado para que el usuario pueda comparar.\n"
-        "- Preferencias de seguridad nocturna o evitar sitios solitarios: si falta ubicación/ruta, pregunta por el dato mínimo sin prometer que buscarás sitios con afluencia, actividad, vigilancia o iluminación. Si el siguiente turno aporta ciudad, zona o coordenadas, conserva esa preferencia y llama search_destination_chargers con esa ubicación; no respondas solo con PlaceDetailCard. Puedes priorizar señales trazadas como dirección céntrica, potencia, EVSEs/conectores o hub si la herramienta lo trae; no afirmes seguridad, vigilancia, iluminación, afluencia, actividad ni que sea menos probable que un lugar sea solitario. Di de forma visible que Kalmio no valida seguridad ni entorno en vivo y que el conductor debe verificar el entorno al llegar de noche. Si muestras alternativas, coloca RiskExplanationCard antes de StationList para que el límite no quede escondido en móvil.\n"
+        "- Preferencias de precio, hubs grandes o tamaño de parada: trátalas como preferencia de decisión sobre paradas, no como comparación de hardware. Si falta ruta o ubicación, no llames herramientas con ubicaciones vacías; pide origen/destino o ubicación actual. Usa pricePerKwhEur/currency solo cuando venga de herramienta y priceIsEstimated no sea true. Puedes usar CostComparisonCard para comparar tarifas verificadas por kWh entre estaciones; no calcules coste total de una sesión si no hay energía/cantidad de carga. Si no hay tarifas de proveedor o solo hay tarifas estimadas, dilo sin mostrar precio. Si los datos pueden estar desactualizados, usa RiskExplanationCard; no lo conviertas en una tarifa estimada visible. No conviertas una preferencia de precio en una ruta arriesgada.\n"
+        "- Cargar antes de salir vs al llegar: si faltan datos, no calcules. Da una comparación conceptual breve: cargar antes reduce riesgo si sales bajo, la ruta es larga o no conoces carga en destino; cargar al llegar puede tener sentido si llegas con margen y hay punto autorizado en destino. Luego pide origen, destino, batería actual y modelo/consumo/autonomía.\n"
+        "- Viajes futuros: di visiblemente antes de mostrar paradas que disponibilidad, acceso y tarifas pueden cambiar antes del viaje. En reparaciones A2UI, no elimines esa advertencia; debe conservar las tres palabras disponibilidad, acceso y tarifas antes de cualquier lista de paradas. Niños/comodidad: si la herramienta trae amenities en la parada primaria, debes mencionarlos brevemente por nombre en la respuesta visible como servicios indicados o comodidad potencial despues del riesgo principal; no digas que están cerca, disponibles, son seguros, ideales, perfectos o aptos para niños salvo que el dato venga explícitamente de la herramienta. Separa proximidad de servicios: puedes decir que la estación está cerca de la ubicación buscada y que trae servicios indicados, pero no digas que restaurantes/cafeterías/baños están cerca si la herramienta solo trae amenities.\n"
+        "- Preferencias de servicios como baños, cafetería, restaurante o comer: si faltan ruta o ubicación, pregunta por ubicación/ruta. Si el siguiente turno aporta ciudad, zona o coordenadas, conserva esa preferencia y llama search_destination_chargers con esa ubicación; no vuelvas a preguntar qué necesita. Si la búsqueda devuelve amenities vacíos o no incluye esos servicios, muestra los cargadores encontrados y di visiblemente que baños/cafetería/restaurante no están verificados en esos resultados.\n"
+        "- Preferencias de desvío controlado por comodidad: usa route tooling si hay ruta. Si la herramienta trae detourMin y amenities, presenta la parada primaria como punto autorizado dentro o cerca del margen pedido y menciona servicios indicados como comodidad potencial; no digas 'buenos servicios', 'más cómodo' ni que el sitio es cómodo si la herramienta solo trae amenities. No introduzcas preferencias de pocas paradas salvo que el usuario las pida. Si muestras alternativas, conserva el desvío de la herramienta para que el usuario pueda comparar.\n"
+        "- Preferencias de seguridad nocturna o evitar sitios solitarios: si falta ubicación/ruta, pregunta por el dato mínimo sin prometer que buscarás sitios con afluencia, actividad, vigilancia o iluminación. Si el siguiente turno aporta ciudad, zona o coordenadas, conserva esa preferencia y llama search_destination_chargers con esa ubicación; no respondas solo con PlaceDetailCard. Puedes priorizar señales disponibles como dirección céntrica, potencia, puestos de carga/conectores o hub si la herramienta lo trae; no afirmes seguridad, vigilancia, iluminación, afluencia, actividad ni que sea menos probable que un lugar sea solitario. Di de forma visible que Kalmio no valida seguridad ni entorno en vivo y que el conductor debe verificar el entorno al llegar de noche. Si muestras alternativas, coloca RiskExplanationCard antes de StationList para que el límite no quede escondido en móvil.\n"
         "- Estancias de varios días: piensa en carga durante estancia y vuelta; si hay viaje redondo y falta origen, pídelo; si solo pide carga en destino y hay ubicación suficiente, busca en destino. Si la estancia añade riesgo o una decisión útil, explícalo con AssistantMessage o RiskExplanationCard; no repitas destino/noches en un componente dedicado.\n"
-        "- Rutas baratas, reservas duras, carga justa o comparativas rápida/barata necesitan origen, destino y datos de vehículo/batería para calcular energía, llegada o coste total; si faltan, pregunta en el mismo turno por origen, destino, batería actual y modelo/consumo/autonomía. Si la herramienta sí trae pricePerKwhEur y priceIsEstimated no es true, puedes comparar tarifa por kWh entre estaciones trazadas. No inventes tarifas, kWh, llegada ni comparativas de precio; si no hay datos de tarifas de proveedor, dilo.\n"
+        "- Rutas baratas, reservas duras, carga justa o comparativas rápida/barata necesitan origen, destino y datos de vehículo/batería para calcular energía, llegada o coste total; si faltan, pregunta en el mismo turno por origen, destino, batería actual y modelo/consumo/autonomía. Si la herramienta sí trae pricePerKwhEur y priceIsEstimated no es true, puedes comparar tarifa por kWh entre estaciones. No inventes tarifas, kWh, llegada ni comparativas de precio; si no hay datos de tarifas de proveedor, dilo.\n"
         "Ejemplos críticos por analogía, no reglas rígidas: 'Necesito cargar ya' -> pide ubicación, no destino; 'En Córdoba' tras urgencia -> busca Córdoba; "
         "'Paseo de la Victoria de Córdoba' -> si solo resuelves Córdoba, explica la aproximación; "
         "'Voy a dormir en Valencia, busca cargadores cerca del hotel' -> llama search_destination_chargers con Valencia como aproximación y explica que el hotel exacto refina; "
-        "'Valencia centro' tras hotel sin cargador -> PlaceDetailCard + StationDetailCard + StationList + RiskExplanationCard si falta hotel exacto, usando una parada primaria trazada y alternativas trazadas; "
-        "'Voy a Granada y duermo cerca de la Alhambra' -> llama search_destination_chargers con Alhambra/Granada aproximado; si es finde, antes de paradas di que disponibilidad, acceso y tarifas pueden cambiar, y pide hotel/zona/direccion exacta para refinar; "
+        "'Valencia centro' tras hotel sin cargador -> PlaceDetailCard + StationDetailCard + StationList + RiskExplanationCard si falta hotel exacto, usando una parada primaria y alternativas de la herramienta; "
+        "'Voy a Granada y duermo cerca de la Alhambra' -> usa Granada como primera búsqueda aproximada para no esconder cargadores urbanos si no tienes coordenadas exactas autorizadas del alojamiento; si es finde, antes de paradas di que disponibilidad, acceso y tarifas pueden cambiar, muestra PlaceDetailCard de Granada/Alhambra como aproximación y pide hotel/zona/direccion exacta para refinar; "
         "'Me voy 3 días a Córdoba y me quedo en el hotel Meliá' -> llama search_destination_chargers con Córdoba como aproximación, no ActionButtons; "
         "'Voy una semana a Cádiz y necesito cargar durante la estancia' -> llama search_destination_chargers con Cádiz como aproximación; usa PlaceDetailCard para la ubicación y RiskExplanationCard/AssistantMessage para explicar la incertidumbre de estancia, no preguntes primero por hotel/zona; "
         "'Quiero la ruta más barata, pero sin bajar del 20%' sin origen/destino -> no llames plan_route, pregunta origen, destino y datos de vehículo/batería; "
         "'Voy a Córdoba el viernes y vuelvo el domingo' -> ClarifyingQuestionCard preguntando origen/salida para planificar ida/vuelta antes de llamar herramientas; "
         "'Zaragoza a Barcelona con 25%' sin consumo/modelo -> no valides ese 25%; "
-        "'Córdoba a Valencia con 58%, no quiero llegar justo' -> plan_route puede mostrar RouteSummaryCard y paradas trazadas, pero debes decir que la llegada/reserva no se valida sin consumo o perfil; "
+        "'Córdoba a Valencia con 58%, no quiero llegar justo' -> plan_route puede mostrar RouteSummaryCard y paradas autorizadas, pero debes decir que la llegada/reserva no se valida sin consumo o perfil; "
         "'Sevilla a Granada, me da para llegar sin cargar?' -> plan_route puede mostrar RouteSummaryCard de distancia/duración, pero no respondas sí/no sin batería actual/autonomía/modelo/consumo; pide esos datos; "
         "'Alicante a Bilbao, prefiero parar pocas veces' -> plan_route puede mostrar contexto y puntos de corredor, pero debes decir antes que no puedes optimizar pocas paradas sin autonomía/consumo/modelo; "
-        "'Evita cargadores caros si hay alternativas razonables' -> pide ruta o ubicación; si la herramienta trae tarifas trazadas, compara tarifa/kWh, si no, aclara que no inventas tarifas; "
-        "'Prefiero hubs grandes aunque sean un poco más caros' -> no llames herramientas sin ruta/ubicación; pide ruta o ubicación actual y usa tarifas trazadas solo si el proveedor las da; "
+        "'Evita cargadores caros si hay alternativas razonables' -> pide ruta o ubicación; si la herramienta trae tarifas verificadas, compara tarifa/kWh, si no, aclara que no inventas tarifas; "
+        "'Prefiero hubs grandes aunque sean un poco más caros' -> no llames herramientas sin ruta/ubicación; pide ruta o ubicación actual y usa tarifas verificadas solo si el proveedor las da; "
         "'Me conviene cargar antes de salir o al llegar?' -> compara conceptualmente y pide origen, destino, batería y vehículo antes de calcular; "
-        "'Busca una parada con baños y cafetería' -> pregunta ubicación/ruta; 'Estoy cerca de Almansa' después -> llama search_destination_chargers con Almansa, muestra cargadores trazados y di que baños/cafetería no están verificados si amenities viene vacío; "
-        "'Prefiero desviarme 10 minutos si el sitio es más cómodo. Voy de Madrid a Valencia' -> plan_route, muestra desvío trazado y amenities como servicios trazados, no comodidad garantizada ni pocas paradas; "
-        "'No quiero cargar en sitios solitarios de noche' -> pregunta ubicación/ruta; 'Estoy en Valencia centro' después -> llama search_destination_chargers, muestra puntos autorizados trazados y explica que no validas seguridad, iluminación, afluencia ni actividad en vivo; "
-        "'Mi coche carga máximo a 100 kW, no necesito ultrarrápidos' -> usa preferences.max_useful_power_kw=100.\n"
+        "'Busca una parada con baños y cafetería' -> pregunta ubicación/ruta; 'Estoy cerca de Almansa' después -> llama search_destination_chargers con Almansa, muestra cargadores encontrados y di que baños/cafetería no están verificados si amenities viene vacío; "
+        "'Prefiero desviarme 10 minutos si el sitio es más cómodo. Voy de Madrid a Valencia' -> plan_route, muestra desvío de la herramienta y amenities como servicios indicados, no comodidad garantizada ni pocas paradas; "
+        "'No quiero cargar en sitios solitarios de noche' -> pregunta ubicación/ruta; 'Estoy en Valencia centro' después -> llama search_destination_chargers, muestra puntos autorizados y explica que no validas seguridad, iluminación, afluencia ni actividad en vivo; "
+        "'Mi coche carga máximo a 100 kW, no necesito ultrarrápidos' -> usa preferences.max_useful_power_kw=100 y, si muestras estaciones de más de 100 kW, di antes que el coche no aprovechará más de 100 kW y que la potencia superior no se premia.\n"
     )
     catalog_instructions = (
         "Catálogo A2UI permitido por propósito, no por reglas rígidas de intención:\n"
         "AssistantMessage texto breve; TripSummaryCard ruta clara con origin, destination, battery y arrivalReservePercent; RouteSummaryCard solo plan_route; "
-        "StationDetailCard/StationList solo estaciones de carga respaldadas por herramientas; en esos bloques name/stationName debe ser la estación trazable; address puede ser dirección/zona trazada. RiskExplanationCard incertidumbre concreta; "
-        "CostComparisonCard solo tarifas/costes de herramienta; para preferencias de precio usa pricePerKwhEur y savingPerKwhEur trazados y no estimados, no estimatedCostEur sin energía trazada. PlaceDetailCard muestra lugares o zonas resueltas; StationDetailCard muestra estación concreta con distanceKm, powerKw, pricePerKwhEur, availableEvses, connectorTypes, lat/lon cuando estén trazados; no muestres pricePerKwhEur si priceIsEstimated es true. "
+        "StationDetailCard/StationList solo estaciones de carga respaldadas por herramientas; en esos bloques name/stationName debe ser una estación verificable; address puede ser dirección/zona de herramienta. RiskExplanationCard incertidumbre concreta; "
+        "CostComparisonCard solo tarifas/costes de herramienta; para preferencias de precio usa pricePerKwhEur y savingPerKwhEur verificados y no estimados, no estimatedCostEur sin energía verificada. PlaceDetailCard muestra lugares o zonas resueltas; StationDetailCard muestra estación concreta con distanceKm, powerKw, pricePerKwhEur, availableEvses, connectorTypes, lat/lon cuando vengan de herramienta; no muestres pricePerKwhEur si priceIsEstimated es true. "
         "si quieres mostrar alternativas o riesgo, usa bloques separados StationList y RiskExplanationCard elegidos por el agente. "
-        "MapPreviewCard solo para rutas de plan_route con routeGeometry GeoJSON LineString trazada, origin/destination con coordenadas trazadas, primaryStation/stations trazadas, corridorRadiusKm y geometryPrecision='provider'. "
+        "MapPreviewCard solo para rutas de plan_route con routeGeometry GeoJSON LineString de proveedor, origin/destination con coordenadas de herramienta, primaryStation/stations de herramienta, corridorRadiusKm y geometryPrecision='provider'. "
         "Si no tienes geometría de proveedor, usa geometryPrecision='schematic' o no muestres mapa; no inventes coordenadas ni geometría. "
         "ActionButtons usa event para backend/agente, functionCall.openUrl para abrir mapas, o disabled con reason; "
         "ClarifyingQuestionCard faltan datos críticos; "
@@ -1012,7 +1013,7 @@ def codex_prompt(
         "y usa AssistantMessage solo como introducción breve, cierre o aclaración de límites. "
         "Una respuesta simple también es válida si evita sobreafirmar o si no hay datos estructurados suficientes."
     )
-    station_result_instructions = station_search_result_prompt(tool_history)
+    station_result_instructions = station_search_result_prompt(message, tool_history)
     service_result_instructions = requested_service_result_prompt(message, tool_history)
     if repair_issues:
         return (
@@ -1055,7 +1056,7 @@ def codex_prompt(
     )
 
 
-def station_search_result_prompt(tool_history: list[dict[str, Any]]) -> str:
+def station_search_result_prompt(message: str, tool_history: list[dict[str, Any]]) -> str:
     result = latest_station_search_result(tool_history)
     if not result:
         return ""
@@ -1063,10 +1064,18 @@ def station_search_result_prompt(tool_history: list[dict[str, Any]]) -> str:
     if not stops:
         return ""
     tool_name = result.get("tool") or "search_destination_chargers/plan_route"
+    destination_context = ""
+    if message_mentions_destination_or_stay(normalize(message)) and isinstance(result.get("location"), dict):
+        destination_context = (
+            "Como estos resultados vienen de una búsqueda de destino/estancia, incluye PlaceDetailCard antes de las "
+            "estaciones para mostrar la ubicación usada. Si la ubicación es ciudad/zona aproximada, usa "
+            "precision='approximate', needsConfirmation=true y pide dirección, zona exacta o coordenadas para refinar.\n"
+        )
     return (
-        f"Ya tienes resultados trazados de {tool_name} en el historial. No repitas la misma búsqueda ni pidas "
+        f"Ya tienes resultados de {tool_name} en el historial. No repitas la misma búsqueda ni pidas "
         "otra herramienta salvo que cambie materialmente ubicación, ruta, conector o preferencia. Devuelve type=final "
         "con StationDetailCard/StationList/RiskExplanationCard usando solo esos resultados.\n"
+        f"{destination_context}"
     )
 
 
@@ -1082,7 +1091,7 @@ def requested_service_result_prompt(message: str, tool_history: list[dict[str, A
         return ""
     return (
         "Dato crítico de servicios: el usuario pidió baños/cafetería/restaurante, pero los resultados de herramienta "
-        "no traen esos amenities trazados. En la respuesta final muestra los cargadores, pero di de forma visible que "
+        "no traen esos amenities. En la respuesta final muestra los cargadores, pero di de forma visible que "
         "baños/cafetería/restaurante no están verificados en esos resultados; no los inventes ni los formules como cercanos.\n"
     )
 
@@ -1307,7 +1316,7 @@ def station_props_from_result(value: dict[str, Any]) -> dict[str, Any]:
         "lat",
         "lon",
         "availableEvses",
-        "connectorCount",
+        "totalEvses",
         "connectorTypes",
         "pricePerKwhEur",
         "currency",
@@ -1323,6 +1332,7 @@ def station_props_from_result(value: dict[str, Any]) -> dict[str, Any]:
             ("max_power_kw", "powerKw"),
             ("available_evses", "availableEvses"),
             ("available_connectors", "availableEvses"),
+            ("connector_count", "totalEvses"),
             ("connector_types", "connectorTypes"),
             ("price_eur_kwh", "pricePerKwhEur"),
             ("price_per_kwh", "pricePerKwhEur"),
@@ -1661,8 +1671,8 @@ def add_station_fact(facts: dict[str, Any], value: Any) -> None:
         "lat",
         "lon",
         "availableEvses",
+        "totalEvses",
         "connectorTypes",
-        "connectorCount",
         "pricePerKwhEur",
         "currency",
         "priceIsEstimated",
@@ -1681,7 +1691,7 @@ def station_value_aliases(value: dict[str, Any]) -> dict[str, Any]:
         "lat": ("lat",),
         "lon": ("lon",),
         "availableEvses": ("availableEvses", "available_evses", "availableConnectors", "available_connectors"),
-        "connectorCount": ("connectorCount", "connector_count"),
+        "totalEvses": ("totalEvses", "total_evses", "connector_count"),
         "connectorTypes": ("connectorTypes", "connector_types"),
         "pricePerKwhEur": ("pricePerKwhEur", "pricePerKwh", "price_eur_kwh", "price_per_kwh"),
         "currency": ("currency",),
@@ -1793,21 +1803,30 @@ def comfort_copy_contract_issues(blocks: list[dict]) -> list[str]:
     )
     if any(visible_text_has_term(visible_text, term) for term in unsafe_terms):
         return [
-            "La respuesta hace un claim de seguridad/comodidad para niños no trazado. "
-            "Debe formular servicios solo como datos trazados o comodidad potencial, sin ideal/seguro/apto/entretener."
+            "La respuesta hace un claim de seguridad/comodidad para niños no respaldado por datos. "
+            "Debe formular servicios solo como datos indicados o comodidad potencial, sin ideal/seguro/apto/entretener."
         ]
-    amenity_terms = ("cafeteria", "cafe", "supermercado", "restaurante", "bano", "banos")
-    proximity_terms = ("cerca", "cercano", "cercana", "cercanos", "cercanas")
-    if any(visible_text_has_term(visible_text, term) for term in proximity_terms) and any(
-        visible_text_has_term(visible_text, term) for term in amenity_terms
-    ):
+    if claims_service_proximity(visible_text):
         if is_service_location_clarifying_copy(blocks, visible_text) or mentions_unverified_service_data(visible_text):
             return []
         return [
-            "La respuesta afirma que un servicio está cerca sin dato trazable de proximidad. "
-            "Debe decir servicios trazados o comodidad potencial y pedir confirmación."
+            "La respuesta afirma que un servicio está cerca sin dato verificable de proximidad. "
+            "Debe decir servicios indicados o comodidad potencial y pedir confirmación."
         ]
     return []
+
+
+def claims_service_proximity(visible_text: str) -> bool:
+    amenity_terms = ("cafeteria", "cafe", "supermercado", "restaurante", "bano", "banos")
+    proximity_terms = ("cerca", "cercano", "cercana", "cercanos", "cercanas")
+    nearby_words = r"(?:[^\w.!?;:]+\w+){0,6}[^\w.!?;:]+"
+    for amenity in amenity_terms:
+        for proximity in proximity_terms:
+            if re.search(rf"\b{re.escape(amenity)}\b{nearby_words}\b{re.escape(proximity)}\b", visible_text):
+                return True
+            if re.search(rf"\b{re.escape(proximity)}\b{nearby_words}\b{re.escape(amenity)}\b", visible_text):
+                return True
+    return False
 
 
 def night_safety_copy_contract_issues(blocks: list[dict], message: str) -> list[str]:
@@ -1838,8 +1857,8 @@ def night_safety_copy_contract_issues(blocks: list[dict], message: str) -> list[
     )
     if any(term in visible_text for term in unsafe_terms):
         return [
-            "La respuesta hace una inferencia de seguridad nocturna no trazada. "
-            "Puede decir que prioriza señales trazadas como dirección céntrica o EVSEs, "
+            "La respuesta hace una inferencia de seguridad nocturna no respaldada por datos. "
+            "Puede decir que prioriza señales disponibles como dirección céntrica o puestos de carga, "
             "pero no puede usar afluencia, actividad, vigilancia o iluminación como criterio positivo; "
             "debe aclarar que no valida seguridad, iluminación ni afluencia en vivo."
         ]
@@ -2029,7 +2048,7 @@ def single_connector_preference_contract_issues(
     ):
         issues.append(
             "El usuario pidio evitar cargadores con un solo conector/EVSE, pero la parada primaria tiene "
-            "solo 1 EVSE/conector trazado y hay alternativas con mas de 1. La primaria debe usar una opcion multi-EVSE/conector trazada."
+            "solo 1 puesto/conector registrado y hay alternativas con mas de 1. La primaria debe usar una opcion multi-puesto registrada."
         )
 
     visible_text = normalize(
@@ -2041,8 +2060,8 @@ def single_connector_preference_contract_issues(
     )
     if claims_connector_count_without_connector_count(visible_text, candidates):
         issues.append(
-            "La respuesta presenta availableEvses como conteo de conectores. Debe decir EVSEs trazados "
-            "o puntos de carga importados, y reservar 'conectores' para connectorCount/connectorTypes trazados."
+            "La respuesta presenta availableEvses como conteo de conectores. Debe decir puestos de carga registrados "
+            "o puntos de carga importados, y reservar 'conectores' para connectorTypes."
         )
     return issues
 
@@ -2097,17 +2116,17 @@ def traced_evse_or_connector_count(value: dict[str, Any] | None) -> float | None
     if not isinstance(value, dict):
         return None
     aliases = station_value_aliases(value)
-    connector_count = optional_float(aliases.get("connectorCount"))
-    if connector_count is not None:
-        return connector_count
+    total_evses = optional_float(aliases.get("totalEvses"))
+    if total_evses is not None:
+        return total_evses
     return optional_float(aliases.get("availableEvses"))
 
 
 def claims_connector_count_without_connector_count(visible_text: str, candidates: list[dict[str, Any]]) -> bool:
     if not visible_text:
         return False
-    has_connector_count = any(optional_float(station_value_aliases(candidate).get("connectorCount")) is not None for candidate in candidates)
-    if has_connector_count:
+    has_total_evses = any(optional_float(station_value_aliases(candidate).get("totalEvses")) is not None for candidate in candidates)
+    if has_total_evses:
         return False
     return any(
         phrase in visible_text
@@ -2353,7 +2372,7 @@ def few_stops_copy_context_contract_issues(blocks: list[dict], message: str) -> 
     ):
         return [
             "La respuesta introduce una preferencia de pocas paradas que el usuario no pidió. "
-            "Debe mantener el foco en la preferencia real: desvío controlado y comodidad trazada."
+            "Debe mantener el foco en la preferencia real: desvío controlado y comodidad indicada."
         ]
     return []
 
@@ -2372,7 +2391,13 @@ def future_trip_volatility_copy_contract_issues(blocks: list[dict], message: str
     )
     if not has_route_or_charge_block and not claims_route_or_stops:
         return []
-    availability_terms = ("disponibilidad", "ocupacion", "ocupación", "evses trazados", "conectores trazados")
+    availability_terms = (
+        "disponibilidad",
+        "ocupacion",
+        "ocupación",
+        "evses registrados",
+        "conectores registrados",
+    )
     access_terms = ("acceso", "accesos")
     tariff_terms = ("tarifa", "tarifas", "precio", "precios", "coste", "costes")
     if (
@@ -2811,6 +2836,23 @@ def message_mentions_hotel_or_poi(normalized_text: str) -> bool:
     )
 
 
+def message_mentions_destination_or_stay(normalized_text: str) -> bool:
+    return message_mentions_hotel_or_poi(normalized_text) or any(
+        term in normalized_text
+        for term in (
+            "destino",
+            "estancia",
+            "durante la estancia",
+            "semana",
+            "dias",
+            "días",
+            "finde",
+            "fin de semana",
+            "al llegar",
+        )
+    )
+
+
 def asks_for_refinement(normalized_text: str) -> bool:
     return any(
         term in normalized_text
@@ -2892,7 +2934,7 @@ def station_metric_contract_issues(label: str, props: dict, facts: dict[str, Any
 
     issues: list[str] = []
     rendered_values = station_value_aliases(props)
-    for field in ("powerKw", "distanceKm", "detourMin", "lat", "lon", "availableEvses", "pricePerKwhEur"):
+    for field in ("powerKw", "distanceKm", "detourMin", "lat", "lon", "availableEvses", "totalEvses", "pricePerKwhEur"):
         if field not in rendered_values:
             continue
         rendered = rendered_values.get(field)
@@ -2964,7 +3006,7 @@ def map_preview_contract_issues(
         if lat is None or lon is None:
             issues.append(f"MapPreviewCard.{field} necesita lat y lon juntos.")
         elif not coordinate_traced(lat, lon, facts["locations"], explicit_coordinates):
-            issues.append(f"MapPreviewCard.{field} no coincide con una ubicación trazada.")
+            issues.append(f"MapPreviewCard.{field} no coincide con una ubicación de herramienta.")
 
     primary_station = props.get("primaryStation")
     if isinstance(primary_station, dict):
@@ -3168,7 +3210,7 @@ def close_station_coordinates(lat: float, lon: float, expected_lat: Any, expecte
 def cost_contract_issues(props: dict, facts: dict[str, Any]) -> list[str]:
     rendered_price = optional_float(props.get("pricePerKwhEur") or props.get("pricePerKwh"))
     if rendered_price is None:
-        return ["CostComparisonCard necesita pricePerKwhEur trazado; no debe mostrar comparativas sin tarifa."]
+        return ["CostComparisonCard necesita pricePerKwhEur verificado; no debe mostrar comparativas sin tarifa."]
 
     best = display_text(props.get("best") or props.get("stationName") or props.get("name"), "")
     source = facts["stations"].get(station_key(best)) if best else None
@@ -3178,9 +3220,9 @@ def cost_contract_issues(props: dict, facts: dict[str, Any]) -> list[str]:
         return [f"CostComparisonCard no debe comparar precio porque la tarifa para {best} está marcada como estimada."]
     expected = optional_float(source.get("pricePerKwhEur"))
     if expected is None:
-        return [f"CostComparisonCard no puede comparar precio porque {best} no tiene tarifa trazada."]
+        return [f"CostComparisonCard no puede comparar precio porque {best} no tiene tarifa verificada."]
     if not values_match(rendered_price, expected):
-        return [f"CostComparisonCard.pricePerKwhEur no coincide con la tarifa trazada para {best}."]
+        return [f"CostComparisonCard.pricePerKwhEur no coincide con la tarifa verificada para {best}."]
 
     compared_price = optional_float(props.get("comparedWithPricePerKwhEur"))
     compared_with = display_text(props.get("comparedWith"), "")
@@ -3194,14 +3236,14 @@ def cost_contract_issues(props: dict, facts: dict[str, Any]) -> list[str]:
             ]
         compared_expected = optional_float(compared_source.get("pricePerKwhEur"))
         if compared_expected is None:
-            return [f"CostComparisonCard no puede comparar precio porque {compared_with} no tiene tarifa trazada."]
+            return [f"CostComparisonCard no puede comparar precio porque {compared_with} no tiene tarifa verificada."]
         if not values_match(compared_price, compared_expected):
-            return [f"CostComparisonCard.comparedWithPricePerKwhEur no coincide con la tarifa trazada para {compared_with}."]
+            return [f"CostComparisonCard.comparedWithPricePerKwhEur no coincide con la tarifa verificada para {compared_with}."]
 
     if props.get("estimatedCostEur") is not None:
-        return ["CostComparisonCard.estimatedCostEur requiere energía/cantidad de carga trazada; usa tarifa por kWh si no existe."]
+        return ["CostComparisonCard.estimatedCostEur requiere energía/cantidad de carga verificada; usa tarifa por kWh si no existe."]
     if props.get("savingEur") is not None:
-        return ["CostComparisonCard.savingEur es ambiguo sin energía trazada; usa savingPerKwhEur para comparar tarifas."]
+        return ["CostComparisonCard.savingEur es ambiguo sin energía verificada; usa savingPerKwhEur para comparar tarifas."]
     return []
 
 
@@ -3741,7 +3783,7 @@ def route_station_props(station: dict[str, Any], title: str | None = None) -> di
     if station.get("available_connectors") is not None:
         props["availableEvses"] = station.get("available_connectors")
     if station.get("connector_count") is not None:
-        props["connectorCount"] = station.get("connector_count")
+        props["totalEvses"] = station.get("connector_count")
     if station.get("connector"):
         props["connectorTypes"] = [station.get("connector")]
     if isinstance(station.get("services"), list):
@@ -4173,4 +4215,4 @@ def extra_blocks_from_props(block_type: str, props: dict, index: int) -> list[di
 
 def normalize(value: str) -> str:
     substitutions = str.maketrans("áéíóúüñ", "aeiouun")
-    return value.lower().translate(substitutions)
+    return value.lower().replace("\u00a0", " ").replace("\u202f", " ").translate(substitutions)

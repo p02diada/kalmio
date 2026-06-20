@@ -1,0 +1,281 @@
+{
+  "messages": [
+    {
+      "version": "v0.9.1",
+      "createSurface": {
+        "surfaceId": "kalmio-chat",
+        "catalogId": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
+        "sendDataModel": true
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateComponents": {
+        "surfaceId": "kalmio-chat",
+        "components": [
+          {
+            "text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré.",
+            "id": "assistant-initial",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "chips": [
+              "Necesito cargar ya",
+              "Ruta con parada segura",
+              "Parada cerca del hotel",
+              "Priorizar servicios"
+            ],
+            "id": "preference-starters",
+            "component": "PreferenceChips",
+            "version": 1
+          },
+          {
+            "text": "Mi coche carga máximo a 100 kW, no necesito ultrarrápidos. Voy de Madrid a Valencia con 60%",
+            "id": "user-1bac945a33",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "text": "Tu coche carga máximo a 100 kW, así que la potencia superior de la estación recomendada no se aprovecha. He trazado la ruta de Madrid a Valencia con una parada de carga en el corredor.",
+            "id": "msg1",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "origin": "Madrid",
+            "destination": "Valencia",
+            "distanceKm": 356.7,
+            "durationMin": 240,
+            "id": "route1",
+            "component": "RouteSummaryCard",
+            "version": 1
+          },
+          {
+            "name": "Moya Hub Honrubia",
+            "stationName": "Moya Hub Honrubia",
+            "powerKw": 240,
+            "distanceKm": 1.23,
+            "detourMin": 3,
+            "availableEvses": 9,
+            "connectorCount": 12,
+            "amenities": [
+              "HOTEL",
+              "RESTAURANT",
+              "PARKING_LOT",
+              "FUEL_STATION",
+              "WIFI",
+              "CAFE",
+              "SUPERMARKET",
+              "NATURE"
+            ],
+            "lat": 39.602992,
+            "lon": -2.279669,
+            "confidence": "media",
+            "id": "stop1",
+            "component": "RecommendedStopCard",
+            "version": 1
+          },
+          {
+            "level": "medio",
+            "text": "Sin datos de autonomía ni consumo de tu coche, no puedo validar la batería de llegada ni la reserva. La parada mostrada es un punto de carga en el corredor, no un plan optimizado. Tu coche no aprovechará más de 100 kW, aunque la estación ofrezca 240 kW.",
+            "id": "risk1",
+            "component": "RiskExplanationCard",
+            "version": 1
+          },
+          {
+            "stops": [
+              {
+                "name": "V-VALENCIA-022-2",
+                "stationName": "V-VALENCIA-022-2",
+                "powerKw": 22,
+                "distanceKm": 1.73,
+                "detourMin": 4,
+                "availableEvses": 4,
+                "connectorCount": 4,
+                "amenities": [
+                  "SUPERMARKET",
+                  "MALL",
+                  "SPORT",
+                  "BUS_STOP",
+                  "PARKING_LOT",
+                  "FUEL_STATION",
+                  "RESTAURANT",
+                  "CAFE",
+                  "HOTEL",
+                  "WIFI"
+                ],
+                "lat": 39.48123,
+                "lon": -0.389118
+              },
+              {
+                "name": "V-VALENCIA-023",
+                "stationName": "V-VALENCIA-023",
+                "powerKw": 22,
+                "distanceKm": 2.9,
+                "detourMin": 7,
+                "availableEvses": 4,
+                "connectorCount": 6,
+                "amenities": [
+                  "MALL",
+                  "SPORT",
+                  "BUS_STOP",
+                  "TAXI_STAND",
+                  "PARKING_LOT",
+                  "FUEL_STATION",
+                  "RESTAURANT",
+                  "CAFE",
+                  "HOTEL",
+                  "WIFI"
+                ],
+                "lat": 39.49549,
+                "lon": -0.401537
+              }
+            ],
+            "id": "alts1",
+            "component": "AlternativeStopsList",
+            "version": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateDataModel": {
+        "surfaceId": "kalmio-chat",
+        "path": "/",
+        "value": {
+          "conversation": {
+            "surfaceId": "kalmio-chat",
+            "componentOrder": [
+              {
+                "id": "assistant-initial",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "preference-starters",
+                "component": "PreferenceChips"
+              },
+              {
+                "id": "user-1bac945a33",
+                "component": "UserMessage"
+              },
+              {
+                "id": "msg1",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "route1",
+                "component": "RouteSummaryCard"
+              },
+              {
+                "id": "stop1",
+                "component": "RecommendedStopCard"
+              },
+              {
+                "id": "risk1",
+                "component": "RiskExplanationCard"
+              },
+              {
+                "id": "alts1",
+                "component": "AlternativeStopsList"
+              }
+            ]
+          },
+          "facts": {
+            "locations": [],
+            "routes": [
+              {
+                "origin": "Madrid",
+                "destination": "Valencia",
+                "distanceKm": 356.7,
+                "durationMin": 240,
+                "sourceComponentId": "route1"
+              }
+            ],
+            "stops": [
+              {
+                "name": "Moya Hub Honrubia",
+                "stationName": "Moya Hub Honrubia",
+                "powerKw": 240,
+                "distanceKm": 1.23,
+                "detourMin": 3,
+                "availableEvses": 9,
+                "connectorCount": 12,
+                "amenities": [
+                  "HOTEL",
+                  "RESTAURANT",
+                  "PARKING_LOT",
+                  "FUEL_STATION",
+                  "WIFI",
+                  "CAFE",
+                  "SUPERMARKET",
+                  "NATURE"
+                ],
+                "lat": 39.602992,
+                "lon": -2.279669,
+                "confidence": "media",
+                "sourceComponentId": "stop1"
+              },
+              {
+                "name": "V-VALENCIA-022-2",
+                "stationName": "V-VALENCIA-022-2",
+                "powerKw": 22,
+                "distanceKm": 1.73,
+                "detourMin": 4,
+                "availableEvses": 4,
+                "connectorCount": 4,
+                "amenities": [
+                  "SUPERMARKET",
+                  "MALL",
+                  "SPORT",
+                  "BUS_STOP",
+                  "PARKING_LOT",
+                  "FUEL_STATION",
+                  "RESTAURANT",
+                  "CAFE",
+                  "HOTEL",
+                  "WIFI"
+                ],
+                "lat": 39.48123,
+                "lon": -0.389118,
+                "sourceComponentId": "alts1"
+              },
+              {
+                "name": "V-VALENCIA-023",
+                "stationName": "V-VALENCIA-023",
+                "powerKw": 22,
+                "distanceKm": 2.9,
+                "detourMin": 7,
+                "availableEvses": 4,
+                "connectorCount": 6,
+                "amenities": [
+                  "MALL",
+                  "SPORT",
+                  "BUS_STOP",
+                  "TAXI_STAND",
+                  "PARKING_LOT",
+                  "FUEL_STATION",
+                  "RESTAURANT",
+                  "CAFE",
+                  "HOTEL",
+                  "WIFI"
+                ],
+                "lat": 39.49549,
+                "lon": -0.401537,
+                "sourceComponentId": "alts1"
+              }
+            ],
+            "risks": [
+              {
+                "level": "medio",
+                "text": "Sin datos de autonomía ni consumo de tu coche, no puedo validar la batería de llegada ni la reserva. La parada mostrada es un punto de carga en el corredor, no un plan optimizado. Tu coche no aprovechará más de 100 kW, aunque la estación ofrezca 240 kW.",
+                "sourceComponentId": "risk1"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

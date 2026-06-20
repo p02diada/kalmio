@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kalmio caso 001 - antes</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f6f3ed;
+        color: #17201b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: #f6f3ed;
+      }
+
+      main {
+        width: min(100%, 430px);
+        margin: 0 auto;
+        min-height: 100vh;
+        padding: 18px 14px 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 4px 2px 10px;
+      }
+
+      .brand {
+        font-size: 0.78rem;
+        color: #68736d;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 1.42rem;
+        letter-spacing: 0;
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip,
+      .button {
+        border: 1px solid #d8d2c7;
+        background: #fffdf8;
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 0.86rem;
+        color: #26332d;
+      }
+
+      .bubble {
+        border: 1px solid #e1dbd0;
+        background: #fffdf8;
+        border-radius: 8px;
+        padding: 12px;
+        box-shadow: 0 1px 0 rgb(23 32 27 / 0.04);
+      }
+
+      .bubble.user {
+        align-self: flex-end;
+        max-width: 86%;
+        background: #18382f;
+        color: white;
+        border-color: #18382f;
+      }
+
+      .label {
+        margin-bottom: 4px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #68736d;
+      }
+
+      .user .label {
+        color: #c7ddd6;
+      }
+
+      .body {
+        margin: 0;
+        font-size: 0.94rem;
+        line-height: 1.5;
+      }
+
+      .fields {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin: 12px 0;
+      }
+
+      .field {
+        border-radius: 999px;
+        background: #eee8dd;
+        padding: 5px 8px;
+        color: #5a655e;
+        font-size: 0.76rem;
+      }
+
+      .risk {
+        border-color: #e4c386;
+        background: #fff7e6;
+      }
+
+      .risk-title {
+        margin: 0 0 6px;
+        font-size: 0.94rem;
+        font-weight: 700;
+        color: #6b4b12;
+      }
+
+      .failure {
+        border-left: 4px solid #d39722;
+      }
+
+      .caption {
+        margin-top: auto;
+        padding: 10px 2px 0;
+        font-size: 0.76rem;
+        line-height: 1.45;
+        color: #68736d;
+      }
+    </style>
+  </head>
+  <body>
+    <main aria-label="Evidencia antes del caso 001">
+      <header>
+        <div>
+          <h1>Chat</h1>
+          <div class="brand">Kalmio</div>
+        </div>
+      </header>
+
+      <section class="bubble">
+        <p class="body">
+          Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o
+          destino. Si falta un dato crítico, te lo pediré.
+        </p>
+      </section>
+
+      <section class="chips" aria-label="Atajos">
+        <span class="chip">Necesito cargar ya</span>
+        <span class="chip">Ruta con parada segura</span>
+        <span class="chip">Parada cerca del hotel</span>
+        <span class="chip">Priorizar servicios</span>
+      </section>
+
+      <section class="bubble user">
+        <div class="label">Usuario</div>
+        <p class="body">Necesito cargar ya, estoy al 12%</p>
+      </section>
+
+      <section class="bubble">
+        <div class="label">Kalmio</div>
+        <h2 class="risk-title">Necesito tu ubicación</h2>
+        <p class="body">Comparte tu ubicación o escribe una ciudad/coordenadas para continuar sin inventar resultados.</p>
+        <div class="fields">
+          <span class="field">ciudad</span>
+          <span class="field">latitud</span>
+          <span class="field">longitud</span>
+        </div>
+        <span class="button">Usar mi ubicación</span>
+        <span class="button">Escribir ubicación</span>
+      </section>
+
+      <section class="bubble user">
+        <div class="label">Usuario</div>
+        <p class="body">En Córdoba</p>
+      </section>
+
+      <section class="bubble failure">
+        <div class="label">Kalmio</div>
+        <p class="body">
+          No he podido cerrar una respuesta fiable con los datos validados. No voy a completar estaciones, coordenadas,
+          precios ni disponibilidad por mi cuenta.
+        </p>
+      </section>
+
+      <section class="bubble risk">
+        <p class="risk-title">Datos a confirmar</p>
+        <p class="body">
+          No he podido completar esta respuesta con fiabilidad. Reintenta con menos datos ambiguos o corrige origen,
+          destino, batería y conector.
+        </p>
+      </section>
+
+      <p class="caption">
+        Reconstrucción visual desde <code>reports/artifacts/case-001-turn-2.json</code>, que conserva la salida real
+        fallida de DeepSeek antes de la corrección.
+      </p>
+    </main>
+  </body>
+</html>

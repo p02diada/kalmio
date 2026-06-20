@@ -1,0 +1,245 @@
+{
+  "messages": [
+    {
+      "version": "v0.9.1",
+      "createSurface": {
+        "surfaceId": "kalmio-chat",
+        "catalogId": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
+        "sendDataModel": true
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateComponents": {
+        "surfaceId": "kalmio-chat",
+        "components": [
+          {
+            "text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré.",
+            "id": "assistant-initial",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "chips": [
+              "Necesito cargar ya",
+              "Ruta con parada segura",
+              "Parada cerca del hotel",
+              "Priorizar servicios"
+            ],
+            "id": "preference-starters",
+            "component": "PreferenceChips",
+            "version": 1
+          },
+          {
+            "text": "Quiero parar donde haya restaurante y cargadores rápidos. Voy de Madrid a Valencia con 60%",
+            "id": "user-b44fa15193",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "text": "He trazado la ruta Madrid → Valencia (356,7 km, ~4 h) y localizado paradas de carga en el corredor. La principal tiene restaurante y cargadores rápidos.",
+            "id": "msg1",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "origin": "Madrid",
+            "destination": "Valencia",
+            "distanceKm": 356.7,
+            "durationMin": 240,
+            "id": "route1",
+            "component": "RouteSummaryCard",
+            "version": 1
+          },
+          {
+            "stationName": "Moya Hub Honrubia",
+            "powerKw": 240,
+            "distanceKm": 1.23,
+            "detourMin": 3,
+            "availableEvses": 9,
+            "connectorCount": 12,
+            "amenities": [
+              "RESTAURANT",
+              "CAFE",
+              "WIFI",
+              "SUPERMARKET"
+            ],
+            "lat": 39.602992,
+            "lon": -2.279669,
+            "name": "Moya Hub Honrubia",
+            "confidence": "media",
+            "id": "stop1",
+            "component": "RecommendedStopCard",
+            "version": 1
+          },
+          {
+            "level": "medio",
+            "text": "Sin datos de autonomía ni consumo de tu vehículo, no puedo validar la batería de llegada ni el margen de reserva. Las paradas mostradas son puntos de carga trazados en el corredor, no un plan optimizado. Recuerda que disponibilidad, acceso y tarifas pueden cambiar antes del viaje.",
+            "id": "risk1",
+            "component": "RiskExplanationCard",
+            "version": 1
+          },
+          {
+            "stops": [
+              {
+                "stationName": "Aparcamiento CTM",
+                "powerKw": 400,
+                "distanceKm": 4.77,
+                "detourMin": 11,
+                "availableEvses": 15,
+                "connectorCount": 28,
+                "amenities": [
+                  "RESTAURANT",
+                  "CAFE",
+                  "HOTEL"
+                ],
+                "lat": 40.365577,
+                "lon": -3.654602,
+                "name": "Aparcamiento CTM"
+              },
+              {
+                "stationName": "V-VALENCIA-022-2",
+                "powerKw": 22,
+                "distanceKm": 1.73,
+                "detourMin": 4,
+                "availableEvses": 4,
+                "connectorCount": 4,
+                "amenities": [
+                  "RESTAURANT",
+                  "CAFE",
+                  "SUPERMARKET"
+                ],
+                "lat": 39.48123,
+                "lon": -0.389118,
+                "name": "V-VALENCIA-022-2"
+              }
+            ],
+            "id": "alt1",
+            "component": "AlternativeStopsList",
+            "version": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateDataModel": {
+        "surfaceId": "kalmio-chat",
+        "path": "/",
+        "value": {
+          "conversation": {
+            "surfaceId": "kalmio-chat",
+            "componentOrder": [
+              {
+                "id": "assistant-initial",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "preference-starters",
+                "component": "PreferenceChips"
+              },
+              {
+                "id": "user-b44fa15193",
+                "component": "UserMessage"
+              },
+              {
+                "id": "msg1",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "route1",
+                "component": "RouteSummaryCard"
+              },
+              {
+                "id": "stop1",
+                "component": "RecommendedStopCard"
+              },
+              {
+                "id": "risk1",
+                "component": "RiskExplanationCard"
+              },
+              {
+                "id": "alt1",
+                "component": "AlternativeStopsList"
+              }
+            ]
+          },
+          "facts": {
+            "locations": [],
+            "routes": [
+              {
+                "origin": "Madrid",
+                "destination": "Valencia",
+                "distanceKm": 356.7,
+                "durationMin": 240,
+                "sourceComponentId": "route1"
+              }
+            ],
+            "stops": [
+              {
+                "stationName": "Moya Hub Honrubia",
+                "powerKw": 240,
+                "distanceKm": 1.23,
+                "detourMin": 3,
+                "availableEvses": 9,
+                "connectorCount": 12,
+                "amenities": [
+                  "RESTAURANT",
+                  "CAFE",
+                  "WIFI",
+                  "SUPERMARKET"
+                ],
+                "lat": 39.602992,
+                "lon": -2.279669,
+                "name": "Moya Hub Honrubia",
+                "confidence": "media",
+                "sourceComponentId": "stop1"
+              },
+              {
+                "stationName": "Aparcamiento CTM",
+                "powerKw": 400,
+                "distanceKm": 4.77,
+                "detourMin": 11,
+                "availableEvses": 15,
+                "connectorCount": 28,
+                "amenities": [
+                  "RESTAURANT",
+                  "CAFE",
+                  "HOTEL"
+                ],
+                "lat": 40.365577,
+                "lon": -3.654602,
+                "name": "Aparcamiento CTM",
+                "sourceComponentId": "alt1"
+              },
+              {
+                "stationName": "V-VALENCIA-022-2",
+                "powerKw": 22,
+                "distanceKm": 1.73,
+                "detourMin": 4,
+                "availableEvses": 4,
+                "connectorCount": 4,
+                "amenities": [
+                  "RESTAURANT",
+                  "CAFE",
+                  "SUPERMARKET"
+                ],
+                "lat": 39.48123,
+                "lon": -0.389118,
+                "name": "V-VALENCIA-022-2",
+                "sourceComponentId": "alt1"
+              }
+            ],
+            "risks": [
+              {
+                "level": "medio",
+                "text": "Sin datos de autonomía ni consumo de tu vehículo, no puedo validar la batería de llegada ni el margen de reserva. Las paradas mostradas son puntos de carga trazados en el corredor, no un plan optimizado. Recuerda que disponibilidad, acceso y tarifas pueden cambiar antes del viaje.",
+                "sourceComponentId": "risk1"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

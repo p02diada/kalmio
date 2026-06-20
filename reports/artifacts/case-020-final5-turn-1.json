@@ -1,0 +1,103 @@
+{
+  "messages": [
+    {
+      "version": "v0.9.1",
+      "createSurface": {
+        "surfaceId": "kalmio-chat",
+        "catalogId": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
+        "sendDataModel": true
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateComponents": {
+        "surfaceId": "kalmio-chat",
+        "components": [
+          {
+            "text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré.",
+            "id": "assistant-initial",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "chips": [
+              "Necesito cargar ya",
+              "Ruta con parada segura",
+              "Parada cerca del hotel",
+              "Priorizar servicios"
+            ],
+            "id": "preference-starters",
+            "component": "PreferenceChips",
+            "version": 1
+          },
+          {
+            "text": "Voy a Córdoba el viernes y vuelvo el domingo, dónde cargo?",
+            "id": "user-9682358937",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "text": "Veo que es un viaje de ida y vuelta a Córdoba el fin de semana. ¿Desde qué ciudad sales el viernes?",
+            "id": "msg1",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "question": "¿Cuál es tu ciudad de origen o salida?",
+            "fields": [
+              {
+                "key": "origin",
+                "label": "Origen / salida",
+                "type": "text",
+                "placeholder": "Ej: Madrid, Sevilla..."
+              }
+            ],
+            "id": "clar1",
+            "component": "ClarifyingQuestionCard",
+            "version": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateDataModel": {
+        "surfaceId": "kalmio-chat",
+        "path": "/",
+        "value": {
+          "conversation": {
+            "surfaceId": "kalmio-chat",
+            "componentOrder": [
+              {
+                "id": "assistant-initial",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "preference-starters",
+                "component": "PreferenceChips"
+              },
+              {
+                "id": "user-9682358937",
+                "component": "UserMessage"
+              },
+              {
+                "id": "msg1",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "clar1",
+                "component": "ClarifyingQuestionCard"
+              }
+            ]
+          },
+          "facts": {
+            "locations": [],
+            "routes": [],
+            "stops": [],
+            "risks": []
+          }
+        }
+      }
+    }
+  ]
+}

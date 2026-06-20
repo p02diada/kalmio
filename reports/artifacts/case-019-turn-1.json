@@ -1,0 +1,228 @@
+{
+  "messages": [
+    {
+      "version": "v0.9.1",
+      "createSurface": {
+        "surfaceId": "kalmio-chat",
+        "catalogId": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
+        "sendDataModel": true
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateComponents": {
+        "surfaceId": "kalmio-chat",
+        "components": [
+          {
+            "text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré.",
+            "id": "assistant-initial",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "chips": [
+              "Necesito cargar ya",
+              "Ruta con parada segura",
+              "Parada cerca del hotel",
+              "Priorizar servicios"
+            ],
+            "id": "preference-starters",
+            "component": "PreferenceChips",
+            "version": 1
+          },
+          {
+            "text": "Voy una semana a Cádiz y necesito cargar durante la estancia",
+            "id": "user-9d18a9d62c",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "text": "He buscado puntos de carga autorizados en Cádiz para tu estancia de una semana.",
+            "id": "msg1",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "nights": 7,
+            "city": "Cádiz",
+            "recommendation": "Controlar carga cerca del alojamiento y confirmar antes de depender de ella.",
+            "id": "stay1",
+            "component": "StayPlanningCard",
+            "version": 1
+          },
+          {
+            "name": "ONCE DZ Cádiz",
+            "stationName": "ONCE DZ Cádiz",
+            "powerKw": 22,
+            "connectorTypes": [
+              "TYPE2"
+            ],
+            "availableEvses": 1,
+            "distanceKm": 0.23,
+            "address": "C/Acacias, 5, 11007, ESP",
+            "lat": 36.525602,
+            "lon": -6.286801,
+            "amenities": [],
+            "detourMin": null,
+            "confidence": "media",
+            "id": "rec1",
+            "component": "RecommendedStopCard",
+            "version": 1
+          },
+          {
+            "stops": [
+              {
+                "name": "Cádiz - Canalejas",
+                "stationName": "Cádiz - Canalejas",
+                "powerKw": 7,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "availableEvses": 16,
+                "distanceKm": 0.49,
+                "address": "Avda Del Puerto S/N, 11006, 01",
+                "lat": 36.53088,
+                "lon": -6.291401,
+                "amenities": [
+                  "PARKING_LOT"
+                ]
+              },
+              {
+                "name": "Repsol, Dársena Cádiz, Puerto",
+                "stationName": "Repsol, Dársena Cádiz, Puerto",
+                "powerKw": 22,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "availableEvses": 2,
+                "distanceKm": 0.81,
+                "address": "Puerto Cádiz\nEn estación Movele\nDársena Comer, 11006, ESP",
+                "lat": 36.533595,
+                "lon": -6.292706,
+                "amenities": []
+              }
+            ],
+            "id": "alt1",
+            "component": "AlternativeStopsList",
+            "version": 1
+          },
+          {
+            "level": "medio",
+            "text": "Datos procedentes solo de puntos de carga autorizados importados. Confirma acceso final, tarifa y disponibilidad antes de depender de ellos.",
+            "id": "risk1",
+            "component": "RiskExplanationCard",
+            "version": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateDataModel": {
+        "surfaceId": "kalmio-chat",
+        "path": "/",
+        "value": {
+          "conversation": {
+            "surfaceId": "kalmio-chat",
+            "componentOrder": [
+              {
+                "id": "assistant-initial",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "preference-starters",
+                "component": "PreferenceChips"
+              },
+              {
+                "id": "user-9d18a9d62c",
+                "component": "UserMessage"
+              },
+              {
+                "id": "msg1",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "stay1",
+                "component": "StayPlanningCard"
+              },
+              {
+                "id": "rec1",
+                "component": "RecommendedStopCard"
+              },
+              {
+                "id": "alt1",
+                "component": "AlternativeStopsList"
+              },
+              {
+                "id": "risk1",
+                "component": "RiskExplanationCard"
+              }
+            ]
+          },
+          "facts": {
+            "locations": [],
+            "routes": [],
+            "stops": [
+              {
+                "name": "ONCE DZ Cádiz",
+                "stationName": "ONCE DZ Cádiz",
+                "powerKw": 22,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "availableEvses": 1,
+                "distanceKm": 0.23,
+                "address": "C/Acacias, 5, 11007, ESP",
+                "lat": 36.525602,
+                "lon": -6.286801,
+                "amenities": [],
+                "detourMin": null,
+                "confidence": "media",
+                "sourceComponentId": "rec1"
+              },
+              {
+                "name": "Cádiz - Canalejas",
+                "stationName": "Cádiz - Canalejas",
+                "powerKw": 7,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "availableEvses": 16,
+                "distanceKm": 0.49,
+                "address": "Avda Del Puerto S/N, 11006, 01",
+                "lat": 36.53088,
+                "lon": -6.291401,
+                "amenities": [
+                  "PARKING_LOT"
+                ],
+                "sourceComponentId": "alt1"
+              },
+              {
+                "name": "Repsol, Dársena Cádiz, Puerto",
+                "stationName": "Repsol, Dársena Cádiz, Puerto",
+                "powerKw": 22,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "availableEvses": 2,
+                "distanceKm": 0.81,
+                "address": "Puerto Cádiz\nEn estación Movele\nDársena Comer, 11006, ESP",
+                "lat": 36.533595,
+                "lon": -6.292706,
+                "amenities": [],
+                "sourceComponentId": "alt1"
+              }
+            ],
+            "risks": [
+              {
+                "level": "medio",
+                "text": "Datos procedentes solo de puntos de carga autorizados importados. Confirma acceso final, tarifa y disponibilidad antes de depender de ellos.",
+                "sourceComponentId": "risk1"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

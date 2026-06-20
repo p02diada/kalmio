@@ -79,6 +79,7 @@ Backend: Django, Django Ninja, Django ORM, GeoDjango, Postgres/PostGIS, provider
 - Describe components to the agent by purpose and data requirements, not as hardcoded intent mappings.
 - Repair A2UI only for catalog, structure, action-safety, or data-traceability violations.
 - Renderer styling is controlled by the renderer/design system. Agents may provide semantic component choices and supported semantic hints, but not arbitrary CSS, raw HTML, scripts, or visual styling.
+- For charger capacity props, use EVSE semantics internally: `availableEvses` for available EVSE count and `totalEvses` for total EVSE count. Do not expose `connectorCount` as an A2UI prop. Use `connectorTypes` only for physical connector types such as CCS2 or Type2.
 - User interactions must map to official A2UI actions: `event` for backend/agent handling, or registered `functionCall` for safe local renderer behavior such as opening a URL. Do not invent ad hoc action handlers or expose raw `href` as the action model.
 - Client-to-server A2UI events must be sent as `{version:"v0.9.1", action:{...}}`; do not convert UI events into visible user chat text in the frontend.
 - Prefer `updateDataModel` / data bindings for factual route, charger, location, uncertainty, and vehicle state. Component props may reference or summarize that data, but must not become an untraceable source of facts.
@@ -103,6 +104,7 @@ Backend: Django, Django Ninja, Django ORM, GeoDjango, Postgres/PostGIS, provider
 - Use Impeccable before important UI screens.
 - Maintain consistent spacing, typography, color, states, and microcopy.
 - Avoid generic gradients and overloaded layouts.
+- Keep technical charging terms out of driver-facing labels unless they are widely understood. In visible UI/copy, show EVSE-derived capacity as "puestos de carga" or "puestos" and compact ratios like `4/10`; reserve "conectores" for physical connector types such as CCS2 or Type2. Do not label EVSE counts as connectors.
 - Prefer design tokens and Tailwind utilities directly. Add semantic CSS classes only when they encapsulate reused patterns, complex CSS, or behavior that utilities express poorly; avoid creating a parallel design system with one-off semantic classes.
 
 ## Security Rules

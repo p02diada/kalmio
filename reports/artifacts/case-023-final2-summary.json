@@ -1,0 +1,63 @@
+{
+  "ready": {
+    "status": "ready",
+    "service": "kalmio-backend",
+    "time": "2026-06-16T01:55:17.021016+00:00",
+    "checks": [
+      {
+        "name": "database",
+        "ok": true
+      },
+      {
+        "name": "migrations",
+        "ok": true
+      },
+      {
+        "name": "route_provider",
+        "ok": true,
+        "detail": {
+          "provider": "osrm"
+        }
+      },
+      {
+        "name": "authorized_charger_data",
+        "ok": true,
+        "detail": {
+          "stations": 13541
+        }
+      }
+    ]
+  },
+  "turns": [
+    {
+      "idx": 1,
+      "input": "No quiero cargar en sitios solitarios de noche",
+      "status": 200,
+      "components": [
+        "AssistantMessage",
+        "PreferenceChips",
+        "UserMessage",
+        "AssistantMessage"
+      ],
+      "visible_text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Necesito cargar ya Ruta con parada segura Parada cerca del hotel Priorizar servicios preference-starters PreferenceChips  No quiero cargar en sitios solitarios de noche user-40b143d10c UserMessage  Entendido, evitar sitios solitarios de noche. ¿Para qué ubicación o ruta necesitas buscar puntos de carga? Dime ciudad, zona o coordenadas donde estés o vayas a estar. 1 AssistantMessage "
+    },
+    {
+      "idx": 2,
+      "input": "Estoy en Valencia centro",
+      "status": 200,
+      "components": [
+        "AssistantMessage",
+        "PreferenceChips",
+        "UserMessage",
+        "AssistantMessage",
+        "UserMessage",
+        "AssistantMessage",
+        "RecommendedStopCard",
+        "RiskExplanationCard",
+        "AlternativeStopsList"
+      ],
+      "visible_text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Necesito cargar ya Ruta con parada segura Parada cerca del hotel Priorizar servicios preference-starters PreferenceChips  No quiero cargar en sitios solitarios de noche user-40b143d10c UserMessage  Entendido, evitar sitios solitarios de noche. ¿Para qué ubicación o ruta necesitas buscar puntos de carga? Dime ciudad, zona o coordenadas donde estés o vayas a estar. 1 AssistantMessage  Estoy en Valencia centro user-fbe0e780ea UserMessage  Entendido, evitas sitios solitarios de noche. He buscado puntos de carga en Valencia centro. Estos son los resultados trazados, pero recuerda que Kalmio no valida seguridad, iluminación ni afluencia en vivo; verifica el entorno al llegar. msg1 AssistantMessage  E-V-Valencia-091 E-V-Valencia-091 Roger de Lauria,10, 46002, ESP   CCS2 TYPE2    Céntrico, pero confirma entorno al llegar de noche.  media rec1 RecommendedStopCard  medio Kalmio no verifica seguridad, iluminación ni actividad en tiempo real. El conductor debe evaluar el entorno al llegar, especialmente de noche. risk1 RiskExplanationCard  E-V-Valencia-076 E-V-Valencia-076 San Vicente Mártir,57, 46002, ESP   TYPE2    APK2 Lys APK2 Lys Calle del Pintor, Calle de Martínez Cubells 3, 46002, ESP   TYPE2    alt1 AlternativeStopsList "
+    }
+  ],
+  "delete_status": 200
+}

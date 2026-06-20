@@ -1,0 +1,258 @@
+{
+  "messages": [
+    {
+      "version": "v0.9.1",
+      "createSurface": {
+        "surfaceId": "kalmio-chat",
+        "catalogId": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
+        "sendDataModel": true
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateComponents": {
+        "surfaceId": "kalmio-chat",
+        "components": [
+          {
+            "text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré.",
+            "id": "assistant-initial",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "chips": [
+              "Necesito cargar ya",
+              "Ruta con parada segura",
+              "Parada cerca del hotel",
+              "Priorizar servicios"
+            ],
+            "id": "preference-starters",
+            "component": "PreferenceChips",
+            "version": 1
+          },
+          {
+            "text": "Estoy al 8% y no conozco la zona",
+            "id": "user-bf71db209d",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "reason": "nearby_chargers",
+            "title": "Necesito tu ubicación",
+            "body": "Comparte tu ubicación o escribe una ciudad/coordenadas para continuar sin inventar resultados.",
+            "precision": "approximate",
+            "manualFields": [
+              "ciudad",
+              "latitud",
+              "longitud"
+            ],
+            "id": "loc",
+            "component": "LocationRequestCard",
+            "version": 1
+          },
+          {
+            "text": "En Córdoba",
+            "id": "user-ed47a0f271",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "battery": 8,
+            "nearest": "BALLENOIL-ES336090-COLON",
+            "stationName": "BALLENOIL-ES336090-COLON",
+            "distanceKm": 0.3,
+            "risk": "Estás al 8% de batería. El margen es muy bajo; dirígete cuanto antes a la estación más cercana.",
+            "id": "urgent_charge",
+            "component": "UrgentChargeCard",
+            "version": 1
+          },
+          {
+            "level": "medio",
+            "text": "Con solo un 8% de batería, cualquier desvío o espera puede dejarte sin energía. Recomendamos ir directamente a la parada principal.",
+            "id": "risk_explanation",
+            "component": "RiskExplanationCard",
+            "version": 1
+          },
+          {
+            "actions": [
+              {
+                "label": "Abrir en Google Maps",
+                "functionCall": {
+                  "call": "openUrl",
+                  "args": {
+                    "url": "https://www.google.com/maps/dir/?api=1&destination=37.890608,-4.777821"
+                  }
+                }
+              }
+            ],
+            "id": "actions",
+            "component": "ActionButtons",
+            "version": 1
+          },
+          {
+            "stops": [
+              {
+                "stationName": "Parking Calle Sevilla Nº5 - Córdoba",
+                "distanceKm": 0.5,
+                "powerKw": 22,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "lat": 37.883857,
+                "lon": -4.780831,
+                "name": "Parking Calle Sevilla Nº5 - Córdoba"
+              },
+              {
+                "stationName": "Hotel Córdoba Center",
+                "distanceKm": 0.59,
+                "powerKw": 22,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "lat": 37.892339,
+                "lon": -4.783527,
+                "name": "Hotel Córdoba Center"
+              }
+            ],
+            "id": "alternatives",
+            "component": "AlternativeStopsList",
+            "version": 1
+          },
+          {
+            "text": "He encontrado cargadores cerca de Córdoba. El más cercano (BALLENOIL-ES336090-COLON) está a 0.3 km con 150 kW CCS2. Recuerda confirmar disponibilidad antes de llegar.",
+            "id": "assistant_message",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "text": "El cargador al que iba está ocupado, dame un plan B",
+            "id": "user-dae31026eb",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "text": "No he podido cerrar una respuesta fiable con los datos validados. No voy a completar estaciones, coordenadas, precios ni disponibilidad por mi cuenta.",
+            "id": "assistant-0f9f95308f",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "level": "medio",
+            "text": "No he podido completar esta respuesta con fiabilidad. Reintenta con menos datos ambiguos o corrige origen, destino, batería y conector.",
+            "id": "risk-9662543f26",
+            "component": "RiskExplanationCard",
+            "version": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateDataModel": {
+        "surfaceId": "kalmio-chat",
+        "path": "/",
+        "value": {
+          "conversation": {
+            "surfaceId": "kalmio-chat",
+            "componentOrder": [
+              {
+                "id": "assistant-initial",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "preference-starters",
+                "component": "PreferenceChips"
+              },
+              {
+                "id": "user-bf71db209d",
+                "component": "UserMessage"
+              },
+              {
+                "id": "loc",
+                "component": "LocationRequestCard"
+              },
+              {
+                "id": "user-ed47a0f271",
+                "component": "UserMessage"
+              },
+              {
+                "id": "urgent_charge",
+                "component": "UrgentChargeCard"
+              },
+              {
+                "id": "risk_explanation",
+                "component": "RiskExplanationCard"
+              },
+              {
+                "id": "actions",
+                "component": "ActionButtons"
+              },
+              {
+                "id": "alternatives",
+                "component": "AlternativeStopsList"
+              },
+              {
+                "id": "assistant_message",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "user-dae31026eb",
+                "component": "UserMessage"
+              },
+              {
+                "id": "assistant-0f9f95308f",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "risk-9662543f26",
+                "component": "RiskExplanationCard"
+              }
+            ]
+          },
+          "facts": {
+            "locations": [],
+            "routes": [],
+            "stops": [
+              {
+                "stationName": "Parking Calle Sevilla Nº5 - Córdoba",
+                "distanceKm": 0.5,
+                "powerKw": 22,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "lat": 37.883857,
+                "lon": -4.780831,
+                "name": "Parking Calle Sevilla Nº5 - Córdoba",
+                "sourceComponentId": "alternatives"
+              },
+              {
+                "stationName": "Hotel Córdoba Center",
+                "distanceKm": 0.59,
+                "powerKw": 22,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "lat": 37.892339,
+                "lon": -4.783527,
+                "name": "Hotel Córdoba Center",
+                "sourceComponentId": "alternatives"
+              }
+            ],
+            "risks": [
+              {
+                "level": "medio",
+                "text": "Con solo un 8% de batería, cualquier desvío o espera puede dejarte sin energía. Recomendamos ir directamente a la parada principal.",
+                "sourceComponentId": "risk_explanation"
+              },
+              {
+                "level": "medio",
+                "text": "No he podido completar esta respuesta con fiabilidad. Reintenta con menos datos ambiguos o corrige origen, destino, batería y conector.",
+                "sourceComponentId": "risk-9662543f26"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

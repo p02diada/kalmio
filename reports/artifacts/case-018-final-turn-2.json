@@ -1,0 +1,256 @@
+{
+  "messages": [
+    {
+      "version": "v0.9.1",
+      "createSurface": {
+        "surfaceId": "kalmio-chat",
+        "catalogId": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
+        "sendDataModel": true
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateComponents": {
+        "surfaceId": "kalmio-chat",
+        "components": [
+          {
+            "text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré.",
+            "id": "assistant-initial",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "chips": [
+              "Necesito cargar ya",
+              "Ruta con parada segura",
+              "Parada cerca del hotel",
+              "Priorizar servicios"
+            ],
+            "id": "preference-starters",
+            "component": "PreferenceChips",
+            "version": 1
+          },
+          {
+            "text": "Voy a un hotel sin cargador, necesito cargar durante la estancia",
+            "id": "user-17cd30272d",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "text": "He encontrado puntos de carga cerca de Valencia para tu estancia. Como no tengo el hotel exacto, uso Valencia como aproximación. La opción más práctica por potencia y distancia es:",
+            "id": "msg1",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "name": "E-V-Valencia-091",
+            "stationName": "E-V-Valencia-091",
+            "address": "Roger de Lauria,10, 46002, ESP",
+            "distanceKm": 0.17,
+            "powerKw": 100,
+            "connectorTypes": [
+              "CCS2",
+              "TYPE2"
+            ],
+            "availableEvses": 4,
+            "lat": 39.46912,
+            "lon": -0.37463,
+            "detourMin": null,
+            "confidence": "media",
+            "id": "rec1",
+            "component": "RecommendedStopCard",
+            "version": 1
+          },
+          {
+            "stops": [
+              {
+                "name": "E-V-Valencia-076",
+                "stationName": "E-V-Valencia-076",
+                "address": "San Vicente Mártir,57, 46002, ESP",
+                "distanceKm": 0.18,
+                "powerKw": 22,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "availableEvses": 2,
+                "lat": 39.47008,
+                "lon": -0.37838
+              },
+              {
+                "name": "APK2 Lys",
+                "stationName": "APK2 Lys",
+                "address": "Calle del Pintor, Calle de Martínez Cubells 3, 46002, ESP",
+                "distanceKm": 0.23,
+                "powerKw": 7,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "availableEvses": 2,
+                "lat": 39.468331,
+                "lon": -0.374505
+              }
+            ],
+            "id": "alt1",
+            "component": "AlternativeStopsList",
+            "version": 1
+          },
+          {
+            "nights": null,
+            "city": "Valencia",
+            "recommendation": "Controlar carga cerca del alojamiento y confirmar antes de depender de ella.",
+            "id": "stay1",
+            "component": "StayPlanningCard",
+            "version": 1
+          },
+          {
+            "level": "medio",
+            "text": "Los datos provienen de puntos de carga autorizados importados. La disponibilidad en vivo no está confirmada; verifica acceso y tarifas antes de depender de ellos.",
+            "id": "risk1",
+            "component": "RiskExplanationCard",
+            "version": 1
+          },
+          {
+            "text": "En Valencia centro",
+            "id": "user-628442529d",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "text": "No he podido cerrar una respuesta fiable con los datos validados. No voy a completar estaciones, coordenadas, precios ni disponibilidad por mi cuenta.",
+            "id": "assistant-062b283d4f",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "level": "medio",
+            "text": "No he podido validar la ruta ahora mismo. Reinténtalo con origen y destino concretos, o busca primero una parada de carga cerca de una ciudad.",
+            "id": "risk-577f8fa953",
+            "component": "RiskExplanationCard",
+            "version": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateDataModel": {
+        "surfaceId": "kalmio-chat",
+        "path": "/",
+        "value": {
+          "conversation": {
+            "surfaceId": "kalmio-chat",
+            "componentOrder": [
+              {
+                "id": "assistant-initial",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "preference-starters",
+                "component": "PreferenceChips"
+              },
+              {
+                "id": "user-17cd30272d",
+                "component": "UserMessage"
+              },
+              {
+                "id": "msg1",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "rec1",
+                "component": "RecommendedStopCard"
+              },
+              {
+                "id": "alt1",
+                "component": "AlternativeStopsList"
+              },
+              {
+                "id": "stay1",
+                "component": "StayPlanningCard"
+              },
+              {
+                "id": "risk1",
+                "component": "RiskExplanationCard"
+              },
+              {
+                "id": "user-628442529d",
+                "component": "UserMessage"
+              },
+              {
+                "id": "assistant-062b283d4f",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "risk-577f8fa953",
+                "component": "RiskExplanationCard"
+              }
+            ]
+          },
+          "facts": {
+            "locations": [],
+            "routes": [],
+            "stops": [
+              {
+                "name": "E-V-Valencia-091",
+                "stationName": "E-V-Valencia-091",
+                "address": "Roger de Lauria,10, 46002, ESP",
+                "distanceKm": 0.17,
+                "powerKw": 100,
+                "connectorTypes": [
+                  "CCS2",
+                  "TYPE2"
+                ],
+                "availableEvses": 4,
+                "lat": 39.46912,
+                "lon": -0.37463,
+                "detourMin": null,
+                "confidence": "media",
+                "sourceComponentId": "rec1"
+              },
+              {
+                "name": "E-V-Valencia-076",
+                "stationName": "E-V-Valencia-076",
+                "address": "San Vicente Mártir,57, 46002, ESP",
+                "distanceKm": 0.18,
+                "powerKw": 22,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "availableEvses": 2,
+                "lat": 39.47008,
+                "lon": -0.37838,
+                "sourceComponentId": "alt1"
+              },
+              {
+                "name": "APK2 Lys",
+                "stationName": "APK2 Lys",
+                "address": "Calle del Pintor, Calle de Martínez Cubells 3, 46002, ESP",
+                "distanceKm": 0.23,
+                "powerKw": 7,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "availableEvses": 2,
+                "lat": 39.468331,
+                "lon": -0.374505,
+                "sourceComponentId": "alt1"
+              }
+            ],
+            "risks": [
+              {
+                "level": "medio",
+                "text": "Los datos provienen de puntos de carga autorizados importados. La disponibilidad en vivo no está confirmada; verifica acceso y tarifas antes de depender de ellos.",
+                "sourceComponentId": "risk1"
+              },
+              {
+                "level": "medio",
+                "text": "No he podido validar la ruta ahora mismo. Reinténtalo con origen y destino concretos, o busca primero una parada de carga cerca de una ciudad.",
+                "sourceComponentId": "risk-577f8fa953"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

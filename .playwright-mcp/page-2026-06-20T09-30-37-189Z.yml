@@ -1,0 +1,475 @@
+- generic [ref=e3]:
+  - generic [ref=e5]:
+    - list [ref=e7]:
+      - listitem [ref=e8]:
+        - link "Kalmio home" [ref=e9] [cursor=pointer]:
+          - /url: /
+          - img [ref=e11]
+          - generic [ref=e15]:
+            - generic [ref=e16]: Kalmio
+            - generic [ref=e17]: EV assistant
+    - generic [ref=e19]:
+      - generic [ref=e20]: Viaje
+      - list [ref=e22]:
+        - listitem [ref=e23]:
+          - link "Inicio" [ref=e24] [cursor=pointer]:
+            - /url: /
+            - img [ref=e25]
+            - generic [ref=e28]: Inicio
+        - listitem [ref=e29]:
+          - link "Chat" [ref=e30] [cursor=pointer]:
+            - /url: /chat
+            - img [ref=e31]
+            - generic [ref=e33]: Chat
+        - listitem [ref=e34]:
+          - link "Planes" [ref=e35] [cursor=pointer]:
+            - /url: /activity
+            - img [ref=e36]
+            - generic [ref=e38]: Planes
+    - list [ref=e40]:
+      - listitem [ref=e41]:
+        - link "Cuenta" [ref=e42] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e43]
+          - generic [ref=e46]: Cuenta
+  - main [ref=e47]:
+    - generic [ref=e49]:
+      - generic [ref=e50]:
+        - generic [ref=e51]:
+          - generic [ref=e52]:
+            - paragraph [ref=e53]: A2UI review surface
+            - heading "Revision de experiencia" [level=1] [ref=e54]
+          - generic [ref=e55]: 15 tipos
+        - generic [ref=e56]:
+          - generic "Modo de revision" [ref=e57]:
+            - button "Componentes" [ref=e58]
+            - button "Escenarios" [ref=e59]
+          - generic [ref=e60]:
+            - switch "Mostrar metadatos A2UI" [ref=e61] [cursor=pointer]
+            - text: Mostrar IDs tecnicos
+      - generic [ref=e62]: Datos de muestra para revisar flujo, responsive y claridad. No representan disponibilidad, precio, estaciones reales ni una ruta calculada.
+      - generic [ref=e63]:
+        - link "UserMessage" [ref=e64] [cursor=pointer]:
+          - /url: "#UserMessage"
+        - link "PositionRequestCard" [ref=e65] [cursor=pointer]:
+          - /url: "#PositionRequestCard"
+        - link "PlaceDetailCard" [ref=e66] [cursor=pointer]:
+          - /url: "#PlaceDetailCard"
+        - link "StationDetailCard" [ref=e67] [cursor=pointer]:
+          - /url: "#StationDetailCard"
+        - link "RiskExplanationCard" [ref=e68] [cursor=pointer]:
+          - /url: "#RiskExplanationCard"
+        - link "ActionButtons" [ref=e69] [cursor=pointer]:
+          - /url: "#ActionButtons"
+        - link "AssistantMessage" [ref=e70] [cursor=pointer]:
+          - /url: "#AssistantMessage"
+        - link "TripSummaryCard" [ref=e71] [cursor=pointer]:
+          - /url: "#TripSummaryCard"
+        - link "RouteSummaryCard" [ref=e72] [cursor=pointer]:
+          - /url: "#RouteSummaryCard"
+        - link "MapPreviewCard" [ref=e73] [cursor=pointer]:
+          - /url: "#MapPreviewCard"
+        - link "StationList" [ref=e74] [cursor=pointer]:
+          - /url: "#StationList"
+        - link "CostComparisonCard" [ref=e75] [cursor=pointer]:
+          - /url: "#CostComparisonCard"
+        - link "PreferenceChips" [ref=e76] [cursor=pointer]:
+          - /url: "#PreferenceChips"
+        - link "ClarifyingQuestionCard" [ref=e77] [cursor=pointer]:
+          - /url: "#ClarifyingQuestionCard"
+        - link "ErrorFallbackCard" [ref=e78] [cursor=pointer]:
+          - /url: "#ErrorFallbackCard"
+      - generic [ref=e79]:
+        - article [ref=e80]:
+          - generic [ref=e81]:
+            - generic [ref=e82]:
+              - paragraph [ref=e83]: Carga urgente
+              - heading "UserMessage" [level=2] [ref=e84]
+              - paragraph [ref=e85]: Debe mantener claro qué dijo el conductor sin competir con la recomendación del asistente.
+            - generic [ref=e86]: solo
+          - generic [ref=e89]:
+            - generic [ref=e90]:
+              - img [ref=e91]
+              - text: Usuario
+            - text: Estoy en Zaragoza con 9%, no conozco la zona y necesito cargar ya.
+        - article [ref=e93]:
+          - generic [ref=e94]:
+            - generic [ref=e95]:
+              - paragraph [ref=e96]: Carga urgente
+              - heading "PositionRequestCard" [level=2] [ref=e97]
+              - paragraph [ref=e98]: Debe obtener ubicación con permiso explícito y ofrecer alternativa manual equivalente.
+            - generic [ref=e99]: solo
+          - generic [ref=e101]:
+            - generic [ref=e104]:
+              - img [ref=e106]
+              - generic [ref=e110]:
+                - generic [ref=e111]: Necesito tu ubicacion
+                - paragraph [ref=e112]: Tu posición se usa solo para resolver esta búsqueda.
+            - generic [ref=e113]:
+              - paragraph [ref=e114]: Comparte una ubicacion aproximada o escribe ciudad y carretera para buscar cargadores cercanos.
+              - generic [ref=e115]:
+                - generic [ref=e116]: Ciudad
+                - generic [ref=e117]: Coordenadas
+                - generic [ref=e118]: Carretera o salida
+              - generic [ref=e119]:
+                - button "Usar mi ubicación" [ref=e120]:
+                  - img [ref=e121]
+                  - text: Usar mi ubicación
+                - button "Escribir ubicación" [ref=e123]
+        - article [ref=e124]:
+          - generic [ref=e125]:
+            - generic [ref=e126]:
+              - paragraph [ref=e127]: Carga urgente
+              - heading "PlaceDetailCard" [level=2] [ref=e128]
+              - paragraph [ref=e129]: Debe mostrar precisión y necesidad de confirmación sin exponer coordenadas como dato dominante.
+            - generic [ref=e130]: solo
+          - generic [ref=e132]:
+            - generic [ref=e135]:
+              - img [ref=e137]
+              - generic [ref=e141]:
+                - generic [ref=e142]: Lugar resuelto
+                - paragraph [ref=e143]: Zaragoza, entorno urbano
+            - generic [ref=e144]:
+              - paragraph [ref=e145]: Ubicacion aproximada usada para orientar la busqueda.
+              - generic [ref=e146]:
+                - generic [ref=e147]:
+                  - generic [ref=e148]: Precisión
+                  - generic [ref=e149]: Aproximada
+                - generic [ref=e150]:
+                  - generic [ref=e151]: Estado
+                  - generic [ref=e152]: Por confirmar
+              - generic [ref=e153]: Confirma el lugar final
+              - group [ref=e154]:
+                - generic "Coordenadas usadas" [ref=e155] [cursor=pointer]
+        - article [ref=e156]:
+          - generic [ref=e157]:
+            - generic [ref=e158]:
+              - paragraph [ref=e159]: Carga urgente
+              - heading "StationDetailCard" [level=2] [ref=e160]
+              - paragraph [ref=e161]: "Debe ser la decisión principal: estación, margen útil y datos disponibles sin prometer disponibilidad."
+            - generic [ref=e162]: solo
+          - generic [ref=e164]:
+            - generic [ref=e167]:
+              - img [ref=e169]
+              - generic [ref=e173]:
+                - generic [ref=e174]: Demo Charge Urgente
+                - paragraph [ref=e175]: Estación cercana · Salida 245, entorno urbano
+            - generic [ref=e176]:
+              - generic [ref=e177]:
+                - generic [ref=e178]:
+                  - generic [ref=e179]: Distancia
+                  - generic [ref=e180]: 7.6 km
+                - generic [ref=e181]:
+                  - generic [ref=e182]: Potencia
+                  - generic [ref=e183]: 150 kW
+                - generic [ref=e184]:
+                  - generic [ref=e185]: Capacidad
+                  - generic [ref=e186]: 2 EVSEs
+                - generic [ref=e187]:
+                  - generic [ref=e188]: Desvío
+                  - generic [ref=e189]: No calculado
+              - generic [ref=e190]:
+                - generic [ref=e191]: Conectores registrados
+                - generic [ref=e192]:
+                  - generic [ref=e193]: CCS2
+                  - generic [ref=e194]: TYPE2
+        - article [ref=e195]:
+          - generic [ref=e196]:
+            - generic [ref=e197]:
+              - paragraph [ref=e198]: Carga urgente
+              - heading "RiskExplanationCard" [level=2] [ref=e199]
+              - paragraph [ref=e200]: Debe bajar ansiedad explicando incertidumbre concreta y el siguiente comportamiento seguro.
+            - generic [ref=e201]: solo
+          - generic [ref=e203]:
+            - generic [ref=e206]:
+              - img [ref=e208]
+              - generic [ref=e210]:
+                - generic [ref=e211]: Riesgo alto
+                - paragraph [ref=e212]: "Nivel: alto"
+            - paragraph [ref=e214]: La bateria actual deja poco margen. Esta revision usa datos de muestra; no confirma disponibilidad ni precio.
+        - article [ref=e215]:
+          - generic [ref=e216]:
+            - generic [ref=e217]:
+              - paragraph [ref=e218]: Carga urgente
+              - heading "ActionButtons" [level=2] [ref=e219]
+              - paragraph [ref=e220]: Debe separar acción primaria, corrección y acciones bloqueadas sin ambigüedad.
+            - generic [ref=e221]: solo
+          - generic [ref=e223]:
+            - button "Confirmar esta parada" [ref=e225]
+            - button "Buscar otra cercana" [ref=e227]
+        - article [ref=e228]:
+          - generic [ref=e229]:
+            - generic [ref=e230]:
+              - paragraph [ref=e231]: Ruta con parada comoda
+              - heading "AssistantMessage" [level=2] [ref=e232]
+              - paragraph [ref=e233]: "Debe sonar como copiloto: breve, honesto y sin convertir la respuesta en un panel técnico."
+            - generic [ref=e234]: solo
+          - generic [ref=e236]:
+            - img [ref=e238]
+            - generic [ref=e241]:
+              - generic [ref=e242]: Kalmio
+              - text: Voy a priorizar una parada con margen conservador y servicios utiles. Si faltan datos reales del proveedor, lo dire explicitamente.
+        - article [ref=e243]:
+          - generic [ref=e244]:
+            - generic [ref=e245]:
+              - paragraph [ref=e246]: Ruta con parada comoda
+              - heading "TripSummaryCard" [level=2] [ref=e247]
+              - paragraph [ref=e248]: Debe confirmar origen, destino y margen sin parecer una tabla administrativa.
+            - generic [ref=e249]: solo
+          - generic [ref=e251]:
+            - generic [ref=e254]:
+              - img [ref=e256]
+              - generic [ref=e261]: Resumen de la ruta
+            - generic [ref=e262]:
+              - generic [ref=e263]:
+                - generic [ref=e264]: Zaragoza
+                - generic [ref=e265]: →
+                - generic [ref=e266]: Valencia
+              - generic [ref=e267]:
+                - paragraph [ref=e268]: Plan conservador con reserva mínima del 12%.
+                - paragraph [ref=e269]: La parada se evalúa para evitar llegar al destino con margen demasiado justo.
+              - generic [ref=e270]:
+                - generic [ref=e271]:
+                  - generic [ref=e272]: Batería
+                  - generic [ref=e273]: 24%
+                - generic [ref=e274]:
+                  - generic [ref=e275]: Mínimo al llegar
+                  - generic [ref=e276]: 12%
+                - generic [ref=e277]:
+                  - generic [ref=e278]: Tipo
+                  - generic [ref=e279]: Conservadora
+        - article [ref=e280]:
+          - generic [ref=e281]:
+            - generic [ref=e282]:
+              - paragraph [ref=e283]: Ruta con parada comoda
+              - heading "RouteSummaryCard" [level=2] [ref=e284]
+              - paragraph [ref=e285]: Debe explicar esfuerzo, duración y llegada con números legibles en móvil.
+            - generic [ref=e286]: solo
+          - generic [ref=e288]:
+            - generic [ref=e291]:
+              - img [ref=e293]
+              - generic [ref=e296]: Ruta estimada
+            - generic [ref=e298]:
+              - generic [ref=e299]:
+                - generic [ref=e300]: Distancia
+                - generic [ref=e301]: 309 km
+              - generic [ref=e302]:
+                - generic [ref=e303]: Duración
+                - generic [ref=e304]: 3 h 24 min
+              - generic [ref=e305]:
+                - generic [ref=e306]: Energía
+                - generic [ref=e307]: 55.6 kWh
+              - generic [ref=e308]:
+                - generic [ref=e309]: Llegada
+                - generic [ref=e310]: 17%
+        - article [ref=e311]:
+          - generic [ref=e312]:
+            - generic [ref=e313]:
+              - paragraph [ref=e314]: Ruta con parada comoda
+              - heading "MapPreviewCard" [level=2] [ref=e315]
+              - paragraph [ref=e316]: Debe apoyar la ruta, no convertirse en la tarea principal del conductor.
+            - generic [ref=e317]: solo
+          - generic [ref=e319]:
+            - generic [ref=e321]:
+              - generic [ref=e322]:
+                - img [ref=e324]
+                - generic [ref=e328]:
+                  - generic [ref=e329]: Mapa de ruta
+                  - paragraph [ref=e330]: Zaragoza → Valencia · Ruta real
+              - button "Expandir mapa" [ref=e332]:
+                - img [ref=e333]
+            - generic [ref=e338]:
+              - button "Abrir mapa de ruta" [ref=e339]:
+                - generic [ref=e340]:
+                  - generic "Vista previa de ruta" [ref=e341]:
+                    - generic:
+                      - region "Map" [ref=e342]
+                      - button "Map marker":
+                        - generic: Zaragoza
+                      - button "Map marker":
+                        - generic: Valencia
+                      - button "Map marker":
+                        - generic: "1"
+                      - button "Map marker":
+                        - generic: "2"
+                      - button "Map marker":
+                        - generic: "3"
+                  - link "Atribución de OpenStreetMap" [ref=e343] [cursor=pointer]:
+                    - /url: https://www.openstreetmap.org/copyright
+                    - text: © OSM
+              - generic [ref=e344]:
+                - generic [ref=e345]: Zaragoza
+                - generic [ref=e346]: Kalmio demo HPC
+                - generic [ref=e347]: Valencia
+              - generic [ref=e348]:
+                - generic [ref=e349]: Ruta real
+                - generic [ref=e350]: 3 estaciones
+                - generic [ref=e351]: Corredor 25 km
+        - article [ref=e352]:
+          - generic [ref=e353]:
+            - generic [ref=e354]:
+              - paragraph [ref=e355]: Ruta con parada comoda
+              - heading "StationList" [level=2] [ref=e356]
+              - paragraph [ref=e357]: Debe permitir comparar alternativas rápido sin obligar a leer párrafos largos.
+            - generic [ref=e358]: solo
+          - generic [ref=e360]:
+            - generic [ref=e363]:
+              - img [ref=e365]
+              - generic [ref=e369]:
+                - generic [ref=e370]: Otras estaciones viables
+                - paragraph [ref=e371]: 2 alternativas
+            - list [ref=e373]:
+              - listitem [ref=e374]:
+                - generic [ref=e375]:
+                  - generic [ref=e376]: "1"
+                  - generic [ref=e377]:
+                    - generic [ref=e379]:
+                      - generic [ref=e380]: Demo Charge 1
+                      - generic [ref=e381]: Area Mudejar
+                    - generic [ref=e382]:
+                      - generic [ref=e383]:
+                        - generic [ref=e384]: Potencia
+                        - generic [ref=e385]: 100 kW
+                      - generic [ref=e386]:
+                        - generic [ref=e387]: Desvío
+                        - generic [ref=e388]: 4 min
+                      - generic [ref=e389]:
+                        - generic [ref=e390]: Distancia
+                        - generic [ref=e391]: 92 km
+                      - generic [ref=e392]:
+                        - generic [ref=e393]: Precio
+                        - generic [ref=e394]: 0.52 €/kWh
+                      - generic [ref=e395]:
+                        - generic [ref=e396]: Capacidad
+                        - generic [ref=e397]: 2 EVSEs
+                    - generic [ref=e398]:
+                      - generic [ref=e399]:
+                        - generic [ref=e400]: Conectores
+                        - generic [ref=e401]: CCS2
+                      - generic [ref=e402]:
+                        - generic [ref=e403]: Servicios
+                        - generic [ref=e404]: Cafetería
+                        - generic [ref=e405]: Baños
+              - listitem [ref=e406]:
+                - generic [ref=e407]:
+                  - generic [ref=e408]: "2"
+                  - generic [ref=e409]:
+                    - generic [ref=e411]:
+                      - generic [ref=e412]: Demo Charge 2
+                      - generic [ref=e413]: Teruel norte
+                    - generic [ref=e414]:
+                      - generic [ref=e415]:
+                        - generic [ref=e416]: Potencia
+                        - generic [ref=e417]: 60 kW
+                      - generic [ref=e418]:
+                        - generic [ref=e419]: Desvío
+                        - generic [ref=e420]: 9 min
+                      - generic [ref=e421]:
+                        - generic [ref=e422]: Distancia
+                        - generic [ref=e423]: 147 km
+                      - generic [ref=e424]:
+                        - generic [ref=e425]: Capacidad
+                        - generic [ref=e426]: 3 conectores
+                    - generic [ref=e427]:
+                      - generic [ref=e428]:
+                        - generic [ref=e429]: Conectores
+                        - generic [ref=e430]: TYPE2
+                      - generic [ref=e431]:
+                        - generic [ref=e432]: Servicios
+                        - generic [ref=e433]: Supermercado
+                        - generic [ref=e434]: Parking
+        - article [ref=e435]:
+          - generic [ref=e436]:
+            - generic [ref=e437]:
+              - paragraph [ref=e438]: Ruta con parada comoda
+              - heading "CostComparisonCard" [level=2] [ref=e439]
+              - paragraph [ref=e440]: Debe mostrar ahorro solo cuando el precio está verificado y dejar clara la comparación.
+            - generic [ref=e441]: solo
+          - generic [ref=e443]:
+            - generic [ref=e446]:
+              - img [ref=e448]
+              - generic [ref=e451]: Kalmio demo HPC
+            - generic [ref=e452]:
+              - generic [ref=e453]:
+                - paragraph [ref=e454]: Tarifa más baja entre las opciones verificadas.
+                - paragraph [ref=e455]: La comparación solo se muestra porque ambas tarifas vienen marcadas como no estimadas.
+              - generic [ref=e456]:
+                - generic [ref=e457]:
+                  - generic [ref=e458]: Tarifa
+                  - generic [ref=e459]: 0.39 €/kWh
+                - generic [ref=e460]:
+                  - generic [ref=e461]: Comparada con
+                  - generic [ref=e462]: 0.52 €/kWh
+                - generic [ref=e463]:
+                  - generic [ref=e464]: Ahorro/kWh
+                  - generic [ref=e465]: 0.1 EUR
+              - paragraph [ref=e466]: Comparado con Demo Charge 1.
+        - article [ref=e467]:
+          - generic [ref=e468]:
+            - generic [ref=e469]:
+              - paragraph [ref=e470]: Ruta con parada comoda
+              - heading "PreferenceChips" [level=2] [ref=e471]
+              - paragraph [ref=e472]: Debe ofrecer correcciones rápidas con textos que quepan y no desplacen el layout.
+            - generic [ref=e473]: solo
+          - generic [ref=e475]:
+            - button "Parada con restaurante" [ref=e476]
+            - button "Menos desvio" [ref=e477]
+            - button "Mas margen de bateria" [ref=e478]
+            - button "Solo carga rapida" [ref=e479]
+        - article [ref=e480]:
+          - generic [ref=e481]:
+            - generic [ref=e482]:
+              - paragraph [ref=e483]: Llegada y estancia
+              - heading "ClarifyingQuestionCard" [level=2] [ref=e484]
+              - paragraph [ref=e485]: Debe pedir el mínimo dato crítico y hacerlo parecer una continuación natural del chat.
+            - generic [ref=e486]: solo
+          - generic [ref=e488]:
+            - generic [ref=e491]:
+              - img [ref=e493]
+              - generic [ref=e496]:
+                - generic [ref=e497]: Dato necesario
+                - paragraph [ref=e498]: Necesito confirmar esto antes de continuar.
+            - generic [ref=e499]:
+              - paragraph [ref=e500]: Para cerrar el plan necesito un dato mas.
+              - generic [ref=e501]:
+                - generic [ref=e502]: Direccion del hotel
+                - generic [ref=e503]: Bateria al llegar
+                - generic [ref=e504]: Conector
+        - article [ref=e505]:
+          - generic [ref=e506]:
+            - generic [ref=e507]:
+              - paragraph [ref=e508]: Bloque no renderizable
+              - heading "ErrorFallbackCard" [level=2] [ref=e509]
+              - paragraph [ref=e510]: "Debe fallar de forma tranquila: ocultar lo inseguro y mantener vivo el chat."
+            - generic [ref=e511]: solo
+          - generic [ref=e513]:
+            - generic [ref=e516]:
+              - img [ref=e518]
+              - generic [ref=e520]:
+                - generic [ref=e521]: No puedo mostrar una parte de la respuesta
+                - paragraph [ref=e522]: El bloque se ocultó sin interrumpir la conversación.
+            - generic [ref=e523]:
+              - paragraph [ref=e524]: Bloque de demo no renderizable.
+              - group [ref=e525]:
+                - generic "Detalle para soporte" [ref=e526] [cursor=pointer]
+      - generic [ref=e527]:
+        - generic [ref=e528]:
+          - paragraph [ref=e529]: Cobertura del catalogo
+          - generic [ref=e530]: 21 bloques / 15 tipos
+        - generic [ref=e531]:
+          - generic [ref=e532]: UserMessage
+          - generic [ref=e533]: PositionRequestCard
+          - generic [ref=e534]: PlaceDetailCard
+          - generic [ref=e535]: StationDetailCard
+          - generic [ref=e536]: RiskExplanationCard
+          - generic [ref=e537]: ActionButtons
+          - generic [ref=e538]: AssistantMessage
+          - generic [ref=e539]: TripSummaryCard
+          - generic [ref=e540]: RouteSummaryCard
+          - generic [ref=e541]: MapPreviewCard
+          - generic [ref=e542]: StationList
+          - generic [ref=e543]: CostComparisonCard
+          - generic [ref=e544]: PreferenceChips
+          - generic [ref=e545]: ClarifyingQuestionCard
+          - generic [ref=e546]: ErrorFallbackCard
+  - region "Notifications alt+T"

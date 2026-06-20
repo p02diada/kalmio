@@ -1,0 +1,279 @@
+{
+  "messages": [
+    {
+      "version": "v0.9.1",
+      "createSurface": {
+        "surfaceId": "kalmio-chat",
+        "catalogId": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
+        "sendDataModel": true
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateComponents": {
+        "surfaceId": "kalmio-chat",
+        "components": [
+          {
+            "text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré.",
+            "id": "assistant-initial",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "chips": [
+              "Necesito cargar ya",
+              "Ruta con parada segura",
+              "Parada cerca del hotel",
+              "Priorizar servicios"
+            ],
+            "id": "preference-starters",
+            "component": "PreferenceChips",
+            "version": 1
+          },
+          {
+            "text": "Voy de Madrid a Valencia",
+            "id": "user-6dd2d5d2ca",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "text": "Aquí tienes la ruta de Madrid a Valencia con paradas de carga recomendadas.",
+            "id": "msg1",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "origin": "Madrid",
+            "destination": "Valencia",
+            "distanceKm": 356.7,
+            "durationMin": 240,
+            "durationText": "4 h 0 min",
+            "id": "route1",
+            "component": "RouteSummaryCard",
+            "version": 1
+          },
+          {
+            "name": "Moya Hub Honrubia",
+            "stationName": "Moya Hub Honrubia",
+            "powerKw": 240,
+            "distanceKm": 1.23,
+            "detourMin": 3,
+            "availableEvses": 9,
+            "connectorCount": 12,
+            "amenities": [
+              "HOTEL",
+              "RESTAURANT",
+              "PARKING_LOT",
+              "FUEL_STATION",
+              "WIFI",
+              "CAFE",
+              "SUPERMARKET",
+              "NATURE"
+            ],
+            "lat": 39.602992,
+            "lon": -2.279669,
+            "confidence": "media",
+            "id": "stop1",
+            "component": "RecommendedStopCard",
+            "version": 1
+          },
+          {
+            "level": "medio",
+            "text": "Sin datos de autonomía ni consumo, solo mostramos paradas de carga en el corredor. No podemos calcular la batería de llegada ni garantizar que llegues con margen.",
+            "id": "risk1",
+            "component": "RiskExplanationCard",
+            "version": 1
+          },
+          {
+            "stops": [
+              {
+                "name": "Aparcamiento CTM",
+                "stationName": "Aparcamiento CTM",
+                "powerKw": 400,
+                "distanceKm": 4.77,
+                "detourMin": 11,
+                "availableEvses": 15,
+                "connectorCount": 28,
+                "amenities": [
+                  "HOTEL",
+                  "RESTAURANT",
+                  "CAFE",
+                  "RECREATION_AREA",
+                  "BUS_STOP",
+                  "TAXI_STAND",
+                  "CARPOOL_PARKING",
+                  "FUEL_STATION"
+                ],
+                "lat": 40.365577,
+                "lon": -3.654602
+              },
+              {
+                "name": "V-VALENCIA-022-2",
+                "stationName": "V-VALENCIA-022-2",
+                "powerKw": 22,
+                "distanceKm": 1.73,
+                "detourMin": 4,
+                "availableEvses": 4,
+                "connectorCount": 4,
+                "amenities": [
+                  "SUPERMARKET",
+                  "MALL",
+                  "SPORT",
+                  "BUS_STOP",
+                  "PARKING_LOT",
+                  "FUEL_STATION",
+                  "RESTAURANT",
+                  "CAFE",
+                  "HOTEL",
+                  "WIFI"
+                ],
+                "lat": 39.48123,
+                "lon": -0.389118
+              }
+            ],
+            "id": "alt1",
+            "component": "AlternativeStopsList",
+            "version": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateDataModel": {
+        "surfaceId": "kalmio-chat",
+        "path": "/",
+        "value": {
+          "conversation": {
+            "surfaceId": "kalmio-chat",
+            "componentOrder": [
+              {
+                "id": "assistant-initial",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "preference-starters",
+                "component": "PreferenceChips"
+              },
+              {
+                "id": "user-6dd2d5d2ca",
+                "component": "UserMessage"
+              },
+              {
+                "id": "msg1",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "route1",
+                "component": "RouteSummaryCard"
+              },
+              {
+                "id": "stop1",
+                "component": "RecommendedStopCard"
+              },
+              {
+                "id": "risk1",
+                "component": "RiskExplanationCard"
+              },
+              {
+                "id": "alt1",
+                "component": "AlternativeStopsList"
+              }
+            ]
+          },
+          "facts": {
+            "locations": [],
+            "routes": [
+              {
+                "origin": "Madrid",
+                "destination": "Valencia",
+                "distanceKm": 356.7,
+                "durationMin": 240,
+                "durationText": "4 h 0 min",
+                "sourceComponentId": "route1"
+              }
+            ],
+            "stops": [
+              {
+                "name": "Moya Hub Honrubia",
+                "stationName": "Moya Hub Honrubia",
+                "powerKw": 240,
+                "distanceKm": 1.23,
+                "detourMin": 3,
+                "availableEvses": 9,
+                "connectorCount": 12,
+                "amenities": [
+                  "HOTEL",
+                  "RESTAURANT",
+                  "PARKING_LOT",
+                  "FUEL_STATION",
+                  "WIFI",
+                  "CAFE",
+                  "SUPERMARKET",
+                  "NATURE"
+                ],
+                "lat": 39.602992,
+                "lon": -2.279669,
+                "confidence": "media",
+                "sourceComponentId": "stop1"
+              },
+              {
+                "name": "Aparcamiento CTM",
+                "stationName": "Aparcamiento CTM",
+                "powerKw": 400,
+                "distanceKm": 4.77,
+                "detourMin": 11,
+                "availableEvses": 15,
+                "connectorCount": 28,
+                "amenities": [
+                  "HOTEL",
+                  "RESTAURANT",
+                  "CAFE",
+                  "RECREATION_AREA",
+                  "BUS_STOP",
+                  "TAXI_STAND",
+                  "CARPOOL_PARKING",
+                  "FUEL_STATION"
+                ],
+                "lat": 40.365577,
+                "lon": -3.654602,
+                "sourceComponentId": "alt1"
+              },
+              {
+                "name": "V-VALENCIA-022-2",
+                "stationName": "V-VALENCIA-022-2",
+                "powerKw": 22,
+                "distanceKm": 1.73,
+                "detourMin": 4,
+                "availableEvses": 4,
+                "connectorCount": 4,
+                "amenities": [
+                  "SUPERMARKET",
+                  "MALL",
+                  "SPORT",
+                  "BUS_STOP",
+                  "PARKING_LOT",
+                  "FUEL_STATION",
+                  "RESTAURANT",
+                  "CAFE",
+                  "HOTEL",
+                  "WIFI"
+                ],
+                "lat": 39.48123,
+                "lon": -0.389118,
+                "sourceComponentId": "alt1"
+              }
+            ],
+            "risks": [
+              {
+                "level": "medio",
+                "text": "Sin datos de autonomía ni consumo, solo mostramos paradas de carga en el corredor. No podemos calcular la batería de llegada ni garantizar que llegues con margen.",
+                "sourceComponentId": "risk1"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

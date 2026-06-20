@@ -1,0 +1,212 @@
+{
+  "messages": [
+    {
+      "version": "v0.9.1",
+      "createSurface": {
+        "surfaceId": "kalmio-chat",
+        "catalogId": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
+        "sendDataModel": true
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateComponents": {
+        "surfaceId": "kalmio-chat",
+        "components": [
+          {
+            "text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré.",
+            "id": "assistant-initial",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "chips": [
+              "Necesito cargar ya",
+              "Ruta con parada segura",
+              "Parada cerca del hotel",
+              "Priorizar servicios"
+            ],
+            "id": "preference-starters",
+            "component": "PreferenceChips",
+            "version": 1
+          },
+          {
+            "text": "Tengo poca batería y voy con niños",
+            "id": "user-4e1436e217",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "text": "Entiendo, tienes poca batería y viajas con niños. Para ayudarte a encontrar un punto de carga urgente, necesito saber tu ubicación actual (ciudad, zona o coordenadas). ¿Dónde estás ahora?",
+            "id": "1",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "text": "En Córdoba",
+            "id": "user-995fdb2203",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "battery": null,
+            "nearest": "BALLENOIL-ES336090-COLON",
+            "stationName": "BALLENOIL-ES336090-COLON",
+            "distanceKm": 0.3,
+            "risk": "Tienes poca batería y viajas con niños. Esta estación está a solo 300 m y tiene 2 conectores CCS2 de 150 kW. Dispone de cafetería y supermercado cerca, útil para entretener a los niños mientras cargas.",
+            "id": "urgent_charge",
+            "component": "UrgentChargeCard",
+            "version": 1
+          },
+          {
+            "level": "medio",
+            "text": "No conozco tu nivel exacto de batería. Si está muy bajo, prioriza esta parada y no te desvíes. Confirma disponibilidad y acceso antes de llegar.",
+            "id": "risk_explanation",
+            "component": "RiskExplanationCard",
+            "version": 1
+          },
+          {
+            "actions": [
+              {
+                "label": "Abrir en Google Maps",
+                "functionCall": {
+                  "call": "openUrl",
+                  "args": {
+                    "url": "https://www.google.com/maps/dir/?api=1&destination=37.890608,-4.777821"
+                  }
+                }
+              }
+            ],
+            "id": "action_buttons",
+            "component": "ActionButtons",
+            "version": 1
+          },
+          {
+            "stops": [
+              {
+                "name": "Parking Calle Sevilla Nº5 - Córdoba",
+                "stationName": "Parking Calle Sevilla Nº5 - Córdoba",
+                "distanceKm": 0.5,
+                "powerKw": 22,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "availableEvses": 2,
+                "address": "C. Sevilla, 5, 14003 Córdoba, España, 14003, ESP",
+                "lat": 37.883857,
+                "lon": -4.780831
+              },
+              {
+                "name": "Hotel Córdoba Center",
+                "stationName": "Hotel Córdoba Center",
+                "powerKm": 0.59,
+                "powerKw": 22,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "availableEvses": 3,
+                "address": "Av. de la Libertad, 14006, ESP",
+                "lat": 37.892339,
+                "lon": -4.783527
+              }
+            ],
+            "id": "alternatives",
+            "component": "AlternativeStopsList",
+            "version": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateDataModel": {
+        "surfaceId": "kalmio-chat",
+        "path": "/",
+        "value": {
+          "conversation": {
+            "surfaceId": "kalmio-chat",
+            "componentOrder": [
+              {
+                "id": "assistant-initial",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "preference-starters",
+                "component": "PreferenceChips"
+              },
+              {
+                "id": "user-4e1436e217",
+                "component": "UserMessage"
+              },
+              {
+                "id": "1",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "user-995fdb2203",
+                "component": "UserMessage"
+              },
+              {
+                "id": "urgent_charge",
+                "component": "UrgentChargeCard"
+              },
+              {
+                "id": "risk_explanation",
+                "component": "RiskExplanationCard"
+              },
+              {
+                "id": "action_buttons",
+                "component": "ActionButtons"
+              },
+              {
+                "id": "alternatives",
+                "component": "AlternativeStopsList"
+              }
+            ]
+          },
+          "facts": {
+            "locations": [],
+            "routes": [],
+            "stops": [
+              {
+                "name": "Parking Calle Sevilla Nº5 - Córdoba",
+                "stationName": "Parking Calle Sevilla Nº5 - Córdoba",
+                "distanceKm": 0.5,
+                "powerKw": 22,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "availableEvses": 2,
+                "address": "C. Sevilla, 5, 14003 Córdoba, España, 14003, ESP",
+                "lat": 37.883857,
+                "lon": -4.780831,
+                "sourceComponentId": "alternatives"
+              },
+              {
+                "name": "Hotel Córdoba Center",
+                "stationName": "Hotel Córdoba Center",
+                "powerKm": 0.59,
+                "powerKw": 22,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "availableEvses": 3,
+                "address": "Av. de la Libertad, 14006, ESP",
+                "lat": 37.892339,
+                "lon": -4.783527,
+                "sourceComponentId": "alternatives"
+              }
+            ],
+            "risks": [
+              {
+                "level": "medio",
+                "text": "No conozco tu nivel exacto de batería. Si está muy bajo, prioriza esta parada y no te desvíes. Confirma disponibilidad y acceso antes de llegar.",
+                "sourceComponentId": "risk_explanation"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

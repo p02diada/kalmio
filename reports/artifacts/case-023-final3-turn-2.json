@@ -1,0 +1,122 @@
+{
+  "messages": [
+    {
+      "version": "v0.9.1",
+      "createSurface": {
+        "surfaceId": "kalmio-chat",
+        "catalogId": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
+        "sendDataModel": true
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateComponents": {
+        "surfaceId": "kalmio-chat",
+        "components": [
+          {
+            "text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré.",
+            "id": "assistant-initial",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "chips": [
+              "Necesito cargar ya",
+              "Ruta con parada segura",
+              "Parada cerca del hotel",
+              "Priorizar servicios"
+            ],
+            "id": "preference-starters",
+            "component": "PreferenceChips",
+            "version": 1
+          },
+          {
+            "text": "No quiero cargar en sitios solitarios de noche",
+            "id": "user-b1974343d9",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "text": "Entendido, evitar sitios solitarios de noche. Para poder buscar puntos de carga en una zona concreta, necesito saber por dónde vas a estar o tu ruta. ¿Me dices una ciudad, zona o coordenadas?",
+            "id": "msg1",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "text": "Estoy en Valencia centro",
+            "id": "user-ff781b3bf3",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "text": "No he podido cerrar una respuesta fiable con los datos validados. No voy a completar estaciones, coordenadas, precios ni disponibilidad por mi cuenta.",
+            "id": "assistant-8a8cc2a7e6",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "level": "medio",
+            "text": "No he podido completar esta respuesta con fiabilidad. Reintenta con menos datos ambiguos o corrige origen, destino, batería y conector.",
+            "id": "risk-1032e6160d",
+            "component": "RiskExplanationCard",
+            "version": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateDataModel": {
+        "surfaceId": "kalmio-chat",
+        "path": "/",
+        "value": {
+          "conversation": {
+            "surfaceId": "kalmio-chat",
+            "componentOrder": [
+              {
+                "id": "assistant-initial",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "preference-starters",
+                "component": "PreferenceChips"
+              },
+              {
+                "id": "user-b1974343d9",
+                "component": "UserMessage"
+              },
+              {
+                "id": "msg1",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "user-ff781b3bf3",
+                "component": "UserMessage"
+              },
+              {
+                "id": "assistant-8a8cc2a7e6",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "risk-1032e6160d",
+                "component": "RiskExplanationCard"
+              }
+            ]
+          },
+          "facts": {
+            "locations": [],
+            "routes": [],
+            "stops": [],
+            "risks": [
+              {
+                "level": "medio",
+                "text": "No he podido completar esta respuesta con fiabilidad. Reintenta con menos datos ambiguos o corrige origen, destino, batería y conector.",
+                "sourceComponentId": "risk-1032e6160d"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

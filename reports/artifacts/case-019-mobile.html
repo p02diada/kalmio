@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kalmio caso 019 - movil</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #fff;
+      color: #171c19;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main {
+      width: min(100%, 390px);
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 14px 14px 104px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .bubble {
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: .86rem;
+      line-height: 1.48;
+    }
+    .user {
+      align-self: flex-end;
+      max-width: 88%;
+      background: #171c19;
+      color: #fff;
+    }
+    .assistant {
+      border: 1px solid #e4e4e4;
+      background: #fafafa;
+      color: #25302a;
+    }
+    .role {
+      display: block;
+      margin-bottom: 3px;
+      font-size: .68rem;
+      font-weight: 700;
+      opacity: .72;
+    }
+    .card {
+      border: 1px solid #dedede;
+      border-radius: 8px;
+      background: #fff;
+      padding: 14px;
+    }
+    .card h2 {
+      margin: 0 0 7px;
+      font-size: 1rem;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+    .card p {
+      margin: 0;
+      color: #4d5852;
+      font-size: .85rem;
+      line-height: 1.45;
+    }
+    .stay {
+      border-color: #d7e6dd;
+      background: #f7fbf8;
+    }
+    .primary {
+      border-color: #cbd8cf;
+      background: #f8fbf9;
+    }
+    .primary strong,
+    .stop strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: .95rem;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 7px 0;
+    }
+    .pill {
+      border: 1px solid #dedede;
+      border-radius: 999px;
+      background: #fff;
+      padding: 4px 7px;
+      color: #39443e;
+      font-size: .72rem;
+      font-weight: 650;
+    }
+    .address {
+      color: #68736d;
+      font-size: .78rem;
+      line-height: 1.35;
+      white-space: pre-line;
+    }
+    .stops {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .stop {
+      border: 1px solid #ececec;
+      border-radius: 8px;
+      padding: 11px;
+      background: #fafafa;
+    }
+    .risk {
+      border-color: #f1c36d;
+      background: #fff9eb;
+    }
+    .risk h2 { color: #72500d; }
+    .composer {
+      position: fixed;
+      right: 14px;
+      bottom: 14px;
+      left: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid #dedede;
+      border-radius: 8px;
+      background: #fff;
+      padding: 7px;
+      box-shadow: 0 8px 20px rgba(23, 28, 25, .08);
+    }
+    .composer span {
+      flex: 1;
+      color: #7b837f;
+      font-size: .94rem;
+    }
+    .send {
+      border: 0;
+      border-radius: 999px;
+      background: #171c19;
+      padding: 8px 12px;
+      color: #fff;
+      font-weight: 650;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="bubble user">
+      <span class="role">Usuario</span>
+      Voy una semana a Cádiz y necesito cargar durante la estancia
+    </section>
+    <section class="bubble assistant">
+      <span class="role">Kalmio</span>
+      He buscado puntos de carga autorizados en Cádiz para tu estancia de una semana.
+    </section>
+
+    <section class="card stay">
+      <h2>Estancia de una semana</h2>
+      <p>Cádiz, 7 noches. Controlar carga cerca del alojamiento y confirmar antes de depender de ella.</p>
+    </section>
+
+    <section class="card primary">
+      <h2>Parada primaria trazada</h2>
+      <strong>ONCE DZ Cádiz</strong>
+      <div class="meta">
+        <span class="pill">0,23 km</span>
+        <span class="pill">22 kW</span>
+        <span class="pill">TYPE2</span>
+        <span class="pill">1 EVSE trazado</span>
+      </div>
+      <div class="address">C/Acacias, 5, 11007, ESP</div>
+    </section>
+
+    <section class="card stops">
+      <h2>Alternativas trazadas</h2>
+      <article class="stop">
+        <strong>Cádiz - Canalejas</strong>
+        <div class="meta">
+          <span class="pill">0,49 km</span>
+          <span class="pill">7 kW</span>
+          <span class="pill">TYPE2</span>
+          <span class="pill">16 EVSEs trazados</span>
+        </div>
+        <div class="address">Avda Del Puerto S/N, 11006, 01</div>
+      </article>
+      <article class="stop">
+        <strong>Repsol, Dársena Cádiz, Puerto</strong>
+        <div class="meta">
+          <span class="pill">0,81 km</span>
+          <span class="pill">22 kW</span>
+          <span class="pill">TYPE2</span>
+          <span class="pill">2 EVSEs trazados</span>
+        </div>
+        <div class="address">Puerto Cádiz
+En estación Movele
+Dársena Comer, 11006, ESP</div>
+      </article>
+    </section>
+
+    <section class="card risk">
+      <h2>Confirmar antes de depender</h2>
+      <p>Datos procedentes solo de puntos de carga autorizados importados. Confirma acceso final, tarifa y disponibilidad antes de depender de ellos.</p>
+    </section>
+  </main>
+  <form class="composer">
+    <span>Dirección o zona del alojamiento</span>
+    <button class="send" type="button">Enviar</button>
+  </form>
+</body>
+</html>

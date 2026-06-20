@@ -20,6 +20,7 @@ from routing.agent import (
     decode_codex_json,
     parse_openai_compatible_decision,
     run_deepseek_decision,
+    station_search_result_prompt,
     tool_call_argument_grounding_issues,
     validate_blocks,
 )
@@ -666,6 +667,7 @@ def test_codex_prompt_guides_followups_without_backend_intent_mapping():
     prompt = codex_prompt("Me equivoqué, estoy en Valencia centro")
 
     assert "No pidas destino para una carga urgente" in prompt
+    assert "No llames resolve_location con frases que no son ubicaciones concretas" in prompt
     assert "Si el usuario corrige la ubicación" in prompt
     assert "conserva batería, conector y preferencias" in prompt
     assert "no puedes ubicar esa calle exacta" in prompt
@@ -673,12 +675,14 @@ def test_codex_prompt_guides_followups_without_backend_intent_mapping():
     assert "planningLevel=chargers_only" in prompt
     assert "PlaceDetailCard + StationDetailCard + StationList" in prompt
     assert "preferences.max_useful_power_kw" in prompt
-    assert "no presentes la potencia superior como ventaja" in prompt
+    assert "No presentes la potencia superior como ventaja" in prompt
     assert "llama search_destination_chargers directamente" in prompt
     assert "ida y vuelta, volver, regreso" in prompt
     assert "pregunta por el origen" in prompt
     assert "Una ciudad conocida ya es ubicación suficiente" in prompt
     assert "no esperes hotel/zona exacta" in prompt
+    assert "usa primero la ciudad/zona como aproximación verificable" in prompt
+    assert "incluye un PlaceDetailCard como ancla" in prompt
     assert "no presentes el hotel exacto como ubicación validada" in prompt
     assert "no ActionButtons" in prompt
     assert "tool_call no es un componente A2UI" in prompt
@@ -692,8 +696,39 @@ def test_codex_prompt_exposes_max_useful_power_tool_argument():
 
     assert '"max_useful_power_kw":null' in prompt
     assert "pasa X como preferences.max_useful_power_kw" in prompt
-    assert "que el coche no aprovechará más de 100 kW" in prompt
+    assert "Tu coche no aprovechará más de X kW" in prompt
+    assert "No basta con decir que no necesita ultrarrápidos" in prompt
     assert "No digas que has filtrado" in prompt
+
+
+def test_codex_prompt_uses_city_first_for_destination_poi_searches():
+    prompt = codex_prompt("Voy el finde a Granada y duermo cerca de la Alhambra")
+
+    assert "usa Granada como primera búsqueda aproximada" in prompt
+    assert "PlaceDetailCard de Granada/Alhambra como aproximación" in prompt
+
+
+def test_station_search_result_prompt_anchors_destination_search_location():
+    tool_history = [
+        {
+            "call": {
+                "tool": "search_destination_chargers",
+                "args": {"location": {"label": "Cádiz", "lat": 36.5271, "lon": -6.2886}},
+            },
+            "result": {
+                "ok": True,
+                "tool": "search_destination_chargers",
+                "location": {"label": "Cádiz", "lat": 36.5271, "lon": -6.2886},
+                "stops": [{"name": "ONCE DZ Cádiz", "distanceKm": 0.23, "powerKw": 22}],
+            },
+        }
+    ]
+
+    prompt = station_search_result_prompt("Voy una semana a Cádiz y necesito cargar durante la estancia", tool_history)
+
+    assert "incluye PlaceDetailCard antes de las estaciones" in prompt
+    assert "precision='approximate'" in prompt
+    assert "needsConfirmation=true" in prompt
 
 
 def test_a2ui_contract_rejects_hard_power_filter_copy_when_rendering_over_cap_station():
@@ -779,8 +814,8 @@ def test_a2ui_contract_allows_max_useful_power_copy_without_hard_filter_claim():
                 "version": 1,
                 "props": {
                     "text": (
-                        "Tu coche carga hasta 100 kW. La potencia superior no se premia en esta elección; "
-                        "muestro esta parada por ubicación y servicios trazados."
+                        "Tu coche carga hasta 100 kW. La potencia superior no se premia en esta elección; "
+                        "muestro esta parada por ubicación y servicios indicados."
                     )
                 },
             },
@@ -829,8 +864,9 @@ def test_codex_prompt_handles_qualitative_low_battery_and_children_amenities():
     assert "si la herramienta trae amenities en la parada primaria" in prompt
     assert "debes mencionarlos brevemente por nombre" in prompt
     assert "no digas que están cerca, disponibles, son seguros, ideales, perfectos o aptos para niños" in prompt
+    assert "Separa proximidad de servicios" in prompt
     assert "No uses superlativos globales" in prompt
-    assert "de los resultados trazados" in prompt
+    assert "según los datos disponibles" in prompt
 
 
 def test_codex_prompt_keeps_service_preference_when_location_follows():
@@ -871,7 +907,7 @@ def test_codex_prompt_warns_after_tool_when_requested_services_are_unverified():
         ],
     )
 
-    assert "Ya tienes resultados trazados de search_destination_chargers" in prompt
+    assert "Ya tienes resultados de search_destination_chargers" in prompt
     assert "No repitas la misma búsqueda" in prompt
     assert "Dato crítico de servicios" in prompt
     assert "no están verificados en esos resultados" in prompt
@@ -883,8 +919,9 @@ def test_codex_prompt_keeps_plan_b_on_previous_traced_alternatives():
     assert "no la repitas como plan B" in prompt
     assert "nombra la parada descartada" in prompt
     assert "no debe seguir siendo el plan principal" in prompt
-    assert "Reutiliza exactamente alternativas trazadas previas" in prompt
+    assert "Reutiliza exactamente alternativas previas de la herramienta" in prompt
     assert "no cambies métricas ni inventes coordenadas" in prompt
+    assert "Si un dato como precio, dirección exacta o puestos de carga no estaba en la alternativa previa, omítelo" in prompt
     assert "usa su lat/lon exactos" in prompt
     assert "disponibilidad en vivo puede cambiar" in prompt
 
@@ -904,7 +941,7 @@ def test_codex_prompt_guides_chargers_only_route_without_claiming_default_reserv
     prompt = codex_prompt("Voy de Córdoba a Valencia con 58%. No quiero llegar justo")
 
     assert "planningLevel=chargers_only" in prompt
-    assert "Usa RouteSummaryCard para distancia/duración trazadas" in prompt
+    assert "Usa RouteSummaryCard para distancia/duración de la herramienta" in prompt
     assert "no puedes validar batería de llegada ni reserva sin consumo/perfil" in prompt
     assert "AssistantMessage inicial en una frase corta" in prompt
     assert "muestra la parada principal antes del aviso largo" in prompt
@@ -926,7 +963,7 @@ def test_codex_prompt_guides_controlled_detour_comfort_preference():
     prompt = codex_prompt("Prefiero desviarme 10 minutos si el sitio es más cómodo. Voy de Madrid a Valencia con 60%")
 
     assert "Preferencias de desvío controlado por comodidad" in prompt
-    assert "menciona servicios trazados como comodidad potencial" in prompt
+    assert "menciona servicios indicados como comodidad potencial" in prompt
     assert "no digas 'buenos servicios'" in prompt
     assert "No introduzcas preferencias de pocas paradas" in prompt
 
@@ -950,7 +987,7 @@ def test_codex_prompt_guides_few_stops_without_vehicle_profile():
     assert "prefiere parar pocas veces" in prompt
     assert "no puedes garantizar ni optimizar pocas paradas" in prompt
     assert "antes de las paradas" in prompt
-    assert "punto de carga trazado en el corredor" in prompt
+    assert "punto de carga autorizado en el corredor" in prompt
     assert "Alicante a Bilbao, prefiero parar pocas veces" in prompt
 
 
@@ -966,7 +1003,8 @@ def test_codex_prompt_guides_hard_arrival_reserve_without_vehicle_profile():
 def test_codex_prompt_guides_granada_alhambra_weekend_destination_warning():
     prompt = codex_prompt("Voy el finde a Granada y duermo cerca de la Alhambra")
 
-    assert "Alhambra/Granada aproximado" in prompt
+    assert "Granada como primera búsqueda aproximada" in prompt
+    assert "PlaceDetailCard de Granada/Alhambra como aproximación" in prompt
     assert "si es finde" in prompt
     assert "disponibilidad, acceso y tarifas pueden cambiar" in prompt
     assert "pide hotel/zona/direccion exacta" in prompt
@@ -990,10 +1028,10 @@ def test_codex_prompt_guides_hotel_without_charger_primary_destination_stop():
     assert "hotel no tiene cargador" in prompt
     assert "StationDetailCard" in prompt
     assert "StationList" in prompt
-    assert "distancia, potencia, conectores y EVSEs trazados" in prompt
+    assert "distancia, potencia, conectores y puestos de carga registrados" in prompt
     assert "no la presentes como disponibilidad en vivo ni como reserva" in prompt
     assert "Valencia centro" in prompt
-    assert "parada primaria trazada" in prompt
+    assert "parada primaria" in prompt
 
 
 def test_tool_call_grounding_rejects_location_from_prompt_example():
@@ -1070,7 +1108,7 @@ def test_codex_prompt_guides_price_preference_without_route_context():
 
     assert "Preferencias de precio" in prompt
     assert "pide origen/destino o ubicación" in prompt
-    assert "pricePerKwhEur/currency solo cuando venga trazado" in prompt
+    assert "pricePerKwhEur/currency solo cuando venga de herramienta" in prompt
     assert "solo hay tarifas estimadas" in prompt
 
 
@@ -1079,7 +1117,7 @@ def test_codex_prompt_guides_large_hub_preference_without_location_context():
 
     assert "Preferencias de precio, hubs grandes o tamaño de parada" in prompt
     assert "no llames herramientas sin ruta/ubicación" in prompt
-    assert "si la herramienta trae tarifas trazadas, compara tarifa/kWh" in prompt
+    assert "si la herramienta trae tarifas verificadas, compara tarifa/kWh" in prompt
 
 
 def test_codex_prompt_guides_model_and_departure_battery_without_vehicle_profile():
@@ -1579,7 +1617,7 @@ def test_a2ui_contract_rejects_single_evse_primary_when_user_avoids_single_conne
                 "id": "assistant",
                 "type": "AssistantMessage",
                 "version": 1,
-                "props": {"text": "Uso EVSEs trazados para evitar puntos de carga de un solo EVSE."},
+                "props": {"text": "Uso puestos de carga registrados para evitar puntos de carga de un solo puesto."},
             },
             {
                 "id": "recommended",
@@ -1602,7 +1640,7 @@ def test_a2ui_contract_rejects_single_evse_primary_when_user_avoids_single_conne
         message="Evita cargadores con un solo conector. Estoy en Córdoba...",
     )
 
-    assert any("parada primaria tiene solo 1 EVSE" in issue for issue in issues)
+    assert any("parada primaria tiene solo 1 puesto" in issue for issue in issues)
 
 
 def test_a2ui_contract_allows_available_evses_copy_for_single_connector_preference():
@@ -1630,7 +1668,7 @@ def test_a2ui_contract_allows_available_evses_copy_for_single_connector_preferen
                 "type": "AssistantMessage",
                 "version": 1,
                 "props": {
-                    "text": "Priorizo puntos con mas de 1 EVSE trazado; no afirmo ocupacion ni conectores libres en vivo."
+                    "text": "Priorizo puntos con mas de 1 puesto registrado; no afirmo ocupacion ni conectores libres en vivo."
                 },
             },
             {
@@ -2072,7 +2110,7 @@ def test_a2ui_contract_allows_future_route_with_volatility_warning():
                 "version": 1,
                 "props": {
                     "text": (
-                        "Te muestro paradas trazadas en el corredor. Para mañana, confirma disponibilidad, "
+                        "Te muestro paradas autorizadas en el corredor. Para mañana, confirma disponibilidad, "
                         "acceso y tarifas porque pueden cambiar antes del viaje."
                     ),
                 },
@@ -3729,7 +3767,7 @@ def test_comfort_copy_rejects_untraced_children_claims():
         ],
     )
 
-    assert any("claim de seguridad/comodidad para niños no trazado" in issue for issue in issues)
+    assert any("claim de seguridad/comodidad para niños no respaldado por datos" in issue for issue in issues)
 
 
 def test_comfort_copy_allows_service_location_clarifying_question():
@@ -3762,7 +3800,28 @@ def test_comfort_copy_allows_traced_amenities_as_potential_convenience():
                 "type": "RiskExplanationCard",
                 "version": 1,
                 "props": {
-                    "text": "Servicios trazados en el punto: CAFE y SUPERMARKET. Pueden ayudar como comodidad potencial; confirma antes de depender de ellos."
+                    "text": "Servicios indicados en el punto: CAFE y SUPERMARKET. Pueden ayudar como comodidad potencial; confirma antes de depender de ellos."
+                },
+            }
+        ],
+        [],
+    )
+
+    assert issues == []
+
+
+def test_comfort_copy_allows_nearby_station_with_separate_traced_amenities():
+    issues = a2ui_contract_issues(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": (
+                        "La estación recomendada está cerca de Córdoba. "
+                        "Servicios indicados en el punto: CAFE y SUPERMARKET; confirma antes de depender de ellos."
+                    )
                 },
             }
         ],
@@ -3791,7 +3850,7 @@ def test_comfort_copy_allows_perfecto_as_conversational_acknowledgement():
                 "type": "RiskExplanationCard",
                 "version": 1,
                 "props": {
-                    "text": "La parada tiene servicios trazados; confirma disponibilidad y acceso antes de depender de ellos."
+                    "text": "La parada tiene servicios indicados; confirma disponibilidad y acceso antes de depender de ellos."
                 },
             },
         ],
@@ -3936,7 +3995,7 @@ def test_comfort_copy_allows_charger_proximity_with_unverified_service_disclaime
                 "version": 1,
                 "props": {
                     "text": (
-                        "Estos son puntos de carga trazados cerca de Almansa. "
+                        "Estos son puntos de carga encontrados cerca de Almansa. "
                         "Los servicios como baños o cafetería no están verificados en estos resultados."
                     )
                 },
@@ -4000,7 +4059,7 @@ def test_night_safety_contract_rejects_untraced_affluence_claims():
         message="No quiero cargar en sitios solitarios de noche Estoy en Valencia centro",
     )
 
-    assert any("inferencia de seguridad nocturna no trazada" in issue for issue in issues)
+    assert any("inferencia de seguridad nocturna no respaldada por datos" in issue for issue in issues)
 
 
 def test_night_safety_contract_rejects_risk_after_alternatives():
@@ -4011,7 +4070,7 @@ def test_night_safety_contract_rejects_risk_after_alternatives():
                 "type": "AssistantMessage",
                 "version": 1,
                 "props": {
-                    "text": "He priorizado puntos autorizados cerca de Valencia centro usando datos trazados."
+                    "text": "He priorizado puntos autorizados cerca de Valencia centro usando datos disponibles."
                 },
             },
             {
@@ -4070,7 +4129,7 @@ def test_night_safety_contract_allows_traced_central_copy_with_early_risk():
                 "version": 1,
                 "props": {
                     "text": (
-                        "He priorizado puntos autorizados cerca de Valencia centro usando dirección, potencia y EVSEs trazados."
+                        "He priorizado puntos autorizados cerca de Valencia centro usando dirección, potencia y puestos de carga registrados."
                     )
                 },
             },

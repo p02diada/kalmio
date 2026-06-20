@@ -1,0 +1,8 @@
+[     156ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5175/node_modules/.vite/deps/react-dom_client.js?v=8ad17695:14337
+[     442ms] [WARNING] WebGL: CONTEXT_LOST_WEBGL: loseContext: context lost @ http://127.0.0.1:5175/a2ui:0
+[     442ms] [WARNING] WebGL: CONTEXT_LOST_WEBGL: loseContext: context lost @ http://127.0.0.1:5175/a2ui:0
+[     501ms] [WARNING] [.WebGL-0x25b4000f4200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels @ http://127.0.0.1:5175/a2ui:0
+[     628ms] [WARNING] [.WebGL-0x25b4000f4200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels @ http://127.0.0.1:5175/a2ui:0
+[     636ms] [WARNING] [.WebGL-0x25b4000f4200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels @ http://127.0.0.1:5175/a2ui:0
+[     644ms] [WARNING] [.WebGL-0x25b4000f4200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat) @ http://127.0.0.1:5175/a2ui:0
+[   25886ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5175/node_modules/.vite/deps/react-dom_client.js?v=8ad17695:14337

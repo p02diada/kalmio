@@ -1,0 +1,355 @@
+{
+  "messages": [
+    {
+      "version": "v0.9.1",
+      "createSurface": {
+        "surfaceId": "kalmio-chat",
+        "catalogId": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
+        "sendDataModel": true
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateComponents": {
+        "surfaceId": "kalmio-chat",
+        "components": [
+          {
+            "text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré.",
+            "id": "assistant-initial",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "chips": [
+              "Necesito cargar ya",
+              "Ruta con parada segura",
+              "Parada cerca del hotel",
+              "Priorizar servicios"
+            ],
+            "id": "preference-starters",
+            "component": "PreferenceChips",
+            "version": 1
+          },
+          {
+            "text": "Voy de Córdoba a Valencia con 58%. No quiero llegar justo",
+            "id": "user-0200e64947",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "text": "He calculado la ruta de Córdoba a Valencia (520 km, unas 5h43min). Como no tengo datos de tu vehículo (consumo, batería útil), no puedo validar si llegarás con el 58% ni cuánta reserva te quedaría. He buscado paradas de carga en el corredor para que puedas recargar durante el trayecto.",
+            "id": "msg1",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "origin": "Córdoba",
+            "destination": "Valencia",
+            "distanceKm": 520.3,
+            "durationMin": 343,
+            "energyKwh": null,
+            "arrivalBattery": null,
+            "id": "route1",
+            "component": "RouteSummaryCard",
+            "version": 1
+          },
+          {
+            "level": "medio",
+            "text": "Sin conocer el consumo y la capacidad de batería de tu coche, no puedo asegurar que el 58% inicial sea suficiente ni qué parada es óptima. Las estaciones que te muestro son puntos de carga en el corredor, pero la decisión de cuándo parar depende de tu autonomía real.",
+            "id": "risk1",
+            "component": "RiskExplanationCard",
+            "version": 1
+          },
+          {
+            "name": "V-VALENCIA-022-2",
+            "stationName": "V-VALENCIA-022-2",
+            "powerKw": 22,
+            "distanceKm": 1.58,
+            "detourMin": 4,
+            "confidence": "media",
+            "availableEvses": 4,
+            "connectorCount": 4,
+            "amenities": [
+              "SUPERMARKET",
+              "MALL",
+              "SPORT",
+              "BUS_STOP",
+              "PARKING_LOT",
+              "FUEL_STATION",
+              "RESTAURANT",
+              "CAFE",
+              "HOTEL",
+              "WIFI"
+            ],
+            "reliability": 50,
+            "scoreReasons": [
+              "Punto de carga en el corredor",
+              "Disponibilidad declarada",
+              "Hub grande",
+              "Dato antiguo",
+              "Fiabilidad ponderada",
+              "Servicios cercanos"
+            ],
+            "lat": 39.48123,
+            "lon": -0.389118,
+            "id": "stop1",
+            "component": "RecommendedStopCard",
+            "version": 1
+          },
+          {
+            "stops": [
+              {
+                "name": "V-VALENCIA-023",
+                "stationName": "V-VALENCIA-023",
+                "powerKw": 22,
+                "distanceKm": 2.9,
+                "detourMin": 7,
+                "confidence": "media",
+                "availableEvses": 4,
+                "connectorCount": 6,
+                "amenities": [
+                  "MALL",
+                  "SPORT",
+                  "BUS_STOP",
+                  "TAXI_STAND",
+                  "PARKING_LOT",
+                  "FUEL_STATION",
+                  "RESTAURANT",
+                  "CAFE",
+                  "HOTEL",
+                  "WIFI"
+                ],
+                "reliability": 50,
+                "scoreReasons": [
+                  "Punto de carga en el corredor",
+                  "Disponibilidad declarada",
+                  "Hub grande",
+                  "Dato antiguo",
+                  "Fiabilidad ponderada",
+                  "Servicios cercanos"
+                ],
+                "lat": 39.49549,
+                "lon": -0.401537
+              },
+              {
+                "name": "V-BURJASSOT-007",
+                "stationName": "V-BURJASSOT-007",
+                "powerKw": 7,
+                "distanceKm": 3.42,
+                "detourMin": 8,
+                "confidence": "media",
+                "availableEvses": 30,
+                "connectorCount": 30,
+                "amenities": [
+                  "WIFI",
+                  "MALL",
+                  "SUPERMARKET",
+                  "SPORT",
+                  "PARKING_LOT",
+                  "FUEL_STATION",
+                  "RESTAURANT",
+                  "CAFE",
+                  "HOTEL"
+                ],
+                "reliability": 50,
+                "scoreReasons": [
+                  "Punto de carga en el corredor",
+                  "Disponibilidad declarada",
+                  "Hub grande",
+                  "Dato antiguo",
+                  "Fiabilidad ponderada",
+                  "Servicios cercanos"
+                ],
+                "lat": 39.500187,
+                "lon": -0.408214
+              }
+            ],
+            "id": "alts1",
+            "component": "AlternativeStopsList",
+            "version": 1
+          },
+          {
+            "text": "Si me dices el modelo de tu coche, la capacidad de batería y el consumo, puedo calcular una ruta más precisa con paradas óptimas y estimación de batería al llegar.",
+            "id": "msg2",
+            "component": "AssistantMessage",
+            "version": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateDataModel": {
+        "surfaceId": "kalmio-chat",
+        "path": "/",
+        "value": {
+          "conversation": {
+            "surfaceId": "kalmio-chat",
+            "componentOrder": [
+              {
+                "id": "assistant-initial",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "preference-starters",
+                "component": "PreferenceChips"
+              },
+              {
+                "id": "user-0200e64947",
+                "component": "UserMessage"
+              },
+              {
+                "id": "msg1",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "route1",
+                "component": "RouteSummaryCard"
+              },
+              {
+                "id": "risk1",
+                "component": "RiskExplanationCard"
+              },
+              {
+                "id": "stop1",
+                "component": "RecommendedStopCard"
+              },
+              {
+                "id": "alts1",
+                "component": "AlternativeStopsList"
+              },
+              {
+                "id": "msg2",
+                "component": "AssistantMessage"
+              }
+            ]
+          },
+          "facts": {
+            "locations": [],
+            "routes": [
+              {
+                "origin": "Córdoba",
+                "destination": "Valencia",
+                "distanceKm": 520.3,
+                "durationMin": 343,
+                "energyKwh": null,
+                "arrivalBattery": null,
+                "sourceComponentId": "route1"
+              }
+            ],
+            "stops": [
+              {
+                "name": "V-VALENCIA-022-2",
+                "stationName": "V-VALENCIA-022-2",
+                "powerKw": 22,
+                "distanceKm": 1.58,
+                "detourMin": 4,
+                "confidence": "media",
+                "availableEvses": 4,
+                "connectorCount": 4,
+                "amenities": [
+                  "SUPERMARKET",
+                  "MALL",
+                  "SPORT",
+                  "BUS_STOP",
+                  "PARKING_LOT",
+                  "FUEL_STATION",
+                  "RESTAURANT",
+                  "CAFE",
+                  "HOTEL",
+                  "WIFI"
+                ],
+                "reliability": 50,
+                "scoreReasons": [
+                  "Punto de carga en el corredor",
+                  "Disponibilidad declarada",
+                  "Hub grande",
+                  "Dato antiguo",
+                  "Fiabilidad ponderada",
+                  "Servicios cercanos"
+                ],
+                "lat": 39.48123,
+                "lon": -0.389118,
+                "sourceComponentId": "stop1"
+              },
+              {
+                "name": "V-VALENCIA-023",
+                "stationName": "V-VALENCIA-023",
+                "powerKw": 22,
+                "distanceKm": 2.9,
+                "detourMin": 7,
+                "confidence": "media",
+                "availableEvses": 4,
+                "connectorCount": 6,
+                "amenities": [
+                  "MALL",
+                  "SPORT",
+                  "BUS_STOP",
+                  "TAXI_STAND",
+                  "PARKING_LOT",
+                  "FUEL_STATION",
+                  "RESTAURANT",
+                  "CAFE",
+                  "HOTEL",
+                  "WIFI"
+                ],
+                "reliability": 50,
+                "scoreReasons": [
+                  "Punto de carga en el corredor",
+                  "Disponibilidad declarada",
+                  "Hub grande",
+                  "Dato antiguo",
+                  "Fiabilidad ponderada",
+                  "Servicios cercanos"
+                ],
+                "lat": 39.49549,
+                "lon": -0.401537,
+                "sourceComponentId": "alts1"
+              },
+              {
+                "name": "V-BURJASSOT-007",
+                "stationName": "V-BURJASSOT-007",
+                "powerKw": 7,
+                "distanceKm": 3.42,
+                "detourMin": 8,
+                "confidence": "media",
+                "availableEvses": 30,
+                "connectorCount": 30,
+                "amenities": [
+                  "WIFI",
+                  "MALL",
+                  "SUPERMARKET",
+                  "SPORT",
+                  "PARKING_LOT",
+                  "FUEL_STATION",
+                  "RESTAURANT",
+                  "CAFE",
+                  "HOTEL"
+                ],
+                "reliability": 50,
+                "scoreReasons": [
+                  "Punto de carga en el corredor",
+                  "Disponibilidad declarada",
+                  "Hub grande",
+                  "Dato antiguo",
+                  "Fiabilidad ponderada",
+                  "Servicios cercanos"
+                ],
+                "lat": 39.500187,
+                "lon": -0.408214,
+                "sourceComponentId": "alts1"
+              }
+            ],
+            "risks": [
+              {
+                "level": "medio",
+                "text": "Sin conocer el consumo y la capacidad de batería de tu coche, no puedo asegurar que el 58% inicial sea suficiente ni qué parada es óptima. Las estaciones que te muestro son puntos de carga en el corredor, pero la decisión de cuándo parar depende de tu autonomía real.",
+                "sourceComponentId": "risk1"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,500 @@
+{
+  "case": 30,
+  "turns": [
+    "Tengo un Tesla Model Y y salgo con 45%... Madrid a Valencia"
+  ],
+  "http_status": 200,
+  "components": [
+    "AssistantMessage",
+    "PreferenceChips",
+    "UserMessage",
+    "AssistantMessage",
+    "RouteSummaryCard",
+    "RecommendedStopCard",
+    "RiskExplanationCard",
+    "AlternativeStopsList"
+  ],
+  "visible_text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. Necesito cargar ya Ruta con parada segura Parada cerca del hotel Priorizar servicios Tengo un Tesla Model Y y salgo con 45%... Madrid a Valencia Trazamos la ruta Madrid → Valencia (356.7 km, ~4 h). Sales con 45% de batería, pero sin perfil de consumo no puedo validar la batería de llegada ni optimizar paradas. Aquí tienes puntos de carga en el corredor. Madrid Valencia Moya Hub Honrubia Moya Hub Honrubia media HOTEL RESTAURANT PARKING_LOT FUEL_STATION WIFI CAFE SUPERMARKET NATURE medio Sin datos de consumo ni autonomía de tu Tesla Model Y, no puedo calcular la batería de llegada ni garantizar que el 45% de salida sea suficiente. Las paradas mostradas son puntos de carga trazados en el corredor, no un plan optimizado. Si quieres validar si llegas sin cargar o con cuántas paradas, necesito el consumo (kWh/100 km) y la capacidad útil de la batería. Aparcamiento CTM Aparcamiento CTM media HOTEL RESTAURANT CAFE RECREATION_AREA BUS_STOP TAXI_STAND CARPOOL_PARKING FUEL_STATION V-VALENCIA-022-2 V-VALENCIA-022-2 media SUPERMARKET MALL SPORT BUS_STOP PARKING_LOT FUEL_STATION RESTAURANT CAFE HOTEL WIFI",
+  "component_props": [
+    {
+      "text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré.",
+      "id": "assistant-initial",
+      "component": "AssistantMessage",
+      "version": 1
+    },
+    {
+      "chips": [
+        "Necesito cargar ya",
+        "Ruta con parada segura",
+        "Parada cerca del hotel",
+        "Priorizar servicios"
+      ],
+      "id": "preference-starters",
+      "component": "PreferenceChips",
+      "version": 1
+    },
+    {
+      "text": "Tengo un Tesla Model Y y salgo con 45%... Madrid a Valencia",
+      "id": "user-c9fd02de0a",
+      "component": "UserMessage",
+      "version": 1
+    },
+    {
+      "text": "Trazamos la ruta Madrid → Valencia (356.7 km, ~4 h). Sales con 45% de batería, pero sin perfil de consumo no puedo validar la batería de llegada ni optimizar paradas. Aquí tienes puntos de carga en el corredor.",
+      "id": "msg1",
+      "component": "AssistantMessage",
+      "version": 1
+    },
+    {
+      "origin": "Madrid",
+      "destination": "Valencia",
+      "distanceKm": 356.7,
+      "durationMin": 240,
+      "id": "route1",
+      "component": "RouteSummaryCard",
+      "version": 1
+    },
+    {
+      "name": "Moya Hub Honrubia",
+      "stationName": "Moya Hub Honrubia",
+      "powerKw": 240,
+      "distanceKm": 1.23,
+      "detourMin": 3,
+      "confidence": "media",
+      "availableEvses": 9,
+      "connectorCount": 12,
+      "amenities": [
+        "HOTEL",
+        "RESTAURANT",
+        "PARKING_LOT",
+        "FUEL_STATION",
+        "WIFI",
+        "CAFE",
+        "SUPERMARKET",
+        "NATURE"
+      ],
+      "lat": 39.602992,
+      "lon": -2.279669,
+      "id": "stop1",
+      "component": "RecommendedStopCard",
+      "version": 1
+    },
+    {
+      "level": "medio",
+      "text": "Sin datos de consumo ni autonomía de tu Tesla Model Y, no puedo calcular la batería de llegada ni garantizar que el 45% de salida sea suficiente. Las paradas mostradas son puntos de carga trazados en el corredor, no un plan optimizado. Si quieres validar si llegas sin cargar o con cuántas paradas, necesito el consumo (kWh/100 km) y la capacidad útil de la batería.",
+      "id": "risk1",
+      "component": "RiskExplanationCard",
+      "version": 1
+    },
+    {
+      "stops": [
+        {
+          "name": "Aparcamiento CTM",
+          "stationName": "Aparcamiento CTM",
+          "powerKw": 400,
+          "distanceKm": 4.77,
+          "detourMin": 11,
+          "confidence": "media",
+          "availableEvses": 15,
+          "connectorCount": 28,
+          "amenities": [
+            "HOTEL",
+            "RESTAURANT",
+            "CAFE",
+            "RECREATION_AREA",
+            "BUS_STOP",
+            "TAXI_STAND",
+            "CARPOOL_PARKING",
+            "FUEL_STATION"
+          ],
+          "lat": 40.365577,
+          "lon": -3.654602
+        },
+        {
+          "name": "V-VALENCIA-022-2",
+          "stationName": "V-VALENCIA-022-2",
+          "powerKw": 22,
+          "distanceKm": 1.73,
+          "detourMin": 4,
+          "confidence": "media",
+          "availableEvses": 4,
+          "connectorCount": 4,
+          "amenities": [
+            "SUPERMARKET",
+            "MALL",
+            "SPORT",
+            "BUS_STOP",
+            "PARKING_LOT",
+            "FUEL_STATION",
+            "RESTAURANT",
+            "CAFE",
+            "HOTEL",
+            "WIFI"
+          ],
+          "lat": 39.48123,
+          "lon": -0.389118
+        }
+      ],
+      "id": "alts1",
+      "component": "AlternativeStopsList",
+      "version": 1
+    }
+  ],
+  "trace_events": [
+    {
+      "event": "agent_turn",
+      "name": "conversation",
+      "provider": "deepseek",
+      "requestId": "4be3c4d86255403daa509cea04bc277f",
+      "status": "started",
+      "ts": "2026-06-16T02:53:28.041573+00:00",
+      "turnId": "69be36ab42954780baa7d6dfe891ec11"
+    },
+    {
+      "cost": {
+        "basis": "provider_cache_breakdown",
+        "currency": "USD",
+        "estimated": true,
+        "inputCostUsd": 0.00102942,
+        "outputCostUsd": 0.00005236,
+        "pricesPerMillionTokens": {
+          "inputCacheHit": 0.0028,
+          "inputCacheMiss": 0.14,
+          "output": 0.28
+        },
+        "totalCostUsd": 0.00108178
+      },
+      "durationMs": 3215.03,
+      "event": "llm_api_call",
+      "metadata": {
+        "finishReason": "stop",
+        "maxTokens": 1800,
+        "messageCount": 2,
+        "nativeTools": true,
+        "promptChars": 23910,
+        "responseFormat": {
+          "type": "json_object"
+        },
+        "thinking": "disabled",
+        "toolCallCount": 0,
+        "toolCount": 3
+      },
+      "model": "deepseek-v4-flash",
+      "name": "chat.completions.create",
+      "provider": "deepseek",
+      "request": {
+        "_truncated": true,
+        "chars": 27616,
+        "preview": "{\"extra_body\": {\"thinking\": {\"type\": \"disabled\"}}, \"max_tokens\": 1800, \"messages\": [{\"content\": \"Responde solo con JSON válido para respuestas finales. Si usas herramientas, emite tool calls nativas o el objeto JSON type=tool_call como objeto raíz; nunca pongas tool_call dentro de blocks.\", \"role\": \"system\"}, {\"content\": \"Eres el agente conversacional de Kalmio, una PWA móvil para planificar viajes y carga EV. Interpreta la conversación completa y decide intención, herramientas y bloques A2UI; Django solo validará seguridad y datos.\\nHerramientas permitidas. Puedes llamar solo una por respuesta tool_call:\\n- resolve_location: resuelve una ciudad o texto conocido. Args: {\\\"query\\\":\\\"ciudad o texto\\\"}\\n- search_destination_chargers: busca puntos de carga autorizados alrededor de una ubicación ya resuelta o coordenadas dadas por el usuario. Args: {\\\"location\\\":{\\\"label\\\":\\\"...\\\",\\\"lat\\\":0,\\\"lon\\\":0},\\\"connector\\\":null,\\\"radius_km\\\":80,\\\"limit\\\":3}\\n- plan_route: calcula ruta y paradas con proveedor y datos autorizados. Args: {\\\"origin\\\":{\\\"label\\\":\\\"...\\\",\\\"lat\\\":0,\\\"lon\\\":0},\\\"destination\\\":{\\\"label\\\":\\\"...\\\",\\\"lat\\\":0,\\\"lon\\\":0},\\\"vehicle\\\":null,\\\"preferences\\\":{\\\"reserve_min_percent\\\":20,\\\"max_useful_power_kw\\\":null},\\\"corridor_radius_km\\\":25}\\nNunca llames herramientas con label vacío, lat/lon 0,0, placeholders o ubicaciones no dadas/resueltas; pregunta antes.\\nUbicaciones internas conocidas para argumentos de herramienta, sin inventar otras coordenadas: Madrid(40.4168,-3.7038); Valencia(39.4699,-0.3763); Córdoba(37.8882,-4.7794); Sevilla(37.3891,-5.9845); Barcelona(41.3874,2.1686); Málaga(36.7213,-4.4214); Granada(37.1773,-3.5986); Alicante(38.3452,-0.4810); Bilbao(43.2630,-2.9350); Zaragoza(41.6488,-0.8891); Cádiz(36.5271,-6.2886); Alhambra, Granada(37.1761,-3.5881); Almansa(38.8690,-1.0971); Alcobendas(40.5317,-3.6419); Alcora(39.1230,-0.5025).\\nComportamiento EV esperado:\\n- Usa el historial útil, acepta correcciones naturales y no suenes como formulario.\\n- Presenta las recomendaciones como paradas o lugares útiles para el viaje; usa name/stationName como punto de carga trazable y placeName solo si sale de herramienta o del usuario. No inventes lugares, servicios ni POIs.\\n- En copy visible, expresa duraciones largas en horas y minutos (por ejemplo, 8 h 37 min), no como cientos de minutos.\\n- Carga urgente sin ubicación: pide solo ubicación actual, ciudad/zona o coordenadas. No pidas destino para una carga urgente.\\n- Tras una urgencia, una ciudad/zona/coordenadas es continuación de la urgencia; usa herramientas si hay ubicación suficiente.\\n- Si el usuario corrige la ubicación, descarta la anterior, conserva batería, conector y preferencias si siguen teniendo sentido y busca con la nueva.\\n- Si pregunta por un fallo anterior, no contradigas bloques ya validados; explica validación, cobertura, aproximación o datos autorizados.\\n- Calle/POI/zona: intenta resolver la parte conocida con resolve_location. Si no puedes ubicar esa calle exacta, dilo y ofrece ciudad aproximada o coordenadas; no inventes coordenadas.\\n- Ruta sin consumo/modelo: puedes usar plan_route para explorar contexto de ruta y paradas de carga, pero no inventes autonomía, energía ni llegada. Si plan_route devuelve planningLevel=chargers_only, dilo. Usa RouteSummaryCard para distancia/duración trazadas, RecommendedStopCard y AlternativeStopsList para estaciones trazadas cuando sean útiles, y RiskExplanationCard para explicar que no puedes validar batería de llegada ni reserva sin consumo/perfil. No repitas la duración en prosa si ya está en RouteSummaryCard; evita frases como '4 horas' y deja el dato en la tarjeta o usa formato '4 h'. Mantén el AssistantMessage inicial en una frase corta y muestra la parada principal antes del aviso largo para que aparezca pronto en móvil; orden recomendado: RouteSummaryCard, RecommendedStopCard, RiskExplanationCard y después AlternativeStopsList. Si el usuario pregunta si 'le da', 'llega sin cargar' o 'puede llegar sin cargar' y hay origen/destino pero faltan batería actual, autonomía, modelo o consumo, puedes llamar plan_route para mostrar distancia/duración; no respondas sí/no, no afirmes que llega, pide esos datos críticos, y no muestres RecommendedStopCard/AlternativeStopsList como recomendación principal salvo que el usuario pida paradas de respaldo o plan B. Si el usuario prefiere parar pocas veces pero faltan autonomía/consumo/modelo, di antes de las paradas que no puedes garantizar ni optimizar pocas paradas sin esos datos; presenta cualquier estación solo como punto de carga trazado en el corredor, no como plan optimizado. Si el usuario dice que sale con X%, ese X% es batería de salida, no de llegada ni reserva; no escribas 'llegas con X%'. Si el usuario pide no llegar justo sin dar un porcentaje de reserva, no digas que indicó 20%; si usas reserve_min_percent por defecto, llámalo margen conservador por defecto. No digas asegurar/garantizar margen en chargers_only ni 'te ayudará a recuperar margen'; di que cargar ahí puede ayudar a recuperar margen operativo no validado. Si el viaje es futuro (mañana, fecha concreta, finde, viernes/domingo), añade en el AssistantMessage inicial o en el primer RiskExplanationCard, antes de cualquier RecommendedStopCard o AlternativeStopsList, una advertencia visible: disponibilidad, acceso y tarifas pueden cambiar antes del viaje.\\n- Perfil de vehículo: un modelo comercial como Tesla Model Y y una batería de salida no son un perfil autorizado de consumo/autonomía. Para plan_route, usa vehicle:null u omite vehicle salvo que el usuario haya dado explícitamente batería, capacidad útil kWh, consumo kWh/100 km, conector y potencia máxima. No rellenes campos desconocidos con null, ceros o defaults. Puedes mencionar modelo y batería en el copy, pero no calcular energía, autonomía ni llegada con ellos.\\n- Hotel/destino/estancia: si hay ciudad/POI suficiente y el usuario necesita cargar durante la estancia, llama search_destination_chargers directamente; no devuelvas solo un botón para buscar. Una ciudad conocida ya es ubicación suficiente para una búsqueda aproximada; no esperes hotel/zona exacta para la primera búsqueda, puedes pedir refinamiento después de mostrar resultados trazados. No lo conviertas en ruta salvo que pidan origen-destino. Si el usuario dijo que el hotel no tiene cargador y la herramienta devuelve varias paradas, elige una parada primaria con RecommendedStopCard usando solo distancia, potencia, conectores y EVSEs trazados, y pon el resto como AlternativeStopsList; no la presentes como disponibilidad en vivo ni como reserva.\\n- Si buscas por ciudad aproximada porque el hotel/POI exacto no está resuelto, la respuesta visible debe decirlo: usa la ciudad como aproximación, no presentes el hotel exacto como ubicación validada, y pide dirección, zona exacta o coordenadas para refinar.\\n- Si el usuario menciona ida y vuelta, volver, regreso o fechas de salida/vuelta, reconoce contexto de viaje redondo. Si falta origen para planificar ida/vuelta, pregunta por el origen antes de pedir hotel/zona y no llames plan_route ni search_destination_chargers todavia. Usa ClarifyingQuestionCard con field origen/salida cuando falte el origen. No uses la ciudad destino como origen.\\n- Si resolve_location recibe un hotel, calle o POI pero solo devuelve una ciudad/zona, no afirmes que conoces el lugar exacto; di que usas esa ciudad/zona como aproximación o pide coordenadas/dirección exacta.\\n- Si search_destination_chargers devuelve stops, usa nombres y métricas exactas trazables; no uses placeholders cuando hay estaciones. Puedes llamar a esos resultados paradas, pero el punto de carga mostrado debe seguir siendo trazable.\\n- No uses superlativos globales como 'el más rápido en la ciudad' o 'el mejor de Córdoba' salvo que la herramienta lo demuestre. Acota a 'de los resultados trazados' o 'entre estas opciones' cuando compares potencia/distancia.\\n- Si ya hay stops con potencia/distancia/disponibilidad y el usuario pide comparar potencia o alternativas, responde con esos resultados; no repitas la misma búsqueda sin cambiar ubicación, radio, conector o criterio material.\\n- Si una herramienta permitida falla, explica el fallo en contexto y pide una acción mínima; no fabriques datos.\\n- Batería baja: pocas opciones, riesgo explícito, y ActionButtons de navegación con functionCall.openUrl cuando el punto recomendado tiene lat/lon trazables. Si conoces batería, consérvala. Si el usuario dice poca batería sin porcentaje explícito, no inventes un número ni uses texto como 'baja' en UrgentChargeCard.battery; usa battery:null y explica la batería baja en risk/texto visible. Trata esa situación como urgente. Orden exacto recomendado si hay coordenadas trazadas: UrgentChargeCard, RiskExplanationCard si hace falta, ActionButtons, y solo después AlternativeStopsList; nunca pongas AlternativeStopsList antes de ActionButtons en este caso. Con batería <=10%, prioriza una sola parada primaria, muestra el riesgo de margen muy bajo inmediatamente junto a esa parada como frase visible para el conductor, y deja solo 1-2 alternativas trazadas después. Si la parada primaria tiene lat/lon trazables, ActionButtons con functionCall.openUrl es obligatorio y debe ir antes de cualquier AlternativeStopsList; no lo sustituyas por texto. Si usas UrgentChargeCard.risk debe ser una frase humana, no metadata ni enums como margen_muy_bajo; si añades RiskExplanationCard, ponlo antes de las alternativas.\\n- No describas availableEvses, connector counts o EVSEs importados como 'libres', 'disponibles en vivo' u ocupación actual. Di 'EVSEs/conectores trazados' y recuerda confirmar disponibilidad si hace falta. Si el dato disponible es availableEvses, llámalo EVSEs trazados; usa 'conectores' solo cuando tengas connectorCount o connectorTypes trazados. Si el usuario pide evitar cargadores con un solo conector/EVSE, prioriza estaciones con más de 1 EVSE/conector trazado cuando la herramienta lo soporte y explica el dato sin afirmar ocupación en vivo.\\n- Punto de carga ocupado: si el historial deja claro cuál era la parada primaria anterior, no la repitas como plan B. En la respuesta visible, nombra la parada descartada y deja claro que no debe seguir siendo el plan principal. Reutiliza exactamente alternativas trazadas previas con sus nombres, distancias, potencia y coordenadas; no cambies métricas ni inventes coordenadas. Si usas navegación para una alternativa previa, usa su lat/lon exactos. Si no hay alternativas previas suficientes, vuelve a buscar con la ubicación previa o pide el dato mínimo que falte. Recuerda que la disponibilidad en vivo puede cambiar.\\n- En carretera y poco desvío: pide carretera, zona actual/coordenadas y destino si faltan; no lo reduzcas a búsqueda urbana arbitraria. Cuando no haya ubicación suficiente, prefiere ClarifyingQuestionCard con una pregunta breve sobre carretera/zona actual/destino y campos carretera_o_zona_actual, destino y coordenadas. Usa LocationRequestCard solo si basta con ubicación actual; no muestres campos genéricos de ciudad si el usuario ya dijo que está en carretera y quiere poco desvío.\\n- Si el coche carga máximo a X kW, pasa X como preferences.max_useful_power_kw; si recomiendas un cargador de más potencia, di antes de la primera parada que el coche no aprovechará más de 100 kW cuando X=100 y no presentes la potencia superior como ventaja. No digas que has filtrado o excluido paradas por potencia si todavía muestras una estación por encima de ese máximo útil; di que esa potencia superior no se premia ni cambia lo que el coche puede aprovechar.\\n- Restricción dura de llegada: sin perfil de vehículo no la presentes como cumplida; pide modelo/consumo/autonomía. Si la herramienta devuelve arrivalBattery:null o energyKwh:null, no los sustituyas por estimaciones ni por frases de certeza. Si el usuario pide llegar con al menos X%, pasa X como reserve_min_percent y di antes de cualquier RecommendedStopCard/AlternativeStopsList que ese X% no se puede validar en chargers_only sin consumo/perfil.\\n- Preferencias de precio, hubs grandes o tamaño de parada: trátalas como preferencia de decisión sobre paradas, no como comparación de hardware. Si falta ruta o ubicación, no llames herramientas con ubicaciones vacías; pide origen/destino o ubicación actual. No inventes tarifas/precios; si no hay tarifas de proveedor, dilo. No conviertas una preferencia de precio en una ruta arriesgada.\\n- Cargar antes de salir vs al llegar: si faltan datos, no calcules. Da una comparación conceptual breve: cargar antes reduce riesgo si sales bajo, la ruta es larga o no conoces carga en destino; cargar al llegar puede tener sentido si llegas con margen y hay punto trazado en destino. Luego pide origen, destino, batería actual y modelo/consumo/autonomía.\\n- Viajes futuros: di visiblemente antes de mostrar paradas que disponibilidad, acceso y tarifas pueden cambiar antes del viaje. En reparaciones A2UI, no elimines esa advertencia; debe conservar las tres palabras disponibilidad, acceso y tarifas antes de cualquier lista de paradas. Niños/comodidad: si la herramienta trae amenities en la parada primaria, debes mencionarlos brevemente por nombre en la respuesta visible como servicios trazados o comodidad potencial despues del riesgo principal; no digas que están cerca, disponibles, son seguros, ideales, perfectos o aptos para niños salvo que el dato venga explícitamente trazado.\\n- Preferencias de servicios como baños, cafetería, restaurante o comer: si faltan ruta o ubicación, pregunta por ubicación/ruta. Si el siguiente turno aporta ciudad, zona o coordenadas, conserva esa preferencia y llama search_destination_chargers con esa ubicación; no vuelvas a preguntar qué necesita. Si la búsqueda devuelve amenities vacíos o no incluye esos servicios, muestra los cargadores trazados y di visiblemente que baños/cafetería/restaurante no están verificados en esos resultados.\\n- Preferencias de desvío controlado por comodidad: usa route tooling si hay ruta. Si la herramienta trae detourMin y amenities, presenta la parada primaria como punto trazado dentro o cerca del margen pedido y menciona servicios trazados como comodidad potencial; no digas 'buenos servicios', 'más cómodo' ni que el sitio es cómodo si la herramienta solo trae amenities. No introduzcas preferencias de pocas paradas salvo que el usuario las pida. Si muestras alternativas, conserva el desvío trazado para que el usuario pueda comparar.\\n- Preferencias de seguridad nocturna o evitar sitios solitarios: si falta ubicación/ruta, pregunta por el dato mínimo sin prometer que buscarás sitios con afluencia, actividad, vigilancia o iluminación. Si el siguiente turno aporta ciudad, zona o coordenadas, conserva esa preferencia y llama search_destination_chargers con esa ubicación; no respondas solo con LocationDetailCard. Puedes priorizar señales trazadas como dirección céntrica, potencia, EVSEs/conectores o hub si la herramienta lo trae; no afirmes seguridad, vigilancia, iluminación, afluencia, actividad ni que sea menos probable que un lugar sea solitario. Di de forma visible que Kalmio no valida seguridad ni entorno en vivo y que el conductor debe verificar el entorno al llegar de noche. Si muestras alternativas, coloca RiskExplanationCard antes de AlternativeStopsList para que el límite no quede escondido en móvil.\\n- Estancias de varios días: piensa en carga durante estancia y vuelta; si hay viaje redondo y falta origen, pídelo; si solo pide carga en destino y hay ubicación suficiente, busca en destino. Tras una búsqueda para estancia de varios días, incluye StayPlanningCard para el contexto de estancia junto a los puntos de carga trazados.\\n- Rutas baratas, reservas duras, carga justa o comparativas rápida/barata necesitan origen, destino y datos de vehículo/batería para calcular; si faltan, pregunta en el mismo turno por origen, destino, batería actual y modelo/consumo/autonomía. No inventes tarifas, kWh, llegada ni comparativas de precio; si no hay datos de tarifas de proveedor, dilo.\\nEjemplos críticos por analogía, no reglas rígidas: 'Necesito cargar ya' -> pide ubicación, no destino; 'En Córdoba' tras urgencia -> busca Córdoba; 'Paseo de la Victoria de Córdoba' -> si solo resuelves Córdoba, explica la aproximación; 'Voy a dormir en Valencia, busca cargadores cerca del hotel' -> llama search_destination_chargers con Valencia como aproximación y explica que el hotel exacto refina; 'Valencia centro' tras hotel sin cargador -> DestinationChargingCard + RecommendedStopCard + AlternativeStopsList + StayPlanningCard, usando una parada primaria trazada y alternativas trazadas; 'Voy a Granada y duermo cerca de la Alhambra' -> llama search_destination_chargers con Alhambra/Granada aproximado; si es finde, antes de paradas di que disponibilidad, acceso y tarifas pueden cambiar, y pide hotel/zona/direccion exacta para refinar; 'Me voy 3 días a Córdoba y me quedo en el hotel Meliá' -> llama search_destination_chargers con Córdoba como aproximación, no ActionButtons; 'Voy una semana a Cádiz y necesito cargar durante la estancia' -> llama search_destination_chargers con Cádiz como aproximación e incluye StayPlanningCard, no preguntes primero por hotel/zona; 'Quiero la ruta más barata, pero sin bajar del 20%' sin origen/destino -> no llames plan_route, pregunta origen, destino y datos de vehículo/batería; 'Voy a Córdoba el viernes y vuelvo el domingo' -> ClarifyingQuestionCard preguntando origen/salida para planificar ida/vuelta antes de llamar herramientas; 'Zaragoza a Barcelona con 25%' sin consumo/modelo -> no valides ese 25%; 'Córdoba a Valencia con 58%, no quiero llegar justo' -> plan_route puede mostrar RouteSummaryCard y paradas trazadas, pero debes decir que la llegada/reserva no se valida sin consumo o perfil; 'Sevilla a Granada, me da para llegar sin cargar?' -> plan_route puede mostrar RouteSummaryCard de distancia/duración, pero no respondas sí/no sin batería actual/autonomía/modelo/consumo; pide esos datos; 'Alicante a Bilbao, prefiero parar pocas veces' -> plan_route puede mostrar contexto y puntos de corredor, pero debes decir antes que no puedes optimizar pocas paradas sin autonomía/consumo/modelo; 'Evita cargadores caros si hay alternativas razonables' -> pide ruta o ubicación y aclara que no inventas tarifas; 'Prefiero hubs grandes aunque sean un poco más caros' -> no llames herramientas sin ruta/ubicación; pide ruta o ubicación actual y aclara que no validas tarifas si el proveedor no las da; 'Me conviene cargar antes de salir o al llegar?' -> compara conceptualmente y pide origen, destino, batería y vehículo antes de calcular; 'Busca una parada con baños y cafetería' -> pregunta ubicación/ruta; 'Estoy cerca de Almansa' después -> llama search_destination_chargers con Almansa, muestra cargadores trazados y di que baños/cafetería no están verificados si amenities viene vacío; 'Prefiero desviarme 10 minutos si el sitio es más cómodo. Voy de Madrid a Valencia' -> plan_route, muestra desvío trazado y amenities como servicios trazados, no comodidad garantizada ni pocas paradas; 'No quiero cargar en sitios solitarios de noche' -> pregunta ubicación/ruta; 'Estoy en Valencia centro' después -> llama search_destination_chargers, muestra puntos autorizados trazados y explica que no validas seguridad, iluminación, afluencia ni actividad en vivo; 'Mi coche carga máximo a 100 kW, no necesito ultrarrápidos' -> usa preferences.max_useful_power_kw=100.\\nCatálogo A2UI permitido por propósito, no por reglas rígidas de intención:\\nAssistantMessage texto breve; TripSummaryCard ruta clara; RouteSummaryCard solo plan_route; RecommendedStopCard/AlternativeStopsList solo paradas de carga respaldadas por estaciones de herramientas; en esos bloques name/stationName debe ser la estación trazable y placeName solo un lugar confirmado; RiskExplanationCard incertidumbre concreta; CostComparisonCard solo costes de herramienta; UrgentChargeCard carga inmediata trazable; Urgent"
+      },
+      "requestId": "4be3c4d86255403daa509cea04bc277f",
+      "response": {
+        "annotations": null,
+        "audio": null,
+        "content": "{\"type\":\"tool_call\",\"intent\":\"plan_route\",\"confidence\":0.85,\"tool\":\"plan_route\",\"args\":{\"origin\":{\"label\":\"Madrid\",\"lat\":40.4168,\"lon\":-3.7038},\"destination\":{\"label\":\"Valencia\",\"lat\":39.4699,\"lon\":-0.3763},\"vehicle\":null,\"preferences\":{\"reserve_min_percent\":20,\"max_useful_power_kw\":null},\"corridor_radius_km\":25},\"rationale\":\"El usuario da origen Madrid, destino Valencia, modelo Tesla Model Y y batería de salida 45%, pero no perfil completo (consumo, capacidad útil, conector, potencia máxima). Se llama plan_route sin vehicle para obtener distancia/duración y paradas trazadas en el corredor, sin validar llegada ni reserva.\"}",
+        "function_call": null,
+        "refusal": null,
+        "role": "assistant",
+        "tool_calls": null
+      },
+      "status": "ok",
+      "ts": "2026-06-16T02:53:31.635628+00:00",
+      "turnId": "69be36ab42954780baa7d6dfe891ec11",
+      "usage": {
+        "cacheHitInputTokens": 0,
+        "cacheMissInputTokens": 7353,
+        "inputTokens": 7353,
+        "outputTokens": 187,
+        "totalTokens": 7540
+      }
+    },
+    {
+      "durationMs": 8192.35,
+      "event": "internal_tool_call",
+      "metadata": {
+        "alternativeCount": 2,
+        "ok": true,
+        "planningLevel": "chargers_only",
+        "tool": "plan_route"
+      },
+      "name": "plan_route",
+      "request": {
+        "corridor_radius_km": 25,
+        "destination": {
+          "label": "Valencia",
+          "lat": 39.4699,
+          "lon": -0.3763
+        },
+        "origin": {
+          "label": "Madrid",
+          "lat": 40.4168,
+          "lon": -3.7038
+        },
+        "preferences": {
+          "max_useful_power_kw": null,
+          "reserve_min_percent": 20
+        },
+        "vehicle": null
+      },
+      "requestId": "4be3c4d86255403daa509cea04bc277f",
+      "response": {
+        "alternatives": [
+          {
+            "amenities": [
+              "HOTEL",
+              "RESTAURANT",
+              "CAFE",
+              "RECREATION_AREA",
+              "BUS_STOP",
+              "TAXI_STAND",
+              "CARPOOL_PARKING",
+              "FUEL_STATION"
+            ],
+            "availableEvses": 15,
+            "confidence": "media",
+            "connectorCount": 28,
+            "detourMin": 11,
+            "distanceKm": 4.77,
+            "lat": 40.365577,
+            "lon": -3.654602,
+            "name": "Aparcamiento CTM",
+            "powerKw": 400,
+            "reliability": 50,
+            "scoreReasons": [
+              "Punto de carga en el corredor",
+              "Alta potencia",
+              "Disponibilidad declarada",
+              "Hub grande",
+              "Dato antiguo",
+              "Fiabilidad ponderada",
+              "Servicios cercanos"
+            ],
+            "stationName": "Aparcamiento CTM"
+          },
+          {
+            "amenities": [
+              "SUPERMARKET",
+              "MALL",
+              "SPORT",
+              "BUS_STOP",
+              "PARKING_LOT",
+              "FUEL_STATION",
+              "RESTAURANT",
+              "CAFE",
+              "HOTEL",
+              "WIFI"
+            ],
+            "availableEvses": 4,
+            "confidence": "media",
+            "connectorCount": 4,
+            "detourMin": 4,
+            "distanceKm": 1.73,
+            "lat": 39.48123,
+            "lon": -0.389118,
+            "name": "V-VALENCIA-022-2",
+            "powerKw": 22,
+            "reliability": 50,
+            "scoreReasons": [
+              "Punto de carga en el corredor",
+              "Disponibilidad declarada",
+              "Hub grande",
+              "Dato antiguo",
+              "Fiabilidad ponderada",
+              "Servicios cercanos"
+            ],
+            "stationName": "V-VALENCIA-022-2"
+          }
+        ],
+        "arrivalBattery": null,
+        "destination": {
+          "label": "Valencia",
+          "lat": 39.4699,
+          "lon": -0.3763
+        },
+        "distanceKm": 356.7,
+        "durationMin": 240,
+        "energyKwh": null,
+        "ok": true,
+        "origin": {
+          "label": "Madrid",
+          "lat": 40.4168,
+          "lon": -3.7038
+        },
+        "planningLevel": "chargers_only",
+        "recommendation": {
+          "amenities": [
+            "HOTEL",
+            "RESTAURANT",
+            "PARKING_LOT",
+            "FUEL_STATION",
+            "WIFI",
+            "CAFE",
+            "SUPERMARKET",
+            "NATURE"
+          ],
+          "availableEvses": 9,
+          "confidence": "media",
+          "connectorCount": 12,
+          "detourMin": 3,
+          "distanceKm": 1.23,
+          "lat": 39.602992,
+          "lon": -2.279669,
+          "name": "Moya Hub Honrubia",
+          "powerKw": 240,
+          "reliability": 50,
+          "scoreReasons": [
+            "Punto de carga en el corredor",
+            "Alta potencia",
+            "Disponibilidad declarada",
+            "Hub grande",
+            "Dato antiguo",
+            "Fiabilidad ponderada",
+            "Servicios cercanos"
+          ],
+          "stationName": "Moya Hub Honrubia"
+        },
+        "tool": "plan_route",
+        "warnings": [
+          "Sin datos de autonomía, solo mostramos paradas de carga en ruta. No calculamos llegada estimada ni paradas óptimas."
+        ]
+      },
+      "status": "ok",
+      "ts": "2026-06-16T02:53:39.829694+00:00",
+      "turnId": "69be36ab42954780baa7d6dfe891ec11"
+    },
+    {
+      "cost": {
+        "basis": "provider_cache_breakdown",
+        "currency": "USD",
+        "estimated": true,
+        "inputCostUsd": 0.00105579,
+        "outputCostUsd": 0.0002786,
+        "pricesPerMillionTokens": {
+          "inputCacheHit": 0.0028,
+          "inputCacheMiss": 0.14,
+          "output": 0.28
+        },
+        "totalCostUsd": 0.00133439
+      },
+      "durationMs": 8978.6,
+      "event": "llm_api_call",
+      "metadata": {
+        "finishReason": "stop",
+        "maxTokens": 1800,
+        "messageCount": 2,
+        "nativeTools": true,
+        "promptChars": 26574,
+        "responseFormat": {
+          "type": "json_object"
+        },
+        "thinking": "disabled",
+        "toolCallCount": 0,
+        "toolCount": 3
+      },
+      "model": "deepseek-v4-flash",
+      "name": "chat.completions.create",
+      "provider": "deepseek",
+      "request": {
+        "_truncated": true,
+        "chars": 30556,
+        "preview": "{\"extra_body\": {\"thinking\": {\"type\": \"disabled\"}}, \"max_tokens\": 1800, \"messages\": [{\"content\": \"Responde solo con JSON válido para respuestas finales. Si usas herramientas, emite tool calls nativas o el objeto JSON type=tool_call como objeto raíz; nunca pongas tool_call dentro de blocks.\", \"role\": \"system\"}, {\"content\": \"Eres el agente conversacional de Kalmio para planificación EV. Ya se ejecutaron estas herramientas internas de Django. Decide si necesitas otra herramienta permitida o si ya puedes devolver type=final con A2UI.\\nUsuario: Conversación disponible de Kalmio. Usa el historial para resolver referencias y datos parciales; si el usuario cambia claramente de objetivo, sigue el mensaje actual.\\nPista de ubicación conocida detectada en el mensaje actual, no una decisión de intención: Madrid (40.4168, -3.7038).\\nPista de ubicación conocida detectada en el mensaje actual, no una decisión de intención: Valencia (39.4699, -0.3763).\\nAsistente: Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré.\\nMensaje actual del usuario: Tengo un Tesla Model Y y salgo con 45%... Madrid a Valencia\\nHistorial de herramientas: [{\\\"call\\\": {\\\"tool\\\": \\\"plan_route\\\", \\\"args\\\": {\\\"origin\\\": {\\\"label\\\": \\\"Madrid\\\", \\\"lat\\\": 40.4168, \\\"lon\\\": -3.7038}, \\\"destination\\\": {\\\"label\\\": \\\"Valencia\\\", \\\"lat\\\": 39.4699, \\\"lon\\\": -0.3763}, \\\"vehicle\\\": null, \\\"preferences\\\": {\\\"reserve_min_percent\\\": 20, \\\"max_useful_power_kw\\\": null}, \\\"corridor_radius_km\\\": 25}}, \\\"result\\\": {\\\"ok\\\": true, \\\"tool\\\": \\\"plan_route\\\", \\\"planningLevel\\\": \\\"chargers_only\\\", \\\"origin\\\": {\\\"label\\\": \\\"Madrid\\\", \\\"lat\\\": 40.4168, \\\"lon\\\": -3.7038}, \\\"destination\\\": {\\\"label\\\": \\\"Valencia\\\", \\\"lat\\\": 39.4699, \\\"lon\\\": -0.3763}, \\\"distanceKm\\\": 356.7, \\\"durationMin\\\": 240, \\\"energyKwh\\\": null, \\\"arrivalBattery\\\": null, \\\"recommendation\\\": {\\\"name\\\": \\\"Moya Hub Honrubia\\\", \\\"stationName\\\": \\\"Moya Hub Honrubia\\\", \\\"powerKw\\\": 240, \\\"distanceKm\\\": 1.23, \\\"detourMin\\\": 3, \\\"confidence\\\": \\\"media\\\", \\\"availableEvses\\\": 9, \\\"connectorCount\\\": 12, \\\"amenities\\\": [\\\"HOTEL\\\", \\\"RESTAURANT\\\", \\\"PARKING_LOT\\\", \\\"FUEL_STATION\\\", \\\"WIFI\\\", \\\"CAFE\\\", \\\"SUPERMARKET\\\", \\\"NATURE\\\"], \\\"reliability\\\": 50, \\\"scoreReasons\\\": [\\\"Punto de carga en el corredor\\\", \\\"Alta potencia\\\", \\\"Disponibilidad declarada\\\", \\\"Hub grande\\\", \\\"Dato antiguo\\\", \\\"Fiabilidad ponderada\\\", \\\"Servicios cercanos\\\"], \\\"lat\\\": 39.602992, \\\"lon\\\": -2.279669}, \\\"alternatives\\\": [{\\\"name\\\": \\\"Aparcamiento CTM\\\", \\\"stationName\\\": \\\"Aparcamiento CTM\\\", \\\"powerKw\\\": 400, \\\"distanceKm\\\": 4.77, \\\"detourMin\\\": 11, \\\"confidence\\\": \\\"media\\\", \\\"availableEvses\\\": 15, \\\"connectorCount\\\": 28, \\\"amenities\\\": [\\\"HOTEL\\\", \\\"RESTAURANT\\\", \\\"CAFE\\\", \\\"RECREATION_AREA\\\", \\\"BUS_STOP\\\", \\\"TAXI_STAND\\\", \\\"CARPOOL_PARKING\\\", \\\"FUEL_STATION\\\"], \\\"reliability\\\": 50, \\\"scoreReasons\\\": [\\\"Punto de carga en el corredor\\\", \\\"Alta potencia\\\", \\\"Disponibilidad declarada\\\", \\\"Hub grande\\\", \\\"Dato antiguo\\\", \\\"Fiabilidad ponderada\\\", \\\"Servicios cercanos\\\"], \\\"lat\\\": 40.365577, \\\"lon\\\": -3.654602}, {\\\"name\\\": \\\"V-VALENCIA-022-2\\\", \\\"stationName\\\": \\\"V-VALENCIA-022-2\\\", \\\"powerKw\\\": 22, \\\"distanceKm\\\": 1.73, \\\"detourMin\\\": 4, \\\"confidence\\\": \\\"media\\\", \\\"availableEvses\\\": 4, \\\"connectorCount\\\": 4, \\\"amenities\\\": [\\\"SUPERMARKET\\\", \\\"MALL\\\", \\\"SPORT\\\", \\\"BUS_STOP\\\", \\\"PARKING_LOT\\\", \\\"FUEL_STATION\\\", \\\"RESTAURANT\\\", \\\"CAFE\\\", \\\"HOTEL\\\", \\\"WIFI\\\"], \\\"reliability\\\": 50, \\\"scoreReasons\\\": [\\\"Punto de carga en el corredor\\\", \\\"Disponibilidad declarada\\\", \\\"Hub grande\\\", \\\"Dato antiguo\\\", \\\"Fiabilidad ponderada\\\", \\\"Servicios cercanos\\\"], \\\"lat\\\": 39.48123, \\\"lon\\\": -0.389118}], \\\"warnings\\\": [\\\"Sin datos de autonomía, solo mostramos paradas de carga en ruta. No calculamos llegada estimada ni paradas óptimas.\\\"]}}]\\nHerramientas permitidas. Puedes llamar solo una por respuesta tool_call:\\n- resolve_location: resuelve una ciudad o texto conocido. Args: {\\\"query\\\":\\\"ciudad o texto\\\"}\\n- search_destination_chargers: busca puntos de carga autorizados alrededor de una ubicación ya resuelta o coordenadas dadas por el usuario. Args: {\\\"location\\\":{\\\"label\\\":\\\"...\\\",\\\"lat\\\":0,\\\"lon\\\":0},\\\"connector\\\":null,\\\"radius_km\\\":80,\\\"limit\\\":3}\\n- plan_route: calcula ruta y paradas con proveedor y datos autorizados. Args: {\\\"origin\\\":{\\\"label\\\":\\\"...\\\",\\\"lat\\\":0,\\\"lon\\\":0},\\\"destination\\\":{\\\"label\\\":\\\"...\\\",\\\"lat\\\":0,\\\"lon\\\":0},\\\"vehicle\\\":null,\\\"preferences\\\":{\\\"reserve_min_percent\\\":20,\\\"max_useful_power_kw\\\":null},\\\"corridor_radius_km\\\":25}\\nNunca llames herramientas con label vacío, lat/lon 0,0, placeholders o ubicaciones no dadas/resueltas; pregunta antes.\\nUbicaciones internas conocidas para argumentos de herramienta, sin inventar otras coordenadas: Madrid(40.4168,-3.7038); Valencia(39.4699,-0.3763); Córdoba(37.8882,-4.7794); Sevilla(37.3891,-5.9845); Barcelona(41.3874,2.1686); Málaga(36.7213,-4.4214); Granada(37.1773,-3.5986); Alicante(38.3452,-0.4810); Bilbao(43.2630,-2.9350); Zaragoza(41.6488,-0.8891); Cádiz(36.5271,-6.2886); Alhambra, Granada(37.1761,-3.5881); Almansa(38.8690,-1.0971); Alcobendas(40.5317,-3.6419); Alcora(39.1230,-0.5025).\\nYa tienes resultados trazados de plan_route en el historial. No repitas la misma búsqueda ni pidas otra herramienta salvo que cambie materialmente ubicación, ruta, conector o preferencia. Devuelve type=final con RecommendedStopCard/AlternativeStopsList/RiskExplanationCard usando solo esos resultados.\\nComportamiento EV esperado:\\n- Usa el historial útil, acepta correcciones naturales y no suenes como formulario.\\n- Presenta las recomendaciones como paradas o lugares útiles para el viaje; usa name/stationName como punto de carga trazable y placeName solo si sale de herramienta o del usuario. No inventes lugares, servicios ni POIs.\\n- En copy visible, expresa duraciones largas en horas y minutos (por ejemplo, 8 h 37 min), no como cientos de minutos.\\n- Carga urgente sin ubicación: pide solo ubicación actual, ciudad/zona o coordenadas. No pidas destino para una carga urgente.\\n- Tras una urgencia, una ciudad/zona/coordenadas es continuación de la urgencia; usa herramientas si hay ubicación suficiente.\\n- Si el usuario corrige la ubicación, descarta la anterior, conserva batería, conector y preferencias si siguen teniendo sentido y busca con la nueva.\\n- Si pregunta por un fallo anterior, no contradigas bloques ya validados; explica validación, cobertura, aproximación o datos autorizados.\\n- Calle/POI/zona: intenta resolver la parte conocida con resolve_location. Si no puedes ubicar esa calle exacta, dilo y ofrece ciudad aproximada o coordenadas; no inventes coordenadas.\\n- Ruta sin consumo/modelo: puedes usar plan_route para explorar contexto de ruta y paradas de carga, pero no inventes autonomía, energía ni llegada. Si plan_route devuelve planningLevel=chargers_only, dilo. Usa RouteSummaryCard para distancia/duración trazadas, RecommendedStopCard y AlternativeStopsList para estaciones trazadas cuando sean útiles, y RiskExplanationCard para explicar que no puedes validar batería de llegada ni reserva sin consumo/perfil. No repitas la duración en prosa si ya está en RouteSummaryCard; evita frases como '4 horas' y deja el dato en la tarjeta o usa formato '4 h'. Mantén el AssistantMessage inicial en una frase corta y muestra la parada principal antes del aviso largo para que aparezca pronto en móvil; orden recomendado: RouteSummaryCard, RecommendedStopCard, RiskExplanationCard y después AlternativeStopsList. Si el usuario pregunta si 'le da', 'llega sin cargar' o 'puede llegar sin cargar' y hay origen/destino pero faltan batería actual, autonomía, modelo o consumo, puedes llamar plan_route para mostrar distancia/duración; no respondas sí/no, no afirmes que llega, pide esos datos críticos, y no muestres RecommendedStopCard/AlternativeStopsList como recomendación principal salvo que el usuario pida paradas de respaldo o plan B. Si el usuario prefiere parar pocas veces pero faltan autonomía/consumo/modelo, di antes de las paradas que no puedes garantizar ni optimizar pocas paradas sin esos datos; presenta cualquier estación solo como punto de carga trazado en el corredor, no como plan optimizado. Si el usuario dice que sale con X%, ese X% es batería de salida, no de llegada ni reserva; no escribas 'llegas con X%'. Si el usuario pide no llegar justo sin dar un porcentaje de reserva, no digas que indicó 20%; si usas reserve_min_percent por defecto, llámalo margen conservador por defecto. No digas asegurar/garantizar margen en chargers_only ni 'te ayudará a recuperar margen'; di que cargar ahí puede ayudar a recuperar margen operativo no validado. Si el viaje es futuro (mañana, fecha concreta, finde, viernes/domingo), añade en el AssistantMessage inicial o en el primer RiskExplanationCard, antes de cualquier RecommendedStopCard o AlternativeStopsList, una advertencia visible: disponibilidad, acceso y tarifas pueden cambiar antes del viaje.\\n- Perfil de vehículo: un modelo comercial como Tesla Model Y y una batería de salida no son un perfil autorizado de consumo/autonomía. Para plan_route, usa vehicle:null u omite vehicle salvo que el usuario haya dado explícitamente batería, capacidad útil kWh, consumo kWh/100 km, conector y potencia máxima. No rellenes campos desconocidos con null, ceros o defaults. Puedes mencionar modelo y batería en el copy, pero no calcular energía, autonomía ni llegada con ellos.\\n- Hotel/destino/estancia: si hay ciudad/POI suficiente y el usuario necesita cargar durante la estancia, llama search_destination_chargers directamente; no devuelvas solo un botón para buscar. Una ciudad conocida ya es ubicación suficiente para una búsqueda aproximada; no esperes hotel/zona exacta para la primera búsqueda, puedes pedir refinamiento después de mostrar resultados trazados. No lo conviertas en ruta salvo que pidan origen-destino. Si el usuario dijo que el hotel no tiene cargador y la herramienta devuelve varias paradas, elige una parada primaria con RecommendedStopCard usando solo distancia, potencia, conectores y EVSEs trazados, y pon el resto como AlternativeStopsList; no la presentes como disponibilidad en vivo ni como reserva.\\n- Si buscas por ciudad aproximada porque el hotel/POI exacto no está resuelto, la respuesta visible debe decirlo: usa la ciudad como aproximación, no presentes el hotel exacto como ubicación validada, y pide dirección, zona exacta o coordenadas para refinar.\\n- Si el usuario menciona ida y vuelta, volver, regreso o fechas de salida/vuelta, reconoce contexto de viaje redondo. Si falta origen para planificar ida/vuelta, pregunta por el origen antes de pedir hotel/zona y no llames plan_route ni search_destination_chargers todavia. Usa ClarifyingQuestionCard con field origen/salida cuando falte el origen. No uses la ciudad destino como origen.\\n- Si resolve_location recibe un hotel, calle o POI pero solo devuelve una ciudad/zona, no afirmes que conoces el lugar exacto; di que usas esa ciudad/zona como aproximación o pide coordenadas/dirección exacta.\\n- Si search_destination_chargers devuelve stops, usa nombres y métricas exactas trazables; no uses placeholders cuando hay estaciones. Puedes llamar a esos resultados paradas, pero el punto de carga mostrado debe seguir siendo trazable.\\n- No uses superlativos globales como 'el más rápido en la ciudad' o 'el mejor de Córdoba' salvo que la herramienta lo demuestre. Acota a 'de los resultados trazados' o 'entre estas opciones' cuando compares potencia/distancia.\\n- Si ya hay stops con potencia/distancia/disponibilidad y el usuario pide comparar potencia o alternativas, responde con esos resultados; no repitas la misma búsqueda sin cambiar ubicación, radio, conector o criterio material.\\n- Si una herramienta permitida falla, explica el fallo en contexto y pide una acción mínima; no fabriques datos.\\n- Batería baja: pocas opciones, riesgo explícito, y ActionButtons de navegación con functionCall.openUrl cuando el punto recomendado tiene lat/lon trazables. Si conoces batería, consérvala. Si el usuario dice poca batería sin porcentaje explícito, no inventes un número ni uses texto como 'baja' en UrgentChargeCard.battery; usa battery:null y explica la batería baja en risk/texto visible. Trata esa situación como urgente. Orden exacto recomendado si hay coordenadas trazadas: UrgentChargeCard, RiskExplanationCard si hace falta, ActionButtons, y solo después AlternativeStopsList; nunca pongas AlternativeStopsList antes de ActionButtons en este caso. Con batería <=10%, prioriza una sola parada primaria, muestra el riesgo de margen muy bajo inmediatamente junto a esa parada como frase visible para el conductor, y deja solo 1-2 alternativas trazadas después. Si la parada primaria tiene lat/lon trazables, ActionButtons con functionCall.openUrl es obligatorio y debe ir antes de cualquier AlternativeStopsList; no lo sustituyas por texto. Si usas UrgentChargeCard.risk debe ser una frase humana, no metadata ni enums como margen_muy_bajo; si añades RiskExplanationCard, ponlo antes de las alternativas.\\n- No describas availableEvses, connector counts o EVSEs importados como 'libres', 'disponibles en vivo' u ocupación actual. Di 'EVSEs/conectores trazados' y recuerda confirmar disponibilidad si hace falta. Si el dato disponible es availableEvses, llámalo EVSEs trazados; usa 'conectores' solo cuando tengas connectorCount o connectorTypes trazados. Si el usuario pide evitar cargadores con un solo conector/EVSE, prioriza estaciones con más de 1 EVSE/conector trazado cuando la herramienta lo soporte y explica el dato sin afirmar ocupación en vivo.\\n- Punto de carga ocupado: si el historial deja claro cuál era la parada primaria anterior, no la repitas como plan B. En la respuesta visible, nombra la parada descartada y deja claro que no debe seguir siendo el plan principal. Reutiliza exactamente alternativas trazadas previas con sus nombres, distancias, potencia y coordenadas; no cambies métricas ni inventes coordenadas. Si usas navegación para una alternativa previa, usa su lat/lon exactos. Si no hay alternativas previas suficientes, vuelve a buscar con la ubicación previa o pide el dato mínimo que falte. Recuerda que la disponibilidad en vivo puede cambiar.\\n- En carretera y poco desvío: pide carretera, zona actual/coordenadas y destino si faltan; no lo reduzcas a búsqueda urbana arbitraria. Cuando no haya ubicación suficiente, prefiere ClarifyingQuestionCard con una pregunta breve sobre carretera/zona actual/destino y campos carretera_o_zona_actual, destino y coordenadas. Usa LocationRequestCard solo si basta con ubicación actual; no muestres campos genéricos de ciudad si el usuario ya dijo que está en carretera y quiere poco desvío.\\n- Si el coche carga máximo a X kW, pasa X como preferences.max_useful_power_kw; si recomiendas un cargador de más potencia, di antes de la primera parada que el coche no aprovechará más de 100 kW cuando X=100 y no presentes la potencia superior como ventaja. No digas que has filtrado o excluido paradas por potencia si todavía muestras una estación por encima de ese máximo útil; di que esa potencia superior no se premia ni cambia lo que el coche puede aprovechar.\\n- Restricción dura de llegada: sin perfil de vehículo no la presentes como cumplida; pide modelo/consumo/autonomía. Si la herramienta devuelve arrivalBattery:null o energyKwh:null, no los sustituyas por estimaciones ni por frases de certeza. Si el usuario pide llegar con al menos X%, pasa X como reserve_min_percent y di antes de cualquier RecommendedStopCard/AlternativeStopsList que ese X% no se puede validar en chargers_only sin consumo/perfil.\\n- Preferencias de precio, hubs grandes o tamaño de parada: trátalas como preferencia de decisión sobre paradas, no como comparación de hardware. Si falta ruta o ubicación, no llames herramientas con ubicaciones vacías; pide origen/destino o ubicación actual. No inventes tarifas/precios; si no hay tarifas de proveedor, dilo. No conviertas una preferencia de precio en una ruta arriesgada.\\n- Cargar antes de salir vs al llegar: si faltan datos, no calcules. Da una comparación conceptual breve: cargar antes reduce riesgo si sales bajo, la ruta es larga o no conoces carga en destino; cargar al llegar puede tener sentido si llegas con margen y hay punto trazado en destino. Luego pide origen, destino, batería actual y modelo/consumo/autonomía.\\n- Viajes futuros: di visiblemente antes de mostrar paradas que disponibilidad, acceso y tarifas pueden cambiar antes del viaje. En reparaciones A2UI, no elimines esa advertencia; debe conservar las tres palabras disponibilidad, acceso y tarifas antes de cualquier lista de paradas. Niños/comodidad: si la herramienta trae amenities en la parada primaria, debes mencionarlos brevemente por nombre en la respuesta visible como servicios trazados o comodidad potencial despues del riesgo principal; no digas que están cerca, disponibles, son seguros, ideales, perfectos o aptos para niños salvo que el dato venga explícitamente trazado.\\n- Preferencias de servicios como baños, cafetería, restaurante o comer: si faltan ruta o ubicación, pregunta por ubicación/ruta. Si el siguiente turno aporta ciudad, zona o coordenadas, conserva esa preferencia y llama search_destination_chargers con esa ubicación; no vuelvas a preguntar qué necesita. Si la búsqueda devuelve amenities vacíos o no incluye esos servicios, muestra los cargadores trazados y di visiblemente que baños/cafetería/restaurante no están verificados en esos resultados.\\n- Preferencias de desvío controlado por comodidad: usa route tooling si hay ruta. Si la herramienta trae detourMin y amenities, presenta la parada primaria como punto trazado dentro o cerca del margen pedido y menciona servicios trazados como comodidad potencial; no digas 'buenos servicios', 'más cómodo' ni que el sitio es cómodo si la herramienta solo trae amenities. No introduzcas preferencias de pocas paradas salvo que el usuario las pida. Si muestras alternativas, conserva el desvío trazado para que el usuario pueda comparar.\\n- Preferencias de seguridad nocturna o evitar sitios solitarios: si falta ubicación/ruta, pregunta por el dato mínimo sin prometer que buscarás sitios con afluencia, actividad, vigilancia o iluminación. Si el siguiente turno aporta ciudad, zona o coordenadas, conserva esa preferencia y llama search_destination_chargers con esa ubicación; no respondas solo con LocationDetailCard. Puedes priorizar señales trazadas como dirección céntrica, potencia, EVSEs/conectores o hub si la herramienta lo trae; no afirmes seguridad, vigilancia, iluminación, afluencia, actividad ni que sea menos probable que un lugar sea solitario. Di de forma visible que Kalmio no valida seguridad ni entorno en vivo y que el conductor debe verificar el entorno al llegar de noche. Si muestras alternativas, coloca RiskExplanationCard antes de AlternativeStopsList para que el límite no quede escondido en móvil.\\n- Estancias de varios días: piensa en carga durante estancia y vuelta; si hay viaje redondo y falta origen, pídelo; si solo pide carga en destino y hay ubicación suficiente, busca en destino. Tras una búsqueda para estancia de varios días, incluye StayPlanningCard para el contexto de estancia junto a los puntos de carga trazados.\\n- Rutas baratas, reservas duras, carga justa o comparativas rápida/barata necesitan origen, destino y datos de vehículo/batería para calcular; si faltan, pregunta en el mismo turno por origen, destino, batería actual y modelo/consumo/autonomía. No inventes tarifas, kWh, llegada ni comparativas de precio; si no hay datos de tarifas de proveedor, dilo.\\nEjemplos críticos por analogía, no reglas rígidas: 'Necesito cargar ya' -> pide ubicación, no destino; 'En Córdoba' tras urgencia -> busca Córdoba; 'Paseo de la Victoria de Córdoba' -> si solo resuelves Córdoba, explica la aproximación; 'Voy a dormir en Valencia, busca cargadores cerca del hotel' -> llama search_destinat"
+      },
+      "requestId": "4be3c4d86255403daa509cea04bc277f",
+      "response": {
+        "annotations": null,
+        "audio": null,
+        "content": "{\n  \"type\": \"final\",\n  \"intent\": \"plan_route\",\n  \"confidence\": 0.9,\n  \"blocks\": [\n    {\n      \"id\": \"msg1\",\n      \"type\": \"AssistantMessage\",\n      \"version\": 1,\n      \"props\": {\n        \"text\": \"Trazamos la ruta Madrid → Valencia (356.7 km, ~4 h). Sin perfil de consumo no puedo validar si llegas con el 45% ni optimizar paradas, pero aquí tienes puntos de carga en el corredor.\"\n      }\n    },\n    {\n      \"id\": \"route1\",\n      \"type\": \"RouteSummaryCard\",\n      \"version\": 1,\n      \"props\": {\n        \"origin\": \"Madrid\",\n        \"destination\": \"Valencia\",\n        \"distanceKm\": 356.7,\n        \"durationMin\": 240\n      }\n    },\n    {\n      \"id\": \"stop1\",\n      \"type\": \"RecommendedStopCard\",\n      \"version\": 1,\n      \"props\": {\n        \"name\": \"Moya Hub Honrubia\",\n        \"stationName\": \"Moya Hub Honrubia\",\n        \"powerKw\": 240,\n        \"distanceKm\": 1.23,\n        \"detourMin\": 3,\n        \"confidence\": \"media\",\n        \"availableEvses\": 9,\n        \"connectorCount\": 12,\n        \"amenities\": [\"HOTEL\", \"RESTAURANT\", \"PARKING_LOT\", \"FUEL_STATION\", \"WIFI\", \"CAFE\", \"SUPERMARKET\", \"NATURE\"],\n        \"lat\": 39.602992,\n        \"lon\": -2.279669\n      }\n    },\n    {\n      \"id\": \"risk1\",\n      \"type\": \"RiskExplanationCard\",\n      \"version\": 1,\n      \"props\": {\n        \"text\": \"Sin datos de consumo ni autonomía de tu Tesla Model Y, no puedo calcular la batería de llegada ni garantizar que el 45% de salida sea suficiente. Las paradas mostradas son puntos de carga trazados en el corredor, no un plan optimizado. Si quieres validar si llegas sin cargar o con cuántas paradas, necesito el consumo (kWh/100 km) y la capacidad útil de la batería.\"\n      }\n    },\n    {\n      \"id\": \"alts1\",\n      \"type\": \"AlternativeStopsList\",\n      \"version\": 1,\n      \"props\": {\n        \"stops\": [\n          {\n            \"name\": \"Aparcamiento CTM\",\n            \"stationName\": \"Aparcamiento CTM\",\n            \"powerKw\": 400,\n            \"distanceKm\": 4.77,\n            \"detourMin\": 11,\n            \"confidence\": \"media\",\n            \"availableEvses\": 15,\n            \"connectorCount\": 28,\n            \"amenities\": [\"HOTEL\", \"RESTAURANT\", \"CAFE\", \"RECREATION_AREA\", \"BUS_STOP\", \"TAXI_STAND\", \"CARPOOL_PARKING\", \"FUEL_STATION\"],\n            \"lat\": 40.365577,\n            \"lon\": -3.654602\n          },\n          {\n            \"name\": \"V-VALENCIA-022-2\",\n            \"stationName\": \"V-VALENCIA-022-2\",\n            \"powerKw\": 22,\n            \"distanceKm\": 1.73,\n            \"detourMin\": 4,\n            \"confidence\": \"media\",\n            \"availableEvses\": 4,\n            \"connectorCount\": 4,\n            \"amenities\": [\"SUPERMARKET\", \"MALL\", \"SPORT\", \"BUS_STOP\", \"PARKING_LOT\", \"FUEL_STATION\", \"RESTAURANT\", \"CAFE\", \"HOTEL\", \"WIFI\"],\n            \"lat\": 39.48123,\n            \"lon\": -0.389118\n          }\n        ]\n      }\n    }\n  ],\n  \"metadata\": {\n    \"rationale\": \"El usuario tiene un Tesla Model Y y sale con 45% de Madrid a Valencia. Ya se ejecutó plan_route con vehicle:null y planningLevel=chargers_only. Se muestran los resultados trazados: RouteSummaryCard con distancia/duración, RecommendedStopCard con la parada principal (Moya Hub Honrubia), RiskExplanationCard explicando que no se puede validar batería sin perfil, y AlternativeStopsList con las otras dos estaciones.\"\n  }\n}",
+        "function_call": null,
+        "refusal": null,
+        "role": "assistant",
+        "tool_calls": null
+      },
+      "status": "ok",
+      "ts": "2026-06-16T02:53:48.824470+00:00",
+      "turnId": "69be36ab42954780baa7d6dfe891ec11",
+      "usage": {
+        "cacheHitInputTokens": 768,
+        "cacheMissInputTokens": 7526,
+        "inputTokens": 8294,
+        "outputTokens": 995,
+        "totalTokens": 9289
+      }
+    },
+    {
+      "cost": {
+        "basis": "provider_cache_breakdown",
+        "currency": "USD",
+        "estimated": true,
+        "inputCostUsd": 0.0010633,
+        "outputCostUsd": 0.0002632,
+        "pricesPerMillionTokens": {
+          "inputCacheHit": 0.0028,
+          "inputCacheMiss": 0.14,
+          "output": 0.28
+        },
+        "totalCostUsd": 0.0013265
+      },
+      "durationMs": 7545.61,
+      "event": "llm_api_call",
+      "metadata": {
+        "finishReason": "stop",
+        "maxTokens": 1800,
+        "messageCount": 2,
+        "nativeTools": false,
+        "promptChars": 27804,
+        "responseFormat": {
+          "type": "json_object"
+        },
+        "thinking": "disabled",
+        "toolCallCount": 0,
+        "toolCount": 0
+      },
+      "model": "deepseek-v4-flash",
+      "name": "chat.completions.create",
+      "provider": "deepseek",
+      "request": {
+        "_truncated": true,
+        "chars": 28666,
+        "preview": "{\"extra_body\": {\"thinking\": {\"type\": \"disabled\"}}, \"max_tokens\": 1800, \"messages\": [{\"content\": \"Responde solo con JSON válido para respuestas finales. Si usas herramientas, emite tool calls nativas o el objeto JSON type=tool_call como objeto raíz; nunca pongas tool_call dentro de blocks.\", \"role\": \"system\"}, {\"content\": \"Eres el agente conversacional de Kalmio para planificación EV. Tu respuesta anterior fue rechazada por el contrato de seguridad/datos A2UI o por un guardrail de herramientas. No pidas herramientas en esta reparación. Devuelve solo type=final con blocks A2UI válidos; puedes simplificar la UI si no puedes demostrar los datos. Problemas detectados:\\n[\\\"La respuesta trata el 45% de salida como porcentaje de llegada o reserva. Debe decir que el usuario sale con ese porcentaje y que la batería de llegada no está validada.\\\"]\\nUsa solo datos del historial de herramientas; no inventes estaciones, precios, disponibilidad, coordenadas ni estado del vehículo.\\nUsuario: Conversación disponible de Kalmio. Usa el historial para resolver referencias y datos parciales; si el usuario cambia claramente de objetivo, sigue el mensaje actual.\\nPista de ubicación conocida detectada en el mensaje actual, no una decisión de intención: Madrid (40.4168, -3.7038).\\nPista de ubicación conocida detectada en el mensaje actual, no una decisión de intención: Valencia (39.4699, -0.3763).\\nAsistente: Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré.\\nMensaje actual del usuario: Tengo un Tesla Model Y y salgo con 45%... Madrid a Valencia\\nHistorial de herramientas: [{\\\"call\\\": {\\\"tool\\\": \\\"plan_route\\\", \\\"args\\\": {\\\"origin\\\": {\\\"label\\\": \\\"Madrid\\\", \\\"lat\\\": 40.4168, \\\"lon\\\": -3.7038}, \\\"destination\\\": {\\\"label\\\": \\\"Valencia\\\", \\\"lat\\\": 39.4699, \\\"lon\\\": -0.3763}, \\\"vehicle\\\": null, \\\"preferences\\\": {\\\"reserve_min_percent\\\": 20, \\\"max_useful_power_kw\\\": null}, \\\"corridor_radius_km\\\": 25}}, \\\"result\\\": {\\\"ok\\\": true, \\\"tool\\\": \\\"plan_route\\\", \\\"planningLevel\\\": \\\"chargers_only\\\", \\\"origin\\\": {\\\"label\\\": \\\"Madrid\\\", \\\"lat\\\": 40.4168, \\\"lon\\\": -3.7038}, \\\"destination\\\": {\\\"label\\\": \\\"Valencia\\\", \\\"lat\\\": 39.4699, \\\"lon\\\": -0.3763}, \\\"distanceKm\\\": 356.7, \\\"durationMin\\\": 240, \\\"energyKwh\\\": null, \\\"arrivalBattery\\\": null, \\\"recommendation\\\": {\\\"name\\\": \\\"Moya Hub Honrubia\\\", \\\"stationName\\\": \\\"Moya Hub Honrubia\\\", \\\"powerKw\\\": 240, \\\"distanceKm\\\": 1.23, \\\"detourMin\\\": 3, \\\"confidence\\\": \\\"media\\\", \\\"availableEvses\\\": 9, \\\"connectorCount\\\": 12, \\\"amenities\\\": [\\\"HOTEL\\\", \\\"RESTAURANT\\\", \\\"PARKING_LOT\\\", \\\"FUEL_STATION\\\", \\\"WIFI\\\", \\\"CAFE\\\", \\\"SUPERMARKET\\\", \\\"NATURE\\\"], \\\"reliability\\\": 50, \\\"scoreReasons\\\": [\\\"Punto de carga en el corredor\\\", \\\"Alta potencia\\\", \\\"Disponibilidad declarada\\\", \\\"Hub grande\\\", \\\"Dato antiguo\\\", \\\"Fiabilidad ponderada\\\", \\\"Servicios cercanos\\\"], \\\"lat\\\": 39.602992, \\\"lon\\\": -2.279669}, \\\"alternatives\\\": [{\\\"name\\\": \\\"Aparcamiento CTM\\\", \\\"stationName\\\": \\\"Aparcamiento CTM\\\", \\\"powerKw\\\": 400, \\\"distanceKm\\\": 4.77, \\\"detourMin\\\": 11, \\\"confidence\\\": \\\"media\\\", \\\"availableEvses\\\": 15, \\\"connectorCount\\\": 28, \\\"amenities\\\": [\\\"HOTEL\\\", \\\"RESTAURANT\\\", \\\"CAFE\\\", \\\"RECREATION_AREA\\\", \\\"BUS_STOP\\\", \\\"TAXI_STAND\\\", \\\"CARPOOL_PARKING\\\", \\\"FUEL_STATION\\\"], \\\"reliability\\\": 50, \\\"scoreReasons\\\": [\\\"Punto de carga en el corredor\\\", \\\"Alta potencia\\\", \\\"Disponibilidad declarada\\\", \\\"Hub grande\\\", \\\"Dato antiguo\\\", \\\"Fiabilidad ponderada\\\", \\\"Servicios cercanos\\\"], \\\"lat\\\": 40.365577, \\\"lon\\\": -3.654602}, {\\\"name\\\": \\\"V-VALENCIA-022-2\\\", \\\"stationName\\\": \\\"V-VALENCIA-022-2\\\", \\\"powerKw\\\": 22, \\\"distanceKm\\\": 1.73, \\\"detourMin\\\": 4, \\\"confidence\\\": \\\"media\\\", \\\"availableEvses\\\": 4, \\\"connectorCount\\\": 4, \\\"amenities\\\": [\\\"SUPERMARKET\\\", \\\"MALL\\\", \\\"SPORT\\\", \\\"BUS_STOP\\\", \\\"PARKING_LOT\\\", \\\"FUEL_STATION\\\", \\\"RESTAURANT\\\", \\\"CAFE\\\", \\\"HOTEL\\\", \\\"WIFI\\\"], \\\"reliability\\\": 50, \\\"scoreReasons\\\": [\\\"Punto de carga en el corredor\\\", \\\"Disponibilidad declarada\\\", \\\"Hub grande\\\", \\\"Dato antiguo\\\", \\\"Fiabilidad ponderada\\\", \\\"Servicios cercanos\\\"], \\\"lat\\\": 39.48123, \\\"lon\\\": -0.389118}], \\\"warnings\\\": [\\\"Sin datos de autonomía, solo mostramos paradas de carga en ruta. No calculamos llegada estimada ni paradas óptimas.\\\"]}}]\\nBloques rechazados: [{\\\"id\\\": \\\"msg1\\\", \\\"type\\\": \\\"AssistantMessage\\\", \\\"version\\\": 1, \\\"props\\\": {\\\"text\\\": \\\"Trazamos la ruta Madrid → Valencia (356.7 km, ~4 h). Sin perfil de consumo no puedo validar si llegas con el 45% ni optimizar paradas, pero aquí tienes puntos de carga en el corredor.\\\"}}, {\\\"id\\\": \\\"route1\\\", \\\"type\\\": \\\"RouteSummaryCard\\\", \\\"version\\\": 1, \\\"props\\\": {\\\"origin\\\": \\\"Madrid\\\", \\\"destination\\\": \\\"Valencia\\\", \\\"distanceKm\\\": 356.7, \\\"durationMin\\\": 240}}, {\\\"id\\\": \\\"stop1\\\", \\\"type\\\": \\\"RecommendedStopCard\\\", \\\"version\\\": 1, \\\"props\\\": {\\\"name\\\": \\\"Moya Hub Honrubia\\\", \\\"stationName\\\": \\\"Moya Hub Honrubia\\\", \\\"powerKw\\\": 240, \\\"distanceKm\\\": 1.23, \\\"detourMin\\\": 3, \\\"confidence\\\": \\\"media\\\", \\\"availableEvses\\\": 9, \\\"connectorCount\\\": 12, \\\"amenities\\\": [\\\"HOTEL\\\", \\\"RESTAURANT\\\", \\\"PARKING_LOT\\\", \\\"FUEL_STATION\\\", \\\"WIFI\\\", \\\"CAFE\\\", \\\"SUPERMARKET\\\", \\\"NATURE\\\"], \\\"lat\\\": 39.602992, \\\"lon\\\": -2.279669}}, {\\\"id\\\": \\\"risk1\\\", \\\"type\\\": \\\"RiskExplanationCard\\\", \\\"version\\\": 1, \\\"props\\\": {\\\"text\\\": \\\"Sin datos de consumo ni autonomía de tu Tesla Model Y, no puedo calcular la batería de llegada ni garantizar que el 45% de salida sea suficiente. Las paradas mostradas son puntos de carga trazados en el corredor, no un plan optimizado. Si quieres validar si llegas sin cargar o con cuántas paradas, necesito el consumo (kWh/100 km) y la capacidad útil de la batería.\\\"}}, {\\\"id\\\": \\\"alts1\\\", \\\"type\\\": \\\"AlternativeStopsList\\\", \\\"version\\\": 1, \\\"props\\\": {\\\"stops\\\": [{\\\"name\\\": \\\"Aparcamiento CTM\\\", \\\"stationName\\\": \\\"Aparcamiento CTM\\\", \\\"powerKw\\\": 400, \\\"distanceKm\\\": 4.77, \\\"detourMin\\\": 11, \\\"confidence\\\": \\\"media\\\", \\\"availableEvses\\\": 15, \\\"connectorCount\\\": 28, \\\"amenities\\\": [\\\"HOTEL\\\", \\\"RESTAURANT\\\", \\\"CAFE\\\", \\\"RECREATION_AREA\\\", \\\"BUS_STOP\\\", \\\"TAXI_STAND\\\", \\\"CARPOOL_PARKING\\\", \\\"FUEL_STATION\\\"], \\\"lat\\\": 40.365577, \\\"lon\\\": -3.654602}, {\\\"name\\\": \\\"V-VALENCIA-022-2\\\", \\\"stationName\\\": \\\"V-VALENCIA-022-2\\\", \\\"powerKw\\\": 22, \\\"distanceKm\\\": 1.73, \\\"detourMin\\\": 4, \\\"confidence\\\": \\\"media\\\", \\\"availableEvses\\\": 4, \\\"connectorCount\\\": 4, \\\"amenities\\\": [\\\"SUPERMARKET\\\", \\\"MALL\\\", \\\"SPORT\\\", \\\"BUS_STOP\\\", \\\"PARKING_LOT\\\", \\\"FUEL_STATION\\\", \\\"RESTAURANT\\\", \\\"CAFE\\\", \\\"HOTEL\\\", \\\"WIFI\\\"], \\\"lat\\\": 39.48123, \\\"lon\\\": -0.389118}]}}]\\nYa tienes resultados trazados de plan_route en el historial. No repitas la misma búsqueda ni pidas otra herramienta salvo que cambie materialmente ubicación, ruta, conector o preferencia. Devuelve type=final con RecommendedStopCard/AlternativeStopsList/RiskExplanationCard usando solo esos resultados.\\nComportamiento EV esperado:\\n- Usa el historial útil, acepta correcciones naturales y no suenes como formulario.\\n- Presenta las recomendaciones como paradas o lugares útiles para el viaje; usa name/stationName como punto de carga trazable y placeName solo si sale de herramienta o del usuario. No inventes lugares, servicios ni POIs.\\n- En copy visible, expresa duraciones largas en horas y minutos (por ejemplo, 8 h 37 min), no como cientos de minutos.\\n- Carga urgente sin ubicación: pide solo ubicación actual, ciudad/zona o coordenadas. No pidas destino para una carga urgente.\\n- Tras una urgencia, una ciudad/zona/coordenadas es continuación de la urgencia; usa herramientas si hay ubicación suficiente.\\n- Si el usuario corrige la ubicación, descarta la anterior, conserva batería, conector y preferencias si siguen teniendo sentido y busca con la nueva.\\n- Si pregunta por un fallo anterior, no contradigas bloques ya validados; explica validación, cobertura, aproximación o datos autorizados.\\n- Calle/POI/zona: intenta resolver la parte conocida con resolve_location. Si no puedes ubicar esa calle exacta, dilo y ofrece ciudad aproximada o coordenadas; no inventes coordenadas.\\n- Ruta sin consumo/modelo: puedes usar plan_route para explorar contexto de ruta y paradas de carga, pero no inventes autonomía, energía ni llegada. Si plan_route devuelve planningLevel=chargers_only, dilo. Usa RouteSummaryCard para distancia/duración trazadas, RecommendedStopCard y AlternativeStopsList para estaciones trazadas cuando sean útiles, y RiskExplanationCard para explicar que no puedes validar batería de llegada ni reserva sin consumo/perfil. No repitas la duración en prosa si ya está en RouteSummaryCard; evita frases como '4 horas' y deja el dato en la tarjeta o usa formato '4 h'. Mantén el AssistantMessage inicial en una frase corta y muestra la parada principal antes del aviso largo para que aparezca pronto en móvil; orden recomendado: RouteSummaryCard, RecommendedStopCard, RiskExplanationCard y después AlternativeStopsList. Si el usuario pregunta si 'le da', 'llega sin cargar' o 'puede llegar sin cargar' y hay origen/destino pero faltan batería actual, autonomía, modelo o consumo, puedes llamar plan_route para mostrar distancia/duración; no respondas sí/no, no afirmes que llega, pide esos datos críticos, y no muestres RecommendedStopCard/AlternativeStopsList como recomendación principal salvo que el usuario pida paradas de respaldo o plan B. Si el usuario prefiere parar pocas veces pero faltan autonomía/consumo/modelo, di antes de las paradas que no puedes garantizar ni optimizar pocas paradas sin esos datos; presenta cualquier estación solo como punto de carga trazado en el corredor, no como plan optimizado. Si el usuario dice que sale con X%, ese X% es batería de salida, no de llegada ni reserva; no escribas 'llegas con X%'. Si el usuario pide no llegar justo sin dar un porcentaje de reserva, no digas que indicó 20%; si usas reserve_min_percent por defecto, llámalo margen conservador por defecto. No digas asegurar/garantizar margen en chargers_only ni 'te ayudará a recuperar margen'; di que cargar ahí puede ayudar a recuperar margen operativo no validado. Si el viaje es futuro (mañana, fecha concreta, finde, viernes/domingo), añade en el AssistantMessage inicial o en el primer RiskExplanationCard, antes de cualquier RecommendedStopCard o AlternativeStopsList, una advertencia visible: disponibilidad, acceso y tarifas pueden cambiar antes del viaje.\\n- Perfil de vehículo: un modelo comercial como Tesla Model Y y una batería de salida no son un perfil autorizado de consumo/autonomía. Para plan_route, usa vehicle:null u omite vehicle salvo que el usuario haya dado explícitamente batería, capacidad útil kWh, consumo kWh/100 km, conector y potencia máxima. No rellenes campos desconocidos con null, ceros o defaults. Puedes mencionar modelo y batería en el copy, pero no calcular energía, autonomía ni llegada con ellos.\\n- Hotel/destino/estancia: si hay ciudad/POI suficiente y el usuario necesita cargar durante la estancia, llama search_destination_chargers directamente; no devuelvas solo un botón para buscar. Una ciudad conocida ya es ubicación suficiente para una búsqueda aproximada; no esperes hotel/zona exacta para la primera búsqueda, puedes pedir refinamiento después de mostrar resultados trazados. No lo conviertas en ruta salvo que pidan origen-destino. Si el usuario dijo que el hotel no tiene cargador y la herramienta devuelve varias paradas, elige una parada primaria con RecommendedStopCard usando solo distancia, potencia, conectores y EVSEs trazados, y pon el resto como AlternativeStopsList; no la presentes como disponibilidad en vivo ni como reserva.\\n- Si buscas por ciudad aproximada porque el hotel/POI exacto no está resuelto, la respuesta visible debe decirlo: usa la ciudad como aproximación, no presentes el hotel exacto como ubicación validada, y pide dirección, zona exacta o coordenadas para refinar.\\n- Si el usuario menciona ida y vuelta, volver, regreso o fechas de salida/vuelta, reconoce contexto de viaje redondo. Si falta origen para planificar ida/vuelta, pregunta por el origen antes de pedir hotel/zona y no llames plan_route ni search_destination_chargers todavia. Usa ClarifyingQuestionCard con field origen/salida cuando falte el origen. No uses la ciudad destino como origen.\\n- Si resolve_location recibe un hotel, calle o POI pero solo devuelve una ciudad/zona, no afirmes que conoces el lugar exacto; di que usas esa ciudad/zona como aproximación o pide coordenadas/dirección exacta.\\n- Si search_destination_chargers devuelve stops, usa nombres y métricas exactas trazables; no uses placeholders cuando hay estaciones. Puedes llamar a esos resultados paradas, pero el punto de carga mostrado debe seguir siendo trazable.\\n- No uses superlativos globales como 'el más rápido en la ciudad' o 'el mejor de Córdoba' salvo que la herramienta lo demuestre. Acota a 'de los resultados trazados' o 'entre estas opciones' cuando compares potencia/distancia.\\n- Si ya hay stops con potencia/distancia/disponibilidad y el usuario pide comparar potencia o alternativas, responde con esos resultados; no repitas la misma búsqueda sin cambiar ubicación, radio, conector o criterio material.\\n- Si una herramienta permitida falla, explica el fallo en contexto y pide una acción mínima; no fabriques datos.\\n- Batería baja: pocas opciones, riesgo explícito, y ActionButtons de navegación con functionCall.openUrl cuando el punto recomendado tiene lat/lon trazables. Si conoces batería, consérvala. Si el usuario dice poca batería sin porcentaje explícito, no inventes un número ni uses texto como 'baja' en UrgentChargeCard.battery; usa battery:null y explica la batería baja en risk/texto visible. Trata esa situación como urgente. Orden exacto recomendado si hay coordenadas trazadas: UrgentChargeCard, RiskExplanationCard si hace falta, ActionButtons, y solo después AlternativeStopsList; nunca pongas AlternativeStopsList antes de ActionButtons en este caso. Con batería <=10%, prioriza una sola parada primaria, muestra el riesgo de margen muy bajo inmediatamente junto a esa parada como frase visible para el conductor, y deja solo 1-2 alternativas trazadas después. Si la parada primaria tiene lat/lon trazables, ActionButtons con functionCall.openUrl es obligatorio y debe ir antes de cualquier AlternativeStopsList; no lo sustituyas por texto. Si usas UrgentChargeCard.risk debe ser una frase humana, no metadata ni enums como margen_muy_bajo; si añades RiskExplanationCard, ponlo antes de las alternativas.\\n- No describas availableEvses, connector counts o EVSEs importados como 'libres', 'disponibles en vivo' u ocupación actual. Di 'EVSEs/conectores trazados' y recuerda confirmar disponibilidad si hace falta. Si el dato disponible es availableEvses, llámalo EVSEs trazados; usa 'conectores' solo cuando tengas connectorCount o connectorTypes trazados. Si el usuario pide evitar cargadores con un solo conector/EVSE, prioriza estaciones con más de 1 EVSE/conector trazado cuando la herramienta lo soporte y explica el dato sin afirmar ocupación en vivo.\\n- Punto de carga ocupado: si el historial deja claro cuál era la parada primaria anterior, no la repitas como plan B. En la respuesta visible, nombra la parada descartada y deja claro que no debe seguir siendo el plan principal. Reutiliza exactamente alternativas trazadas previas con sus nombres, distancias, potencia y coordenadas; no cambies métricas ni inventes coordenadas. Si usas navegación para una alternativa previa, usa su lat/lon exactos. Si no hay alternativas previas suficientes, vuelve a buscar con la ubicación previa o pide el dato mínimo que falte. Recuerda que la disponibilidad en vivo puede cambiar.\\n- En carretera y poco desvío: pide carretera, zona actual/coordenadas y destino si faltan; no lo reduzcas a búsqueda urbana arbitraria. Cuando no haya ubicación suficiente, prefiere ClarifyingQuestionCard con una pregunta breve sobre carretera/zona actual/destino y campos carretera_o_zona_actual, destino y coordenadas. Usa LocationRequestCard solo si basta con ubicación actual; no muestres campos genéricos de ciudad si el usuario ya dijo que está en carretera y quiere poco desvío.\\n- Si el coche carga máximo a X kW, pasa X como preferences.max_useful_power_kw; si recomiendas un cargador de más potencia, di antes de la primera parada que el coche no aprovechará más de 100 kW cuando X=100 y no presentes la potencia superior como ventaja. No digas que has filtrado o excluido paradas por potencia si todavía muestras una estación por encima de ese máximo útil; di que esa potencia superior no se premia ni cambia lo que el coche puede aprovechar.\\n- Restricción dura de llegada: sin perfil de vehículo no la presentes como cumplida; pide modelo/consumo/autonomía. Si la herramienta devuelve arrivalBattery:null o energyKwh:null, no los sustituyas por estimaciones ni por frases de certeza. Si el usuario pide llegar con al menos X%, pasa X como reserve_min_percent y di antes de cualquier RecommendedStopCard/AlternativeStopsList que ese X% no se puede validar en chargers_only sin consumo/perfil.\\n- Preferencias de precio, hubs grandes o tamaño de parada: trátalas como preferencia de decisión sobre paradas, no como comparación de hardware. Si falta ruta o ubicación, no llames herramientas con ubicaciones vacías; pide origen/destino o ubicación actual. No inventes tarifas/precios; si no hay tarifas de proveedor, dilo. No conviertas una preferencia de precio en una ruta arriesgada.\\n- Cargar antes de salir vs al llegar: si faltan datos, no calcules. Da una comparación conceptual breve: cargar antes reduce riesgo si sales bajo, la ruta es larga o no conoces carga en destino; cargar al llegar puede tener sentido si llegas con margen y hay punto trazado en destino. Luego pide origen, destino, batería actual y modelo/consumo/autonomía.\\n- Viajes futuros: di visiblemente antes de mostrar paradas que disponibilidad, acceso y tarifas pueden cambiar antes del viaje. En reparaciones A2UI, no elimines esa advertencia; debe conservar las tres palabras disponibilidad, acceso y tarifas antes de cualquier lista de paradas. Niños/comodidad: si la herramienta trae amenities en la parada primaria, debes mencionarlos brevemente por nombre en la respuesta visible como servicios trazados o comodidad potencial despues del riesgo principal; no digas que están cerca, disponibles, son seguros, ideales, perfectos o aptos para niños salvo que el dato venga explícitamente trazado.\\n- Preferencias de servicios como baños, cafetería, restaurante o comer: si faltan ruta o ubicación, pregunta por ubicación/ruta. Si el siguiente turno aporta ciudad, zona o coordenadas, conserva esa preferencia y llama search_destination_chargers con esa ubicación; no vuelvas a preguntar qué necesita. Si la búsqueda devuelve amenities vacíos o no incluye esos servicios, muestra los cargadores trazados y di visiblemente que baños/cafetería/restaurante no están verificados en esos resultados.\\n- Preferencias de desvío controlado por comodidad: usa route tooling si hay ruta. Si la herramienta trae detourMin y amenities, presenta la parada primaria como punto trazado dentro o cerca del margen pedido y menciona servicios trazados como comodidad potencial; no digas 'buenos servicios', 'más cómodo' ni que el sitio es cómodo si la herramienta solo trae amenities. No introduzcas preferencias de pocas paradas salvo que el usuario las pida. Si muestras alternativas, conserva el desvío trazado para que el usuario pueda comparar.\\n- Preferencias de seguridad nocturna o evitar sitios solitarios: si falta ubicación/ruta, pregunta por el dato mínimo sin prometer que buscarás sitios con afluencia, actividad, vigilancia o iluminación. Si el siguiente turno aporta ciudad, zona o coordenadas, conserva esa preferencia y llama search_destination_chargers con esa ubicación; no respondas solo con LocationDetailCard. Puedes priorizar señales trazadas como dirección céntrica, potencia, EVSEs/conectores o hub si la herramienta lo trae; n"
+      },
+      "requestId": "4be3c4d86255403daa509cea04bc277f",
+      "response": {
+        "annotations": null,
+        "audio": null,
+        "content": "{\n  \"type\": \"final\",\n  \"intent\": \"plan_route\",\n  \"confidence\": 0.9,\n  \"blocks\": [\n    {\n      \"id\": \"msg1\",\n      \"type\": \"AssistantMessage\",\n      \"version\": 1,\n      \"props\": {\n        \"text\": \"Trazamos la ruta Madrid → Valencia (356.7 km, ~4 h). Sales con 45% de batería, pero sin perfil de consumo no puedo validar la batería de llegada ni optimizar paradas. Aquí tienes puntos de carga en el corredor.\"\n      }\n    },\n    {\n      \"id\": \"route1\",\n      \"type\": \"RouteSummaryCard\",\n      \"version\": 1,\n      \"props\": {\n        \"origin\": \"Madrid\",\n        \"destination\": \"Valencia\",\n        \"distanceKm\": 356.7,\n        \"durationMin\": 240\n      }\n    },\n    {\n      \"id\": \"stop1\",\n      \"type\": \"RecommendedStopCard\",\n      \"version\": 1,\n      \"props\": {\n        \"name\": \"Moya Hub Honrubia\",\n        \"stationName\": \"Moya Hub Honrubia\",\n        \"powerKw\": 240,\n        \"distanceKm\": 1.23,\n        \"detourMin\": 3,\n        \"confidence\": \"media\",\n        \"availableEvses\": 9,\n        \"connectorCount\": 12,\n        \"amenities\": [\"HOTEL\", \"RESTAURANT\", \"PARKING_LOT\", \"FUEL_STATION\", \"WIFI\", \"CAFE\", \"SUPERMARKET\", \"NATURE\"],\n        \"lat\": 39.602992,\n        \"lon\": -2.279669\n      }\n    },\n    {\n      \"id\": \"risk1\",\n      \"type\": \"RiskExplanationCard\",\n      \"version\": 1,\n      \"props\": {\n        \"text\": \"Sin datos de consumo ni autonomía de tu Tesla Model Y, no puedo calcular la batería de llegada ni garantizar que el 45% de salida sea suficiente. Las paradas mostradas son puntos de carga trazados en el corredor, no un plan optimizado. Si quieres validar si llegas sin cargar o con cuántas paradas, necesito el consumo (kWh/100 km) y la capacidad útil de la batería.\"\n      }\n    },\n    {\n      \"id\": \"alts1\",\n      \"type\": \"AlternativeStopsList\",\n      \"version\": 1,\n      \"props\": {\n        \"stops\": [\n          {\n            \"name\": \"Aparcamiento CTM\",\n            \"stationName\": \"Aparcamiento CTM\",\n            \"powerKw\": 400,\n            \"distanceKm\": 4.77,\n            \"detourMin\": 11,\n            \"confidence\": \"media\",\n            \"availableEvses\": 15,\n            \"connectorCount\": 28,\n            \"amenities\": [\"HOTEL\", \"RESTAURANT\", \"CAFE\", \"RECREATION_AREA\", \"BUS_STOP\", \"TAXI_STAND\", \"CARPOOL_PARKING\", \"FUEL_STATION\"],\n            \"lat\": 40.365577,\n            \"lon\": -3.654602\n          },\n          {\n            \"name\": \"V-VALENCIA-022-2\",\n            \"stationName\": \"V-VALENCIA-022-2\",\n            \"powerKw\": 22,\n            \"distanceKm\": 1.73,\n            \"detourMin\": 4,\n            \"confidence\": \"media\",\n            \"availableEvses\": 4,\n            \"connectorCount\": 4,\n            \"amenities\": [\"SUPERMARKET\", \"MALL\", \"SPORT\", \"BUS_STOP\", \"PARKING_LOT\", \"FUEL_STATION\", \"RESTAURANT\", \"CAFE\", \"HOTEL\", \"WIFI\"],\n            \"lat\": 39.48123,\n            \"lon\": -0.389118\n          }\n        ]\n      }\n    }\n  ],\n  \"metadata\": {\n    \"rationale\": \"El usuario sale con 45% de batería, no es llegada ni reserva. Se muestran paradas trazadas del historial sin validar batería de llegada.\"\n  }\n}",
+        "function_call": null,
+        "refusal": null,
+        "role": "assistant",
+        "tool_calls": null
+      },
+      "status": "ok",
+      "ts": "2026-06-16T02:53:56.402235+00:00",
+      "turnId": "69be36ab42954780baa7d6dfe891ec11",
+      "usage": {
+        "cacheHitInputTokens": 0,
+        "cacheMissInputTokens": 7595,
+        "inputTokens": 7595,
+        "outputTokens": 940,
+        "totalTokens": 8535
+      }
+    },
+    {
+      "durationMs": 28363.17,
+      "event": "agent_turn",
+      "name": "conversation",
+      "provider": "deepseek",
+      "requestId": "4be3c4d86255403daa509cea04bc277f",
+      "status": "ok",
+      "ts": "2026-06-16T02:53:56.404751+00:00",
+      "turnId": "69be36ab42954780baa7d6dfe891ec11"
+    }
+  ],
+  "trace_summary": {
+    "llm_calls": 3,
+    "tools": [
+      "plan_route"
+    ],
+    "guardrails": 0,
+    "estimated_cost_usd": 0.00374267
+  }
+}

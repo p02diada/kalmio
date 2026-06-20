@@ -1,0 +1,121 @@
+{
+  "messages": [
+    {
+      "version": "v0.9.1",
+      "createSurface": {
+        "surfaceId": "kalmio-chat",
+        "catalogId": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
+        "sendDataModel": true
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateComponents": {
+        "surfaceId": "kalmio-chat",
+        "components": [
+          {
+            "text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré.",
+            "id": "assistant-initial",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "chips": [
+              "Necesito cargar ya",
+              "Ruta con parada segura",
+              "Parada cerca del hotel",
+              "Priorizar servicios"
+            ],
+            "id": "preference-starters",
+            "component": "PreferenceChips",
+            "version": 1
+          },
+          {
+            "text": "Voy con niños y quiero parar a comer mientras carga",
+            "id": "user-741ac06eac",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "text": "Entiendo que buscas una ruta con parada para comer mientras cargas, con niños. ¿Cuál es tu origen y destino?",
+            "id": "msg1",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "question": "Para planificar la ruta y buscar paradas con servicios, necesito saber:",
+            "fields": [
+              {
+                "key": "origin",
+                "label": "Origen (ciudad o dirección)",
+                "type": "text",
+                "required": true
+              },
+              {
+                "key": "destination",
+                "label": "Destino (ciudad o dirección)",
+                "type": "text",
+                "required": true
+              },
+              {
+                "key": "vehicle_model",
+                "label": "Modelo de coche (opcional, ayuda a optimizar)",
+                "type": "text",
+                "required": false
+              },
+              {
+                "key": "battery_percent",
+                "label": "Batería actual (opcional)",
+                "type": "number",
+                "required": false
+              }
+            ],
+            "id": "clar1",
+            "component": "ClarifyingQuestionCard",
+            "version": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateDataModel": {
+        "surfaceId": "kalmio-chat",
+        "path": "/",
+        "value": {
+          "conversation": {
+            "surfaceId": "kalmio-chat",
+            "componentOrder": [
+              {
+                "id": "assistant-initial",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "preference-starters",
+                "component": "PreferenceChips"
+              },
+              {
+                "id": "user-741ac06eac",
+                "component": "UserMessage"
+              },
+              {
+                "id": "msg1",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "clar1",
+                "component": "ClarifyingQuestionCard"
+              }
+            ]
+          },
+          "facts": {
+            "locations": [],
+            "routes": [],
+            "stops": [],
+            "risks": []
+          }
+        }
+      }
+    }
+  ]
+}

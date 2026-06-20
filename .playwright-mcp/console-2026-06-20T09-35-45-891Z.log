@@ -1,0 +1,28 @@
+[     133ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5175/node_modules/.vite/deps/react-dom_client.js?v=8ad17695:14337
+[     397ms] [WARNING] [.WebGL-0x281c0013a200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels @ http://127.0.0.1:5175/a2ui:0
+[     533ms] [WARNING] [.WebGL-0x281c0013a200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels @ http://127.0.0.1:5175/a2ui:0
+[     543ms] [WARNING] [.WebGL-0x281c0013a200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels @ http://127.0.0.1:5175/a2ui:0
+[     552ms] [WARNING] [.WebGL-0x281c0013a200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat) @ http://127.0.0.1:5175/a2ui:0
+[  324221ms] [ERROR] %o
+
+%s
+
+%s
+ ReferenceError: stationEvseRatio is not defined
+    at stationMapPoint (http://127.0.0.1:5175/src/components/a2ui/a2ui-renderer.tsx?t=1781948469901:1757:19)
+    at routeMapData (http://127.0.0.1:5175/src/components/a2ui/a2ui-renderer.tsx?t=1781948469901:1682:35)
+    at http://127.0.0.1:5175/src/components/a2ui/a2ui-renderer.tsx?t=1781948469901:1141:32
+    at mountMemo (http://127.0.0.1:5175/node_modules/.vite/deps/react-dom_client.js?v=8ad17695:4931:20)
+    at Object.useMemo (http://127.0.0.1:5175/node_modules/.vite/deps/react-dom_client.js?v=8ad17695:13024:13)
+    at exports.useMemo (http://127.0.0.1:5175/node_modules/.vite/deps/react.js?v=dbce708b:736:31)
+    at MapPreviewCard (http://127.0.0.1:5175/src/components/a2ui/a2ui-renderer.tsx?t=1781948469901:1141:18)
+    at Object.react_stack_bottom_frame (http://127.0.0.1:5175/node_modules/.vite/deps/react-dom_client.js?v=8ad17695:12868:12)
+    at renderWithHooks (http://127.0.0.1:5175/node_modules/.vite/deps/react-dom_client.js?v=8ad17695:4213:19)
+    at updateFunctionComponent (http://127.0.0.1:5175/node_modules/.vite/deps/react-dom_client.js?v=8ad17695:5569:16) The above error occurred in the <MapPreviewCard> component. React will try to recreate this component tree from scratch using the error boundary you provided, BlockErrorBoundary. @ http://127.0.0.1:5175/@vite/client:524
+[  341613ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5175/node_modules/.vite/deps/react-dom_client.js?v=8ad17695:14337
+[  366886ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5175/node_modules/.vite/deps/react-dom_client.js?v=8ad17695:14337
+[  544358ms] [ERROR] pt: AJAXError: Failed to fetch (0): https://tiles.openfreemap.org/styles/positron
+    at http://127.0.0.1:5175/node_modules/.vite/deps/maplibre-gl.js?v=ebbc7cfb:494:16
+    at Generator.throw (<anonymous>)
+    at a (http://127.0.0.1:5175/node_modules/.vite/deps/maplibre-gl.js?v=ebbc7cfb:37:17) @ http://127.0.0.1:5175/@vite/client:524
+[  544519ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5175/node_modules/.vite/deps/react-dom_client.js?v=8ad17695:14337

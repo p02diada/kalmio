@@ -1,0 +1,103 @@
+{
+  "messages": [
+    {
+      "version": "v0.9.1",
+      "createSurface": {
+        "surfaceId": "kalmio-chat",
+        "catalogId": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
+        "sendDataModel": true
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateComponents": {
+        "surfaceId": "kalmio-chat",
+        "components": [
+          {
+            "text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré.",
+            "id": "assistant-initial",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "chips": [
+              "Necesito cargar ya",
+              "Ruta con parada segura",
+              "Parada cerca del hotel",
+              "Priorizar servicios"
+            ],
+            "id": "preference-starters",
+            "component": "PreferenceChips",
+            "version": 1
+          },
+          {
+            "text": "Tengo poca batería y voy con niños",
+            "id": "user-a2a0fe30ee",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "text": "Entiendo, tienes poca batería y viajas con niños. Para ayudarte a encontrar un punto de carga urgente, necesito saber dónde estás ahora o en qué ciudad/zona te encuentras.",
+            "id": "1",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "question": "¿Dónde estás ahora? Dame tu ubicación actual, ciudad o zona para buscar el cargador más cercano.",
+            "fields": [
+              {
+                "key": "ubicacion",
+                "label": "Ubicación actual (ciudad, zona o calle)",
+                "type": "text",
+                "required": true
+              }
+            ],
+            "id": "2",
+            "component": "ClarifyingQuestionCard",
+            "version": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateDataModel": {
+        "surfaceId": "kalmio-chat",
+        "path": "/",
+        "value": {
+          "conversation": {
+            "surfaceId": "kalmio-chat",
+            "componentOrder": [
+              {
+                "id": "assistant-initial",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "preference-starters",
+                "component": "PreferenceChips"
+              },
+              {
+                "id": "user-a2a0fe30ee",
+                "component": "UserMessage"
+              },
+              {
+                "id": "1",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "2",
+                "component": "ClarifyingQuestionCard"
+              }
+            ]
+          },
+          "facts": {
+            "locations": [],
+            "routes": [],
+            "stops": [],
+            "risks": []
+          }
+        }
+      }
+    }
+  ]
+}

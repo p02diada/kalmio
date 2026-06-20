@@ -1,10 +1,63 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { A2UIRenderer } from './a2ui-renderer'
 
+const maplibreMock = vi.hoisted(() => {
+  const instances: Array<{
+    addControl: ReturnType<typeof vi.fn>
+    once: ReturnType<typeof vi.fn>
+    addSource: ReturnType<typeof vi.fn>
+    addLayer: ReturnType<typeof vi.fn>
+    fitBounds: ReturnType<typeof vi.fn>
+    resize: ReturnType<typeof vi.fn>
+    on: ReturnType<typeof vi.fn>
+    remove: ReturnType<typeof vi.fn>
+  }> = []
+  const markerElements: HTMLElement[] = []
+
+  return {
+    instances,
+    Map: vi.fn(function Map(options: Record<string, unknown>) {
+      const instance = {
+        addControl: vi.fn(),
+        once: vi.fn((_event: string, callback: () => void) => callback()),
+        addSource: vi.fn(),
+        addLayer: vi.fn(),
+        fitBounds: vi.fn(),
+        resize: vi.fn(),
+        on: vi.fn(),
+        remove: vi.fn(),
+      }
+      instances.push(instance)
+      void options
+      return instance
+    }),
+    markerElements,
+    Marker: vi.fn(function Marker(options?: { element?: HTMLElement }) {
+      if (options?.element) {
+        markerElements.push(options.element)
+      }
+      const marker = {
+        setLngLat: vi.fn(() => marker),
+        addTo: vi.fn(() => marker),
+        remove: vi.fn(),
+      }
+      return marker
+    }),
+    NavigationControl: vi.fn(function NavigationControl() {
+      return {}
+    }),
+  }
+})
+
+vi.mock('maplibre-gl', () => maplibreMock)
+
 describe('A2UIRenderer', () => {
   afterEach(() => {
+    maplibreMock.instances.length = 0
+    maplibreMock.markerElements.length = 0
+    vi.clearAllMocks()
     vi.restoreAllMocks()
   })
 
@@ -144,7 +197,7 @@ describe('A2UIRenderer', () => {
     expect(screen.getByText('Almansa HPC')).toBeInTheDocument()
     expect(screen.getByText('1.2 km')).toBeInTheDocument()
     expect(screen.getByText('0.49 €/kWh')).toBeInTheDocument()
-    expect(screen.getByText('2 EVSEs')).toBeInTheDocument()
+    expect(screen.getByText('2 puestos')).toBeInTheDocument()
     expect(screen.getByText('CCS2')).toBeInTheDocument()
   })
 
@@ -231,19 +284,23 @@ describe('A2UIRenderer', () => {
     )
 
     expect(screen.getByText('Almansa HPC')).toBeInTheDocument()
-    expect(screen.getByText('Área de servicio Almansa')).toBeInTheDocument()
-    expect(screen.getByText('Capacidad')).toBeInTheDocument()
-    expect(screen.getByText('2 EVSEs')).toBeInTheDocument()
-    expect(screen.getByText('Conectores trazados')).toBeInTheDocument()
+    expect(screen.getByText(/Área de servicio Almansa/)).toBeInTheDocument()
+    expect(screen.getAllByText('Puestos').length).toBeGreaterThan(0)
+    expect(screen.getByText('2 puestos')).toBeInTheDocument()
+    expect(screen.getByText('Conectores registrados')).toBeInTheDocument()
     expect(screen.getByText('TYPE2')).toBeInTheDocument()
     expect(screen.getByText('Otras estaciones viables')).toBeInTheDocument()
+    expect(screen.getByText('1 alternativa')).toBeInTheDocument()
     expect(screen.getByText('Centro CCS')).toBeInTheDocument()
-    expect(screen.getByText(/Precio 0.59 €\/kWh/)).toBeInTheDocument()
-    expect(screen.getByText(/Capacidad trazada: 3 EVSEs/)).toBeInTheDocument()
-    expect(screen.getByText(/Conectores trazados: CCS2/)).toBeInTheDocument()
+    expect(screen.getAllByText('Precio').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('0.59 €/kWh').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Puestos').length).toBeGreaterThan(0)
+    expect(screen.getByText('3 puestos')).toBeInTheDocument()
+    expect(screen.getByText('Conectores')).toBeInTheDocument()
+    expect(screen.getAllByText('CCS2').length).toBeGreaterThan(0)
   })
 
-  it('renders an expandable route map with traced route stations', () => {
+  it('renders an expandable route map preview', () => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
 
     render(
@@ -256,8 +313,8 @@ describe('A2UIRenderer', () => {
             props: {
               origin: { label: 'Zaragoza', lat: 41.6488, lon: -0.8891 },
               destination: { label: 'Valencia', lat: 39.4699, lon: -0.3763 },
-              primaryStation: { stationName: 'Kalmio demo HPC', lat: 40.345, lon: -0.997 },
-              stations: [{ stationName: 'Demo Charge 1', lat: 40.583, lon: -1.268 }],
+              primaryStation: { stationName: 'Punto de muestra La Plana', lat: 40.345, lon: -0.997 },
+              stations: [{ stationName: 'Punto de muestra Mudéjar', lat: 40.583, lon: -1.268 }],
               routeGeometry: {
                 type: 'LineString',
                 coordinates: [
@@ -276,14 +333,121 @@ describe('A2UIRenderer', () => {
     )
 
     expect(screen.getByText('Mapa de ruta')).toBeInTheDocument()
-    expect(screen.getByText('Ruta real')).toBeInTheDocument()
+    expect(screen.getByText('Ruta calculada')).toBeInTheDocument()
     expect(screen.getByText('2 estaciones')).toBeInTheDocument()
+
+    expect(screen.getByRole('button', { name: 'Expandir mapa' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir mapa de ruta' }))
+
+    expect(screen.getByLabelText('Mapa de ruta ampliado')).toHaveClass('a2ui-map-fullscreen')
+  })
+
+  it('initializes route maps with a default vector base map', async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({} as CanvasRenderingContext2D)
+
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'route-map',
+            type: 'MapPreviewCard',
+            version: 1,
+            props: {
+              origin: { label: 'Zaragoza', lat: 41.6488, lon: -0.8891 },
+              destination: { label: 'Valencia', lat: 39.4699, lon: -0.3763 },
+              routeGeometry: {
+                type: 'LineString',
+                coordinates: [
+                  [-0.8891, 41.6488],
+                  [-0.3763, 39.4699],
+                ],
+              },
+              geometryPrecision: 'provider',
+              source: 'plan_route',
+            },
+          },
+        ]}
+      />,
+    )
+
+    await waitFor(() => expect(maplibreMock.Map).toHaveBeenCalled())
+
+    const options = maplibreMock.Map.mock.calls[0]?.[0] as { attributionControl?: unknown; interactive?: unknown; style: string }
+    expect(options.attributionControl).toBe(false)
+    expect(options.interactive).toBe(false)
+    expect(options.style).toBe('https://tiles.openfreemap.org/styles/positron')
+    expect(screen.getByRole('link', { name: 'Atribución de OpenStreetMap' })).toHaveTextContent('© OSM')
+    expect(maplibreMock.NavigationControl).not.toHaveBeenCalled()
+  })
+
+  it('enables map controls and attribution only in the expanded route map', async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({} as CanvasRenderingContext2D)
+
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'route-map',
+            type: 'MapPreviewCard',
+            version: 1,
+            props: {
+              origin: { label: 'Zaragoza', lat: 41.6488, lon: -0.8891 },
+              destination: { label: 'Valencia', lat: 39.4699, lon: -0.3763 },
+              primaryStation: {
+                stationName: 'Punto de muestra La Plana',
+                lat: 40.345,
+                lon: -0.997,
+                powerKw: 180,
+                distanceKm: 2.4,
+                detourMin: 6,
+                availableEvses: 2,
+                totalEvses: 5,
+                connectorTypes: ['ccs2'],
+              },
+              routeGeometry: {
+                type: 'LineString',
+                coordinates: [
+                  [-0.8891, 41.6488],
+                  [-0.3763, 39.4699],
+                ],
+              },
+              geometryPrecision: 'provider',
+              source: 'plan_route',
+            },
+          },
+        ]}
+      />,
+    )
+
+    await waitFor(() => expect(maplibreMock.Map).toHaveBeenCalledTimes(1))
 
     fireEvent.click(screen.getByRole('button', { name: 'Expandir mapa' }))
 
-    expect(screen.getByText('Cargadores en ruta')).toBeInTheDocument()
-    expect(screen.getAllByText('Kalmio demo HPC').length).toBeGreaterThan(1)
-    expect(screen.getAllByText('Demo Charge 1').length).toBeGreaterThan(1)
+    await waitFor(() => expect(maplibreMock.Map).toHaveBeenCalledTimes(2))
+
+    expect(screen.getByLabelText('Mapa de ruta ampliado')).toHaveClass('a2ui-map-fullscreen')
+
+    const compactOptions = maplibreMock.Map.mock.calls[0]?.[0] as { attributionControl?: unknown; interactive?: unknown }
+    const expandedOptions = maplibreMock.Map.mock.calls[1]?.[0] as { attributionControl?: unknown; interactive?: unknown }
+    expect(compactOptions).toMatchObject({ attributionControl: false, interactive: false })
+    expect(expandedOptions).toMatchObject({ attributionControl: {}, interactive: true })
+    expect(maplibreMock.NavigationControl).toHaveBeenCalledTimes(1)
+    expect(maplibreMock.instances[1]?.on).not.toHaveBeenCalled()
+
+    const expandedPrimaryMarker = maplibreMock.markerElements.findLast((element) => (
+      element.getAttribute('aria-label') === 'Ver Punto de muestra La Plana'
+    ))
+    expect(expandedPrimaryMarker?.textContent).toContain('2/5')
+
+    fireEvent.click(expandedPrimaryMarker as HTMLElement)
+
+    expect(screen.getByLabelText('Detalle de estación')).toBeInTheDocument()
+    expect(screen.getAllByText('Punto de muestra La Plana').length).toBeGreaterThan(1)
+    expect(screen.getByText('Parada principal')).toBeInTheDocument()
+    expect(screen.getByText('180 kW')).toBeInTheDocument()
+    expect(screen.getByText('2/5 puestos')).toBeInTheDocument()
+    expect(screen.getByText('CCS2')).toBeInTheDocument()
   })
 
   it('hides station prices marked as estimated', () => {
@@ -335,7 +499,7 @@ describe('A2UIRenderer', () => {
     expect(screen.getByText('Almansa HPC')).toBeInTheDocument()
     expect(screen.getByText('0.49 €/kWh')).toBeInTheDocument()
     expect(screen.getByText('0.59 €/kWh')).toBeInTheDocument()
-    expect(screen.getByText('0.1 EUR')).toBeInTheDocument()
+    expect(screen.getByText('0.1 €/kWh')).toBeInTheDocument()
     expect(screen.getByText('Comparado con Almansa AC.')).toBeInTheDocument()
   })
 
@@ -400,12 +564,14 @@ describe('A2UIRenderer', () => {
       />,
     )
 
-    expect(screen.getByText('Servicios trazados')).toBeInTheDocument()
-    expect(screen.getByText('Restaurante')).toBeInTheDocument()
-    expect(screen.getByText('Cafetería')).toBeInTheDocument()
+    expect(screen.getByText('Servicios indicados')).toBeInTheDocument()
+    expect(screen.getAllByText('Restaurante').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Cafetería').length).toBeGreaterThan(0)
     expect(screen.getByText('+3 más')).toBeInTheDocument()
-    expect(screen.getByText(/400 kW · 4.8 km · Desvío 11 min/)).toBeInTheDocument()
-    expect(screen.getByText(/Servicios trazados: Restaurante, Cafetería/)).toBeInTheDocument()
+    expect(screen.getByText('400 kW')).toBeInTheDocument()
+    expect(screen.getByText('4.8 km')).toBeInTheDocument()
+    expect(screen.getByText('11 min')).toBeInTheDocument()
+    expect(screen.getByText('Servicios')).toBeInTheDocument()
     expect(screen.queryByText(/apto para niños|ideal|seguro/i)).not.toBeInTheDocument()
   })
 

@@ -370,13 +370,17 @@
           "maxItems": 8
         },
         "availableEvses": { "type": ["number", "null"], "minimum": 0 },
-        "connectorCount": { "type": ["number", "null"], "minimum": 0 },
+        "totalEvses": { "type": ["number", "null"], "minimum": 0 },
         "amenities": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
           "maxItems": 12
         },
-        "powerKw": { "type": ["number", "null"], "minimum": 0 },
+        "powerKw": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Maximum charging power registered for the station, in kW. Not live or guaranteed delivered power."
+        },
         "pricePerKwhEur": { "type": ["number", "null"], "minimum": 0 },
         "currency": { "type": "string" },
         "priceIsEstimated": { "type": ["boolean", "null"] },
@@ -393,7 +397,10 @@
       "properties": {
         "name": { "$ref": "#/$defs/displayValue" },
         "deltaMin": { "type": ["number", "null"] },
-        "powerKw": { "type": ["number", "null"] },
+        "powerKw": {
+          "type": ["number", "null"],
+          "description": "Maximum charging power registered for the station, in kW. Not live or guaranteed delivered power."
+        },
         "distanceKm": { "type": ["number", "null"] },
         "takeaway": { "type": "string" }
       },

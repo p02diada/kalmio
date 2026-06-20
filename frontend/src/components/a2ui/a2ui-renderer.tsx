@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   AlertTriangle,
   BatteryCharging,
   Bot,
@@ -9,15 +10,15 @@ import {
   MessageCircle,
   Navigation,
   Route,
+  type LucideIcon,
 } from 'lucide-react'
 import { Component, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import type { Map as MapLibreMap, Marker as MapLibreMarker, StyleSpecification } from 'maplibre-gl'
+import { createPortal } from 'react-dom'
+import type { Map as MapLibreMap, Marker as MapLibreMarker } from 'maplibre-gl'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import type { A2UIBlock } from '@/lib/a2ui/types'
 import { cn } from '@/lib/utils'
 
@@ -30,6 +31,15 @@ type RouteMapPoint = {
   lat: number
   lon: number
   kind: 'origin' | 'destination' | 'primary' | 'station'
+  markerLabel?: string
+  capacityLabel?: string
+  evseRatioLabel?: string
+  powerLabel?: string
+  distanceLabel?: string
+  detourLabel?: string
+  priceLabel?: string
+  connectorLabels?: string[]
+  roleLabel?: string
 }
 type RouteMapData = {
   originLabel: string
@@ -42,12 +52,15 @@ type RouteMapData = {
   geometryPrecision: 'provider' | 'schematic' | 'unknown'
   source: string
 }
+const DEFAULT_MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron'
 type A2UIRendererActions = {
   onChipClick?: (value: string) => void
   onActionEvent?: (name: string, context?: Record<string, unknown>, sourceComponentId?: string) => void
   onPositionSubmit?: (value: string) => void
   onManualPositionRequest?: () => void
 }
+type A2UICardTone = 'neutral' | 'primary' | 'route' | 'assistant' | 'warning' | 'error'
+const STATION_POWER_LABEL = 'Potencia máx.'
 
 export function A2UIRenderer({
   blocks,
@@ -96,6 +109,87 @@ class BlockErrorBoundary extends Component<
   }
 }
 
+const A2UI_CARD_TONES: Record<A2UICardTone, { icon: string; iconShell: string }> = {
+  neutral: {
+    icon: 'text-muted-foreground',
+    iconShell: 'bg-muted',
+  },
+  primary: {
+    icon: 'text-primary',
+    iconShell: 'bg-muted',
+  },
+  route: {
+    icon: 'text-route',
+    iconShell: 'bg-route-soft',
+  },
+  assistant: {
+    icon: 'text-assistant',
+    iconShell: 'bg-assistant-soft',
+  },
+  warning: {
+    icon: 'text-foreground',
+    iconShell: 'bg-warning-soft',
+  },
+  error: {
+    icon: 'text-error',
+    iconShell: 'bg-error-soft',
+  },
+}
+
+function A2UICard({
+  icon: Icon,
+  title,
+  subtitle,
+  tone = 'neutral',
+  children,
+  className,
+  contentClassName,
+  titleClassName,
+  headerAction,
+}: {
+  icon?: LucideIcon
+  title: ReactNode
+  subtitle?: ReactNode
+  tone?: A2UICardTone
+  children: ReactNode
+  className?: string
+  contentClassName?: string
+  titleClassName?: string
+  headerAction?: ReactNode
+}) {
+  const toneClasses = A2UI_CARD_TONES[tone]
+
+  return (
+    <Card className={cn('overflow-hidden', className)}>
+      <CardHeader className="pb-2">
+        <div className={cn('flex min-w-0 justify-between gap-3', subtitle ? 'items-start' : 'items-center')}>
+          <div className={cn('flex min-w-0 gap-3', subtitle ? 'items-start' : 'items-center')}>
+            {Icon ? (
+              <span className={cn('grid size-8 shrink-0 place-items-center rounded-md', subtitle && 'mt-0.5', toneClasses.iconShell)}>
+                <Icon className={cn('size-4', toneClasses.icon)} aria-hidden="true" />
+              </span>
+            ) : null}
+            <div className="min-w-0">
+              <CardTitle className={cn('break-words text-sm font-semibold leading-5 tracking-tight text-foreground', titleClassName)}>
+                {title}
+              </CardTitle>
+              {subtitle ? (
+                <p className="mt-0.5 break-words text-caption font-medium leading-4 text-muted-foreground">
+                  {subtitle}
+                </p>
+              ) : null}
+            </div>
+          </div>
+          {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
+        </div>
+      </CardHeader>
+      <CardContent className={cn('space-y-3 pt-1', contentClassName)}>
+        {children}
+      </CardContent>
+    </Card>
+  )
+}
+
 function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRendererActions }) {
   switch (block.type) {
     case 'AssistantMessage':
@@ -121,7 +215,7 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
     case 'StationDetailCard':
       return <StationDetailCard block={block} />
     case 'StationList':
-      return <ListCard title={text(block.props.title, 'Estaciones cercanas')} items={list(block.props.stations)} itemKind="station" />
+      return <StationListCard title={text(block.props.title, 'Estaciones cercanas')} stations={list(block.props.stations)} />
     case 'RiskExplanationCard':
       return <RiskBand level={text(block.props.level, 'medio')} body={text(block.props.text)} />
     case 'CostComparisonCard':
@@ -138,24 +232,16 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
       )
     case 'ClarifyingQuestionCard':
       return (
-        <Card className="border-border bg-muted">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <CircleHelp className="size-4 text-assistant" aria-hidden="true" />
-              Falta un dato
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm leading-6">{text(block.props.question)}</p>
-            <div className="flex flex-wrap gap-2">
-              {strings(block.props.fields).map((field) => (
-                <Badge key={field} variant="secondary">
-                  {field}
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <A2UICard icon={CircleHelp} tone="assistant" title="Dato necesario" subtitle="Necesito confirmar esto antes de continuar.">
+          <p className="text-sm leading-6 text-body">{text(block.props.question)}</p>
+          <div className="flex flex-wrap gap-2">
+            {strings(block.props.fields).map((field) => (
+              <Badge key={field} variant="secondary">
+                {field}
+              </Badge>
+            ))}
+          </div>
+        </A2UICard>
       )
     case 'PositionRequestCard':
       return (
@@ -187,7 +273,7 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
     case 'ErrorFallbackCard':
       return <ErrorFallbackCard type={text(block.props.originalType)} message={text(block.props.message)} />
     default:
-      return <ErrorFallbackCard type={block.type} message="Componente A2UI desconocido." />
+      return <ErrorFallbackCard type={block.type} message="No reconozco esta parte de la respuesta." />
   }
 }
 
@@ -237,44 +323,36 @@ function PositionRequestCard({
   }[status]
 
   return (
-    <Card className="border-assistant bg-muted">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <MapPinned className="size-4 text-assistant" aria-hidden="true" />
-          {text(block.props.title)}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <p className="text-sm leading-6 text-body">{text(block.props.body)}</p>
-        {manualFields.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {manualFields.map((field) => (
-              <Badge key={field} variant="secondary">
-                {field}
-              </Badge>
-            ))}
-          </div>
-        ) : null}
-        <div className="grid gap-2 sm:grid-cols-2">
-          <Button type="button" className="h-auto min-h-11 w-full whitespace-normal font-semibold leading-5" onClick={requestLocation} disabled={status === 'pending'}>
-            <Navigation className="size-4" aria-hidden="true" />
-            {status === 'pending' ? 'Solicitando...' : 'Usar mi ubicación'}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="h-auto min-h-11 w-full whitespace-normal leading-5"
-            onClick={() => {
-              setStatus('manual')
-              onManualPositionRequest?.()
-            }}
-          >
-            Escribir ubicación
-          </Button>
+    <A2UICard icon={MapPinned} tone="assistant" title={text(block.props.title)} subtitle="Tu posición se usa solo para resolver esta búsqueda.">
+      <p className="text-sm leading-6 text-body">{text(block.props.body)}</p>
+      {manualFields.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {manualFields.map((field) => (
+            <Badge key={field} variant="secondary">
+              {field}
+            </Badge>
+          ))}
         </div>
-        {statusMessage ? <p className="text-xs leading-5 text-muted-foreground">{statusMessage}</p> : null}
-      </CardContent>
-    </Card>
+      ) : null}
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Button type="button" className="h-auto min-h-11 w-full whitespace-normal font-semibold leading-5" onClick={requestLocation} disabled={status === 'pending'}>
+          <Navigation className="size-4" aria-hidden="true" />
+          {status === 'pending' ? 'Solicitando...' : 'Usar mi ubicación'}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-auto min-h-11 w-full whitespace-normal leading-5"
+          onClick={() => {
+            setStatus('manual')
+            onManualPositionRequest?.()
+          }}
+        >
+          Escribir ubicación
+        </Button>
+      </div>
+      {statusMessage ? <p className="text-xs leading-5 text-muted-foreground">{statusMessage}</p> : null}
+    </A2UICard>
   )
 }
 
@@ -284,37 +362,36 @@ function PlaceDetailCard({ block }: { block: A2UIBlock }) {
   const coordinates = coordinatePair(block.props.lat, block.props.lon)
 
   return (
-    <Card className="border-route-soft bg-muted">
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-sm font-semibold tracking-tight">
-          <span className="grid size-7 place-items-center rounded-md bg-surface">
-            <MapPinned className="size-4 text-route" aria-hidden="true" />
-          </span>
-          Lugar resuelto
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <span className="text-base font-semibold tracking-tight">{text(block.props.label, 'Lugar indicado')}</span>
-          <span className="text-sm leading-6 text-body">{text(block.props.context, 'Lugar usado para la búsqueda.')}</span>
-        </div>
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div>
-            <span className="block text-caption font-medium text-muted-foreground">Precisión</span>
-            <span className="block text-compact font-semibold tracking-tight">{precision}</span>
-          </div>
-          <div>
-            <span className="block text-caption font-medium text-muted-foreground">Coordenadas</span>
-            <span className="block truncate text-compact font-semibold tracking-tight">{coordinates}</span>
-          </div>
+    <A2UICard
+      icon={MapPinned}
+      tone="route"
+      title="Lugar resuelto"
+      subtitle={text(block.props.label, 'Lugar indicado')}
+      contentClassName="flex flex-col gap-3"
+    >
+      <p className="text-sm leading-6 text-body">{text(block.props.context, 'Lugar usado para la búsqueda.')}</p>
+      <div className="grid grid-cols-2 gap-2 text-sm">
+        <div>
+          <span className="block text-caption font-medium text-muted-foreground">Precisión</span>
+          <span className="block text-compact font-semibold tracking-tight">{precision}</span>
         </div>
         {needsConfirmation ? (
-          <Badge variant="secondary" className="w-fit">
-            Confirma el lugar final
-          </Badge>
+          <div>
+            <span className="block text-caption font-medium text-muted-foreground">Estado</span>
+            <span className="block text-compact font-semibold tracking-tight">Por confirmar</span>
+          </div>
         ) : null}
-      </CardContent>
-    </Card>
+      </div>
+      {needsConfirmation ? (
+        <Badge variant="secondary" className="w-fit">
+          Confirma el lugar final
+        </Badge>
+      ) : null}
+      <details className="text-xs leading-5 text-muted-foreground">
+        <summary className="cursor-pointer font-medium text-body">Coordenadas usadas</summary>
+        <span className="mt-1 block break-words font-mono">{coordinates}</span>
+      </details>
+    </A2UICard>
   )
 }
 
@@ -357,28 +434,21 @@ function MessageCard({
 
 function TripSummaryCard({ block }: { block: A2UIBlock }) {
   return (
-    <Card>
-      <CardHeader className="pb-1">
-        <CardTitle className="flex items-center gap-2 text-compact font-semibold tracking-tight text-route">
-          <Route className="size-4" aria-hidden="true" />
-          Resumen de la ruta
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-          <span>{text(block.props.origin)}</span>
-          <span className="text-muted-foreground" aria-hidden="true">→</span>
-          <span>{text(block.props.destination)}</span>
-        </div>
-        <MetricGrid
-          rows={[
-            ['Batería', percentOrUnknown(block.props.battery)],
-            ['Mínimo al llegar', percent(block.props.arrivalReservePercent)],
-            ['Tipo', 'Conservadora'],
-          ]}
-        />
-      </CardContent>
-    </Card>
+    <A2UICard icon={Route} tone="route" title="Resumen de la ruta" contentClassName="space-y-4">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-lg font-semibold tracking-tight">
+        <span className="min-w-0 break-words">{text(block.props.origin)}</span>
+        <span className="text-muted-foreground" aria-hidden="true">→</span>
+        <span className="min-w-0 break-words">{text(block.props.destination)}</span>
+      </div>
+      <DecisionNarrative props={block.props} />
+      <MetricGrid
+        rows={[
+          ['Batería', percentOrUnknown(block.props.battery)],
+          ['Batería mínima al llegar', percent(block.props.arrivalReservePercent)],
+          ['Tipo', 'Conservadora'],
+        ]}
+      />
+    </A2UICard>
   )
 }
 
@@ -388,39 +458,25 @@ function MetricCard({
   rows,
   tone,
   note,
+  context,
 }: {
   icon: typeof Route
   title: string
   rows: Array<[string, string]>
   tone: 'primary' | 'warning' | 'route' | 'assistant'
   note?: string
+  context?: Record<string, unknown>
 }) {
-  const toneClass = {
-    primary: 'text-primary',
-    warning: 'text-warning',
-    route: 'text-route',
-    assistant: 'text-assistant',
-  }[tone]
-
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-sm font-semibold tracking-tight">
-          <span className="grid size-7 place-items-center rounded-md bg-muted">
-            <Icon className={`size-4 ${toneClass}`} aria-hidden="true" />
-          </span>
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <MetricGrid rows={rows} />
-        {note ? (
-          <p className="border-t border-border pt-3 text-sm leading-6 text-body">
-            {note}
-          </p>
-        ) : null}
-      </CardContent>
-    </Card>
+    <A2UICard icon={Icon} tone={tone} title={title}>
+      {context ? <DecisionNarrative props={context} /> : null}
+      <MetricGrid rows={rows} />
+      {note ? (
+        <p className="border-t border-border pt-3 text-sm leading-6 text-body">
+          {note}
+        </p>
+      ) : null}
+    </A2UICard>
   )
 }
 
@@ -433,77 +489,65 @@ function StationDetailCard({ block }: { block: A2UIBlock }) {
   const title = text(block.props.title, 'Estación de carga')
 
   return (
-    <Card className="border-primary bg-primary text-primary-foreground">
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-start gap-3 text-base font-semibold tracking-tight">
-          <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-md bg-primary-foreground text-primary">
-            <BatteryCharging className="size-4" aria-hidden="true" />
+    <A2UICard
+      icon={BatteryCharging}
+      tone="primary"
+      title={<span className="break-words">{station || 'Estación por confirmar'}</span>}
+      subtitle={compactParts([title, address]).join(' · ')}
+      titleClassName="text-base"
+    >
+      <DecisionNarrative props={block.props} />
+      <MetricGridRows
+        rows={compactRows([
+          isKnownNumber(block.props.distanceKm) ? ['Distancia', metric(block.props.distanceKm, 'km')] : null,
+          isKnownNumber(block.props.powerKw) ? [STATION_POWER_LABEL, metric(block.props.powerKw, 'kW')] : null,
+          stationPriceRow(block.props),
+          capacity ? ['Puestos', capacity] : ['Confianza', text(block.props.confidence)],
+          isKnownNumber(block.props.detourMin) ? ['Desvío', metric(block.props.detourMin, 'min')] : null,
+        ])}
+      />
+      {connectors.length > 0 ? (
+        <div className="border-t border-border pt-3">
+          <span className="block text-caption font-medium text-muted-foreground">
+            Conectores registrados
           </span>
-          <span className="flex min-w-0 flex-col gap-1">
-            <span className="text-caption font-medium text-primary-foreground/70">{title}</span>
-            <span className="break-words">{station || 'Estación por confirmar'}</span>
-            {address ? (
-              <span className="truncate text-caption font-medium text-primary-foreground/70">
-                {address}
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {connectors.map((connector) => (
+              <span
+                key={connector}
+                className="rounded-full bg-primary px-2 py-1 text-caption font-semibold leading-none text-primary-foreground"
+              >
+                {connector}
               </span>
-            ) : null}
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {amenities && amenities.length > 0 ? (
+        <div className="border-t border-border pt-3">
+          <span className="block text-caption font-medium text-muted-foreground">
+            Servicios indicados
           </span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <MetricGridRows
-          rows={compactRows([
-            ['Distancia', metric(block.props.distanceKm, 'km')],
-            ['Potencia', metric(block.props.powerKw, 'kW')],
-            stationPriceRow(block.props),
-            capacity ? ['Capacidad', capacity] : ['Confianza', text(block.props.confidence)],
-            ['Desvío', metric(block.props.detourMin, 'min')],
-          ])}
-          inverted
-        />
-        {connectors.length > 0 ? (
-          <div className="border-t border-primary-foreground/20 pt-3">
-            <span className="block text-caption font-medium text-primary-foreground/70">
-              Conectores trazados
-            </span>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {connectors.map((connector) => (
-                <span
-                  key={connector}
-                  className="rounded-full bg-primary-foreground/10 px-2 py-1 text-caption font-semibold leading-none text-primary-foreground"
-                >
-                  {connector}
-                </span>
-              ))}
-            </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {amenities.map((amenity) => (
+              <span
+                key={amenity}
+                className="rounded-full bg-muted px-2 py-1 text-caption font-semibold leading-none text-foreground"
+              >
+                {amenity}
+              </span>
+            ))}
           </div>
-        ) : null}
-        {amenities && amenities.length > 0 ? (
-          <div className="border-t border-primary-foreground/20 pt-3">
-            <span className="block text-caption font-medium text-primary-foreground/70">
-              Servicios trazados
-            </span>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {amenities.map((amenity) => (
-                <span
-                  key={amenity}
-                  className="rounded-full bg-primary-foreground/10 px-2 py-1 text-caption font-semibold leading-none text-primary-foreground"
-                >
-                  {amenity}
-                </span>
-              ))}
-            </div>
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
+        </div>
+      ) : null}
+    </A2UICard>
   )
 }
 
 function CostComparisonCard({ block }: { block: A2UIBlock }) {
   const tariff = pricePerKwhValue(block.props.pricePerKwhEur, block.props.currency)
   if (bool(block.props.priceIsEstimated) || !tariff) {
-    return <ErrorFallbackCard type={block.type} message="No hay tarifas trazadas para comparar." />
+    return <ErrorFallbackCard type={block.type} message="No hay tarifas verificadas para comparar." />
   }
 
   return (
@@ -516,10 +560,29 @@ function CostComparisonCard({ block }: { block: A2UIBlock }) {
         pricePerKwhValue(block.props.comparedWithPricePerKwhEur, block.props.currency)
           ? ['Comparada con', pricePerKwh(block.props.comparedWithPricePerKwhEur, block.props.currency)]
           : null,
-        isKnownNumber(block.props.savingPerKwhEur) ? ['Ahorro/kWh', metric(block.props.savingPerKwhEur, 'EUR')] : null,
+        isKnownNumber(block.props.savingPerKwhEur) ? ['Ahorro/kWh', pricePerKwh(block.props.savingPerKwhEur, block.props.currency)] : null,
       ])}
+      context={block.props}
       note={priceNote(block.props)}
     />
+  )
+}
+
+function DecisionNarrative({ props }: { props: Record<string, unknown> }) {
+  const takeaway = text(props.takeaway, '')
+  const why = text(props.why, '')
+  const uncertainty = uncertaintyText(props.uncertainty)
+
+  if (!takeaway && !why && !uncertainty) {
+    return null
+  }
+
+  return (
+    <div className="rounded-md bg-muted px-3 py-2 text-sm leading-6">
+      {takeaway ? <p className="font-semibold tracking-tight text-foreground">{takeaway}</p> : null}
+      {why ? <p className={cn('text-body', takeaway && 'mt-1')}>{why}</p> : null}
+      {uncertainty ? <p className={cn('text-muted-foreground', (takeaway || why) && 'mt-1')}>{uncertainty}</p> : null}
+    </div>
   )
 }
 
@@ -529,9 +592,9 @@ function MetricGrid({ rows }: { rows: Array<[string, string]> }) {
 
 function MetricGridRows({ rows, inverted = false }: { rows: Array<[string, string]>; inverted?: boolean }) {
   return (
-    <div className="grid grid-cols-3 gap-2 text-sm">
+    <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
       {rows.map(([label, value]) => (
-        <div key={label} className="min-w-0">
+        <div key={label} className="min-w-0 rounded-md bg-muted px-2.5 py-2">
           <span className={cn('block truncate text-caption font-medium', inverted ? 'text-primary-foreground/70' : 'text-muted-foreground')}>{label}</span>
           <span className={cn('block break-words text-compact font-semibold tracking-tight', inverted ? 'text-primary-foreground' : 'text-foreground')}>{value}</span>
         </div>
@@ -540,40 +603,93 @@ function MetricGridRows({ rows, inverted = false }: { rows: Array<[string, strin
   )
 }
 
-function ListCard({
-  title,
-  items,
-  itemKind = 'default',
-}: {
-  title: string
-  items: RecordList
-  itemKind?: 'default' | 'station'
-}) {
+function StationListCard({ title, stations }: { title: string; stations: RecordList }) {
+  const subtitle = stations.length === 1 ? '1 alternativa' : `${formatNumber(stations.length)} alternativas`
+
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-semibold tracking-tight">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-col divide-y divide-border">
-        {items.map((item, index) => (
-          <div key={`${itemKind === 'station' ? stationTitle(item, 'Estación') : text(item.name)}-${index}`} className="flex items-center gap-3 py-2.5 text-sm first:pt-0 last:pb-0">
-            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
-              {index + 1}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="truncate font-semibold tracking-tight">
-                {itemKind === 'station' ? stationTitle(item, 'Estación') : text(item.name)}
+    <A2UICard icon={BatteryCharging} tone="route" title={title} subtitle={subtitle}>
+      {stations.length === 0 ? (
+        <p className="text-sm leading-6 text-body">No hay estaciones alternativas para mostrar.</p>
+      ) : (
+        <ol className="flex flex-col gap-2">
+          {stations.map((station, index) => (
+            <StationListItem key={`${stationTitle(station, 'Estación')}-${index}`} station={station} index={index} />
+          ))}
+        </ol>
+      )}
+    </A2UICard>
+  )
+}
+
+function StationListItem({ station, index }: { station: Record<string, unknown>; index: number }) {
+  const address = text(station.address, '')
+  const connectors = connectorLabels(station.connectorTypes)
+  const amenities = amenityLabels(station.amenities)
+  const metrics = compactRows([
+    isKnownNumber(station.powerKw) ? [STATION_POWER_LABEL, metric(station.powerKw, 'kW')] : null,
+    isKnownNumber(station.detourMin) ? ['Desvío', metric(station.detourMin, 'min')] : null,
+    isKnownNumber(station.distanceKm) ? ['Distancia', metric(station.distanceKm, 'km')] : null,
+    stationPriceListRow(station),
+    stationCapacity(station) ? ['Puestos', stationCapacity(station)] : null,
+  ])
+
+  return (
+    <li className="rounded-md bg-muted px-3 py-3">
+      <div className="flex min-w-0 items-start gap-3">
+        <span className="grid size-7 shrink-0 place-items-center rounded-full bg-surface text-xs font-semibold text-foreground">
+          {index + 1}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 flex-col gap-1">
+            <div className="min-w-0">
+              <div className="break-words text-sm font-semibold leading-5 tracking-tight text-foreground">
+                {stationTitle(station, 'Estación')}
               </div>
-              <div className="text-muted-foreground">
-                {itemKind === 'station' ? stationDetails(item) : routeDetails(item)}
-              </div>
+              {address ? (
+                <div className="mt-0.5 break-words text-caption font-medium leading-4 text-muted-foreground">
+                  {address}
+                </div>
+              ) : null}
             </div>
           </div>
-        ))}
+          {metrics.length > 0 ? (
+            <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+              {metrics.map(([label, value]) => (
+                <StationMetric key={label} label={label} value={value} />
+              ))}
+            </div>
+          ) : null}
+          {connectors.length > 0 || amenities.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {connectors.length > 0 ? <StationTagList label="Conectores" values={connectors} strong /> : null}
+              {amenities.length > 0 ? <StationTagList label="Servicios" values={amenities} /> : null}
+            </div>
+          ) : null}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </li>
+  )
+}
+
+function StationMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-sm bg-surface px-2 py-1.5">
+      <span className="block text-caption font-medium leading-4 text-muted-foreground">{label}</span>
+      <span className="block truncate text-compact font-semibold leading-5 tracking-tight text-foreground">{value}</span>
+    </div>
+  )
+}
+
+function StationTagList({ label, values, strong = false }: { label: string; values: string[]; strong?: boolean }) {
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+      <span className="text-caption font-medium leading-4 text-muted-foreground">{label}</span>
+      {values.map((value) => (
+        <Badge key={value} variant={strong ? 'default' : 'secondary'} className="rounded-full">
+          {value}
+        </Badge>
+      ))}
+    </div>
   )
 }
 
@@ -581,61 +697,79 @@ function RiskBand({ level, body }: { level: string; body: string }) {
   const severity = level.toLowerCase()
   const high = severity.includes('alto') || severity.includes('alta')
   const low = severity.includes('bajo') || severity.includes('baja') || severity.includes('info')
+  const title = high ? 'Riesgo alto' : low ? 'Aviso de datos' : 'Datos a confirmar'
+  const tone: A2UICardTone = high ? 'error' : low ? 'route' : 'warning'
+
   return (
-    <Alert className={cn('border-warning bg-warning-soft text-foreground', high && 'border-error bg-error-soft')}>
-      <AlertTriangle aria-hidden="true" />
-      <AlertTitle className="text-sm font-semibold">
-        {high ? 'Riesgo alto' : low ? 'Aviso de datos' : 'Datos a confirmar'}
-      </AlertTitle>
-      <AlertDescription className="text-sm leading-6 text-body">
+    <A2UICard icon={AlertTriangle} tone={tone} title={title} subtitle={level ? `Nivel: ${level}` : undefined}>
+      <p className="text-sm leading-6 text-body">
         {body || 'Hay incertidumbre que debes confirmar antes de depender de este resultado.'}
-      </AlertDescription>
-    </Alert>
+      </p>
+    </A2UICard>
   )
 }
 
 function MapPreviewCard({ block }: { block: A2UIBlock }) {
   const mapData = useMemo(() => routeMapData(block.props), [block.props])
+  const [isExpanded, setIsExpanded] = useState(false)
   const stationCount = mapData.stationPoints.length
-  const geometryLabel = mapData.geometryPrecision === 'provider' ? 'Ruta real' : 'Vista esquemática'
+  const geometryLabel = mapData.geometryPrecision === 'provider' ? 'Ruta calculada' : 'Mapa orientativo'
+  const expandedMap = isExpanded && typeof document !== 'undefined'
+    ? createPortal(
+      <section className="a2ui-map-fullscreen" aria-label="Mapa de ruta ampliado">
+        <div className="a2ui-map-fullscreen-header">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold tracking-tight">Mapa de ruta</h2>
+            <p className="truncate text-sm text-muted-foreground">
+              {compactParts([
+                `${mapData.originLabel} → ${mapData.destinationLabel}`,
+                stationCount > 0 ? `${stationCount} estaciones cerca de la ruta` : '',
+              ]).join(' · ')}
+            </p>
+          </div>
+          <Button type="button" variant="outline" size="sm" className="h-9 shrink-0" onClick={() => setIsExpanded(false)}>
+            <ArrowLeft className="size-4" aria-hidden="true" />
+            Volver
+          </Button>
+        </div>
+        <div className="a2ui-map-fullscreen-body">
+          <RouteMapCanvas data={mapData} variant="expanded" />
+        </div>
+      </section>,
+      document.body,
+    )
+    : null
+
+  useEffect(() => {
+    if (!isExpanded || typeof document === 'undefined') {
+      return
+    }
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isExpanded])
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between gap-3">
-          <CardTitle className="flex min-w-0 items-center gap-2 text-base">
-            <MapPinned className="size-4 shrink-0 text-route" aria-hidden="true" />
-            <span className="min-w-0 truncate">Mapa de ruta</span>
-          </CardTitle>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button type="button" variant="outline" size="sm" className="h-8 shrink-0 px-2" aria-label="Expandir mapa">
-                <Maximize2 className="size-4" aria-hidden="true" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[92svh] max-w-[min(68rem,calc(100%-1rem))] overflow-hidden p-0">
-              <DialogHeader className="border-b border-border px-4 pb-3 pt-4 sm:px-5">
-                <DialogTitle>Mapa de ruta</DialogTitle>
-                <DialogDescription>
-                  {compactParts([
-                    `${mapData.originLabel} → ${mapData.destinationLabel}`,
-                    stationCount > 0 ? `${stationCount} estaciones en el corredor` : '',
-                  ]).join(' · ')}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid max-h-[calc(92svh-5rem)] min-h-0 gap-0 overflow-auto md:grid-cols-[minmax(0,1fr)_18rem]">
-                <RouteMapCanvas data={mapData} variant="expanded" />
-                <RouteMapStationPanel data={mapData} />
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <RouteMapCanvas data={mapData} variant="compact" />
+    <>
+      <A2UICard
+        icon={MapPinned}
+        tone="route"
+        title="Mapa de ruta"
+        subtitle={`${mapData.originLabel} → ${mapData.destinationLabel}`}
+        headerAction={(
+          <Button type="button" variant="outline" size="sm" className="h-8 shrink-0 px-2" aria-label="Expandir mapa" onClick={() => setIsExpanded(true)}>
+            <Maximize2 className="size-4" aria-hidden="true" />
+          </Button>
+        )}
+      >
+        <button type="button" className="block w-full rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Abrir mapa de ruta" onClick={() => setIsExpanded(true)}>
+          <RouteMapCanvas data={mapData} variant="compact" />
+        </button>
         <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
           <span className="truncate">{mapData.originLabel}</span>
-          <span className="truncate text-center">{mapData.primaryLabel || geometryLabel}</span>
+          <span className="truncate text-center">{mapData.primaryLabel || 'Parada sugerida'}</span>
           <span className="truncate text-right">{mapData.destinationLabel}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -643,8 +777,9 @@ function MapPreviewCard({ block }: { block: A2UIBlock }) {
           {stationCount > 0 ? <Badge variant="secondary">{stationCount} estaciones</Badge> : null}
           {mapData.corridorRadiusKm !== null ? <Badge variant="secondary">Corredor {formatNumber(mapData.corridorRadiusKm)} km</Badge> : null}
         </div>
-      </CardContent>
-    </Card>
+      </A2UICard>
+      {expandedMap}
+    </>
   )
 }
 
@@ -652,6 +787,12 @@ function RouteMapCanvas({ data, variant }: { data: RouteMapData; variant: 'compa
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const [status, setStatus] = useState<'idle' | 'static' | 'failed'>('idle')
+  const [selectedStationId, setSelectedStationId] = useState<string | null>(null)
+  const isExpanded = variant === 'expanded'
+  const usesDefaultStyle = !mapStyleUrl()
+  const selectedStation = isExpanded
+    ? data.stationPoints.find((station) => station.id === selectedStationId) ?? null
+    : null
   const dataKey = useMemo(() => JSON.stringify({
     routeGeometry: data.routeGeometry,
     points: data.points.map((point) => [point.id, point.lat, point.lon, point.kind]),
@@ -678,11 +819,13 @@ function RouteMapCanvas({ data, variant }: { data: RouteMapData; variant: 'compa
           style: mapLibreStyle(),
           center: routeCenter(data),
           zoom: 6,
-          attributionControl: Boolean(mapStyleUrl()),
-          interactive: true,
+          attributionControl: isExpanded ? {} : usesDefaultStyle ? false : { compact: true },
+          interactive: isExpanded,
         })
         mapRef.current = map
-        map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
+        if (isExpanded) {
+          map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
+        }
         map.once('load', () => {
           if (disposed) {
             return
@@ -710,7 +853,12 @@ function RouteMapCanvas({ data, variant }: { data: RouteMapData; variant: 'compa
             paint: { 'line-color': '#146c5f', 'line-width': 4 },
           })
           for (const point of data.points) {
-            const marker = new maplibregl.Marker({ element: mapMarkerElement(point), anchor: 'center' })
+            const isClickableStation = isExpanded && isStationMapPoint(point)
+            const element = mapMarkerElement(point, isClickableStation)
+            if (isClickableStation) {
+              element.addEventListener('click', () => setSelectedStationId(point.id))
+            }
+            const marker = new maplibregl.Marker({ element, anchor: 'center' })
               .setLngLat([point.lon, point.lat])
               .addTo(map)
             markers.push(marker)
@@ -718,14 +866,13 @@ function RouteMapCanvas({ data, variant }: { data: RouteMapData; variant: 'compa
           const bounds = routeBounds(data)
           if (bounds) {
             map.fitBounds(bounds, {
-              padding: variant === 'expanded' ? 72 : 34,
-              maxZoom: variant === 'expanded' ? 11 : 8,
+              padding: isExpanded ? 72 : 28,
+              maxZoom: isExpanded ? 11 : 7,
               duration: 0,
             })
           }
           map.resize()
         })
-        map.on('error', () => setStatus('failed'))
       } catch {
         if (!disposed) {
           setStatus('failed')
@@ -742,12 +889,20 @@ function RouteMapCanvas({ data, variant }: { data: RouteMapData; variant: 'compa
       mapRef.current?.remove()
       mapRef.current = null
     }
-  }, [data, dataKey, variant])
+  }, [data, dataKey, isExpanded, usesDefaultStyle])
 
   return (
-    <div className={cn('a2ui-map-shell', variant === 'expanded' && 'a2ui-map-shell-expanded')}>
-      <div ref={containerRef} className={cn('a2ui-maplibre-canvas', status !== 'idle' && 'opacity-0')} aria-label="Mapa interactivo de ruta" />
+    <div className={cn('a2ui-map-shell', isExpanded ? 'a2ui-map-shell-expanded' : 'a2ui-map-shell-compact')}>
+      <div ref={containerRef} className={cn('a2ui-maplibre-canvas', status !== 'idle' && 'opacity-0')} aria-label={isExpanded ? 'Mapa interactivo de ruta' : 'Vista previa de ruta'} />
+      {!isExpanded && usesDefaultStyle && status === 'idle' ? (
+        <a className="a2ui-map-attribution" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" aria-label="Atribución de OpenStreetMap">
+          © OSM
+        </a>
+      ) : null}
       {status !== 'idle' ? <StaticRouteMap data={data} /> : null}
+      {selectedStation ? (
+        <RouteMapStationDetails station={selectedStation} onClose={() => setSelectedStationId(null)} />
+      ) : null}
       {status === 'failed' ? (
         <span className="absolute left-3 top-3 rounded-md bg-surface px-2 py-1 text-xs font-medium text-muted-foreground shadow-sm">
           Vista estática
@@ -777,35 +932,37 @@ function StaticRouteMap({ data }: { data: RouteMapData }) {
   )
 }
 
-function RouteMapStationPanel({ data }: { data: RouteMapData }) {
-  const stations = data.stationPoints
+function RouteMapStationDetails({ station, onClose }: { station: RouteMapPoint; onClose: () => void }) {
+  const details = compactRows([
+    station.powerLabel ? [STATION_POWER_LABEL, station.powerLabel] : null,
+    station.distanceLabel ? ['Distancia', station.distanceLabel] : null,
+    station.detourLabel ? ['Desvío', station.detourLabel] : null,
+    station.capacityLabel ? ['Puestos', station.capacityLabel] : null,
+    station.priceLabel ? ['Precio', station.priceLabel] : null,
+  ])
+
   return (
-    <aside className="flex min-h-0 flex-col gap-3 border-t border-border p-4 md:border-l md:border-t-0">
-      <div className="flex flex-col gap-1">
-        <span className="text-sm font-semibold tracking-tight">Cargadores en ruta</span>
-        <span className="text-xs leading-5 text-muted-foreground">
-          {stations.length > 0 ? `${stations.length} estaciones trazadas cerca del corredor.` : 'Sin estaciones trazadas para este mapa.'}
-        </span>
+    <section className="a2ui-map-station-popover" aria-label="Detalle de estación">
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="break-words text-sm font-semibold tracking-tight">{station.label}</div>
+          <div className="mt-0.5 text-xs leading-5 text-muted-foreground">{station.roleLabel}</div>
+        </div>
+        <button type="button" className="rounded-md px-2 py-1 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground" onClick={onClose}>
+          Cerrar
+        </button>
       </div>
-      <div className="flex min-h-0 flex-col divide-y divide-border overflow-auto">
-        {stations.map((station, index) => (
-          <div key={station.id} className="flex gap-3 py-3 text-sm first:pt-0 last:pb-0">
-            <span className={cn(
-              'grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold',
-              station.kind === 'primary' ? 'bg-warning text-foreground' : 'bg-muted text-muted-foreground',
-            )}>
-              {index + 1}
-            </span>
-            <div className="min-w-0">
-              <div className="truncate font-semibold tracking-tight">{station.label}</div>
-              <div className="text-xs leading-5 text-muted-foreground">
-                {station.kind === 'primary' ? 'Parada principal' : 'Alternativa del corredor'}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </aside>
+      {details.length > 0 ? <MetricGridRows rows={details} /> : null}
+      {station.connectorLabels && station.connectorLabels.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {station.connectorLabels.map((connector) => (
+            <Badge key={connector} variant="secondary" className="rounded-full">
+              {connector}
+            </Badge>
+          ))}
+        </div>
+      ) : null}
+    </section>
   )
 }
 
@@ -892,6 +1049,15 @@ function stationMapPoint(item: Record<string, unknown>, kind: 'primary' | 'stati
     lat,
     lon,
     kind,
+    markerLabel: kind === 'primary' ? '1' : String(index + 1),
+    capacityLabel: stationCapacity(item),
+    evseRatioLabel: stationEvseRatio(item),
+    powerLabel: isKnownNumber(item.powerKw) ? metric(item.powerKw, 'kW') : '',
+    distanceLabel: isKnownNumber(item.distanceKm) ? metric(item.distanceKm, 'km') : '',
+    detourLabel: isKnownNumber(item.detourMin) ? metric(item.detourMin, 'min') : '',
+    priceLabel: stationPrice(item) === 'No disponible' ? '' : stationPrice(item),
+    connectorLabels: connectorLabels(item.connectorTypes),
+    roleLabel: kind === 'primary' ? 'Parada principal' : 'Alternativa del corredor',
   }
 }
 
@@ -937,22 +1103,8 @@ function mapStyleUrl() {
   return text(import.meta.env.VITE_KALMIO_MAP_STYLE_URL, '').trim()
 }
 
-function mapLibreStyle(): string | StyleSpecification {
-  const styleUrl = mapStyleUrl()
-  if (styleUrl) {
-    return styleUrl
-  }
-  return {
-    version: 8,
-    sources: {},
-    layers: [
-      {
-        id: 'background',
-        type: 'background',
-        paint: { 'background-color': '#eef4f1' },
-      },
-    ],
-  }
+function mapLibreStyle() {
+  return mapStyleUrl() || DEFAULT_MAP_STYLE_URL
 }
 
 function routeCenter(data: RouteMapData): CoordinateTuple {
@@ -1003,17 +1155,34 @@ function canUseWebGl() {
   }
 }
 
-function mapMarkerElement(point: RouteMapPoint) {
+function mapMarkerElement(point: RouteMapPoint, isClickable = false) {
   const element = document.createElement('div')
   element.className = `a2ui-map-marker a2ui-map-marker-${point.kind}`
+  if (isClickable) {
+    element.className += ' a2ui-map-marker-clickable'
+    element.setAttribute('role', 'button')
+    element.setAttribute('tabindex', '0')
+    element.setAttribute('aria-label', `Ver ${point.label}`)
+    element.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        element.click()
+      }
+    })
+  }
   element.title = point.label
   const dot = document.createElement('span')
   dot.className = 'a2ui-map-marker-dot'
+  dot.textContent = point.markerLabel ?? ''
   const label = document.createElement('span')
   label.className = 'a2ui-map-marker-label'
-  label.textContent = point.label
+  label.textContent = point.evseRatioLabel || point.capacityLabel || point.label
   element.append(dot, label)
   return element
+}
+
+function isStationMapPoint(point: RouteMapPoint) {
+  return point.kind === 'primary' || point.kind === 'station'
 }
 
 function schematicGeometry(data: RouteMapData): LineStringGeometry {
@@ -1066,10 +1235,10 @@ function ActionButtons({
       {actions.map((action, index) => {
         const target = actionTarget(action)
         const isDisabled = bool(action.disabled) || target === null
-        const isPrimary = text(action.priority, '') === 'primary' || (index === 0 && !isDisabled && !text(action.priority, ''))
+        const isPrimary = text(action.priority, '') === 'primary'
 
         return (
-          <div key={`${text(action.label)}-${index}`} className="flex min-w-0 flex-col gap-1">
+          <div key={`${text(action.label)}-${index}`} className={cn('flex min-w-0 flex-col gap-1', isPrimary && actions.length > 1 && 'sm:col-span-2')}>
             <Button
               type="button"
               disabled={isDisabled}
@@ -1144,18 +1313,19 @@ function safeHttpUrl(value: string) {
 
 function ErrorFallbackCard({ type, message }: { type: string; message: string }) {
   return (
-    <Card className="border-border bg-muted">
-      <CardHeader>
-        <CardTitle className="text-base">No puedo mostrar una parte de la respuesta</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-2 text-sm text-muted-foreground">
-        <p>{safeFallbackMessage(message)}</p>
-        <details className="text-xs">
-          <summary className="cursor-pointer font-medium text-body">Detalle para soporte</summary>
-          <code className="mt-1 block break-words">{type}</code>
-        </details>
-      </CardContent>
-    </Card>
+    <A2UICard
+      icon={AlertTriangle}
+      tone="neutral"
+      title="No puedo mostrar una parte de la respuesta"
+      subtitle="Esa parte se ocultó sin interrumpir la conversación."
+      contentClassName="flex flex-col gap-2 text-sm text-muted-foreground"
+    >
+      <p>{safeFallbackMessage(message)}</p>
+      <details className="text-xs">
+        <summary className="cursor-pointer font-medium text-body">Detalle para soporte</summary>
+        <code className="mt-1 block break-words">{type}</code>
+      </details>
+    </A2UICard>
   )
 }
 
@@ -1191,48 +1361,37 @@ function stationLabel(value: Record<string, unknown>) {
   return text(value.stationName ?? value.name, '')
 }
 
-function stationDetails(item: Record<string, unknown>) {
-  const title = stationTitle(item, 'Estación')
-  const station = stationLabel(item)
-  const stationDetail = station && station !== title ? `Estación: ${station}` : ''
-  const amenities = amenitySummary(item.amenities)
-  const capacity = stationCapacity(item)
-  const connectors = connectorLabels(item.connectorTypes)
-  const metricParts = [
-    isKnownNumber(item.powerKw) ? metric(item.powerKw, 'kW') : '',
-    stationPriceDetail(item),
-    isKnownNumber(item.distanceKm) ? metric(item.distanceKm, 'km') : '',
-    isKnownNumber(item.detourMin) ? `Desvío ${metric(item.detourMin, 'min')}` : '',
-    capacity ? `Capacidad trazada: ${capacity}` : '',
-    connectors.length > 0 ? `Conectores trazados: ${connectors.join(', ')}` : '',
-  ].filter(Boolean)
-  const metrics = isKnownNumber(item.powerKw)
-    ? metricParts.join(' · ')
-    : metric(item.deltaMin, 'min de diferencia')
-
-  return compactParts([stationDetail, metrics, amenities]).join(' · ')
-}
-
 function stationCapacity(item: Record<string, unknown>) {
+  const evseRatio = stationEvseRatio(item)
+  if (evseRatio) {
+    return `${evseRatio} puestos`
+  }
   const evses = knownNumber(item.availableEvses)
   if (evses !== null) {
-    return `${formatNumber(evses)} EVSEs`
+    return `${formatNumber(evses)} puestos`
   }
-  const connectors = knownNumber(item.connectorCount)
-  if (connectors !== null) {
-    return `${formatNumber(connectors)} conectores`
+  const totalEvses = stationTotalEvses(item)
+  if (totalEvses !== null) {
+    return `${formatNumber(totalEvses)} puestos`
   }
   return ''
 }
 
-function connectorLabels(value: unknown) {
-  return strings(value).map((item) => item.toUpperCase())
+function stationEvseRatio(item: Record<string, unknown>) {
+  const availableEvses = knownNumber(item.availableEvses)
+  const totalEvses = stationTotalEvses(item)
+  if (availableEvses === null || totalEvses === null) {
+    return ''
+  }
+  return `${formatNumber(availableEvses)}/${formatNumber(totalEvses)}`
 }
 
-function routeDetails(item: Record<string, unknown>) {
-  return isKnownNumber(item.powerKw)
-    ? `${metric(item.powerKw, 'kW')}${isKnownNumber(item.distanceKm) ? ` · ${metric(item.distanceKm, 'km')}` : ''}`
-    : metric(item.deltaMin, 'min de diferencia')
+function stationTotalEvses(item: Record<string, unknown>) {
+  return knownNumber(item.totalEvses)
+}
+
+function connectorLabels(value: unknown) {
+  return strings(value).map((item) => item.toUpperCase())
 }
 
 function pricePerKwh(value: unknown, currency: unknown = 'EUR') {
@@ -1261,9 +1420,11 @@ function stationPriceRow(item: Record<string, unknown>): [string, string] | null
   return value === 'No disponible' ? null : ['Precio', value]
 }
 
-function stationPriceDetail(item: Record<string, unknown>) {
-  const value = stationPrice(item)
-  return value === 'No disponible' ? '' : `Precio ${value}`
+function stationPriceListRow(item: Record<string, unknown>): [string, string] | null {
+  if (bool(item.priceIsEstimated)) {
+    return ['Precio', 'Sin verificar']
+  }
+  return stationPriceRow(item)
 }
 
 function priceNote(props: Record<string, unknown>) {
@@ -1271,6 +1432,31 @@ function priceNote(props: Record<string, unknown>) {
   return compactParts([
     comparedWith ? `Comparado con ${comparedWith}.` : '',
   ]).join(' ')
+}
+
+function uncertaintyText(value: unknown) {
+  const uncertainty = record(value)
+  if (!uncertainty) {
+    return ''
+  }
+  const body = text(uncertainty.text, '')
+  const source = dataSourceLabel(uncertainty.source)
+  const freshness = text(uncertainty.freshness, '')
+  return compactParts([body, source ? `Fuente: ${source}.` : '', freshness ? `Actualización: ${freshness}.` : '']).join(' ')
+}
+
+function dataSourceLabel(value: unknown) {
+  const source = text(value, '').trim().toLowerCase()
+  if (!source || source === 'demo' || source === 'sample') {
+    return ''
+  }
+  const labels: Record<string, string> = {
+    plan_route: 'planificador de ruta',
+    route_provider: 'proveedor de ruta',
+    authorized_chargers: 'datos autorizados de carga',
+    charger_import: 'datos autorizados de carga',
+  }
+  return labels[source] ?? text(value, '')
 }
 
 function compactRows(rows: Array<[string, string] | null>): Array<[string, string]> {
@@ -1344,11 +1530,6 @@ function amenityLabels(value: unknown, limit = 4) {
   const labels = unique.slice(0, limit).map((code) => AMENITY_LABELS[code] ?? humanizeAmenity(code))
   const hidden = unique.length - labels.length
   return hidden > 0 ? [...labels, `+${hidden} más`] : labels
-}
-
-function amenitySummary(value: unknown) {
-  const labels = amenityLabels(value, 3)
-  return labels.length > 0 ? `Servicios trazados: ${labels.join(', ')}` : ''
 }
 
 function normalizeAmenityCode(value: string) {
@@ -1438,7 +1619,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function safeFallbackMessage(message: string) {
   const normalized = message.toLowerCase()
   if (normalized.includes('a2ui') || normalized.includes('codex') || normalized.includes('json')) {
-    return 'He ocultado un bloque que no venía en un formato seguro. Puedes continuar corrigiendo la petición o reintentarla.'
+    return 'He ocultado una parte que no venía en un formato seguro. Puedes continuar corrigiendo la petición o reintentarla.'
   }
-  return message || 'He ocultado un bloque que no venía en un formato seguro.'
+  return message || 'He ocultado una parte que no venía en un formato seguro.'
 }

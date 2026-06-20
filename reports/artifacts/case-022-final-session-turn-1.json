@@ -1,0 +1,115 @@
+{
+  "messages": [
+    {
+      "version": "v0.9.1",
+      "createSurface": {
+        "surfaceId": "kalmio-chat",
+        "catalogId": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
+        "sendDataModel": true
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateComponents": {
+        "surfaceId": "kalmio-chat",
+        "components": [
+          {
+            "text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré.",
+            "id": "assistant-initial",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "chips": [
+              "Necesito cargar ya",
+              "Ruta con parada segura",
+              "Parada cerca del hotel",
+              "Priorizar servicios"
+            ],
+            "id": "preference-starters",
+            "component": "PreferenceChips",
+            "version": 1
+          },
+          {
+            "text": "Busca una parada con baños y cafetería",
+            "id": "user-b376563657",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "text": "Para buscar una parada con baños y cafetería, necesito saber la ubicación o la ruta donde quieres parar. ¿Estás en una ciudad concreta, cerca de algún sitio, o tienes un origen y destino?",
+            "id": "1",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "question": "¿Dónde necesitas la parada?",
+            "fields": [
+              {
+                "key": "ubicacion",
+                "label": "Ciudad, zona o coordenadas",
+                "type": "text",
+                "required": true
+              },
+              {
+                "key": "ruta_origen",
+                "label": "Origen (si es en ruta)",
+                "type": "text",
+                "required": false
+              },
+              {
+                "key": "ruta_destino",
+                "label": "Destino (si es en ruta)",
+                "type": "text",
+                "required": false
+              }
+            ],
+            "id": "2",
+            "component": "ClarifyingQuestionCard",
+            "version": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateDataModel": {
+        "surfaceId": "kalmio-chat",
+        "path": "/",
+        "value": {
+          "conversation": {
+            "surfaceId": "kalmio-chat",
+            "componentOrder": [
+              {
+                "id": "assistant-initial",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "preference-starters",
+                "component": "PreferenceChips"
+              },
+              {
+                "id": "user-b376563657",
+                "component": "UserMessage"
+              },
+              {
+                "id": "1",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "2",
+                "component": "ClarifyingQuestionCard"
+              }
+            ]
+          },
+          "facts": {
+            "locations": [],
+            "routes": [],
+            "stops": [],
+            "risks": []
+          }
+        }
+      }
+    }
+  ]
+}

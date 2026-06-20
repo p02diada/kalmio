@@ -1,0 +1,218 @@
+{
+  "messages": [
+    {
+      "version": "v0.9.1",
+      "createSurface": {
+        "surfaceId": "kalmio-chat",
+        "catalogId": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
+        "sendDataModel": true
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateComponents": {
+        "surfaceId": "kalmio-chat",
+        "components": [
+          {
+            "text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré.",
+            "id": "assistant-initial",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "chips": [
+              "Necesito cargar ya",
+              "Ruta con parada segura",
+              "Parada cerca del hotel",
+              "Priorizar servicios"
+            ],
+            "id": "preference-starters",
+            "component": "PreferenceChips",
+            "version": 1
+          },
+          {
+            "text": "Estoy cerca de Almansa",
+            "id": "user-a05a0005df",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "text": "Estos son los puntos de carga autorizados más cercanos a Almansa.",
+            "id": "msg1",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "name": "Consum Almansa",
+            "stationName": "Consum Almansa",
+            "powerKw": 100,
+            "distanceKm": 0.49,
+            "connectorTypes": [
+              "CCS2",
+              "TYPE2"
+            ],
+            "availableEvses": 0,
+            "address": "C. Corredera, 47, 02640 Almansa, Albacete, Es, 02640, ESP",
+            "lat": 38.865567,
+            "lon": -1.093625,
+            "amenities": [],
+            "detourMin": null,
+            "confidence": "media",
+            "id": "rec1",
+            "component": "RecommendedStopCard",
+            "version": 1
+          },
+          {
+            "stops": [
+              {
+                "name": "Repsol ES, CRED Almansa",
+                "stationName": "Repsol ES, CRED Almansa",
+                "powerKw": 50,
+                "distanceKm": 0.68,
+                "connectorTypes": [
+                  "CCS2",
+                  "CHAdeMO",
+                  "TYPE2"
+                ],
+                "availableEvses": 3,
+                "address": "AV. AYORA, 20, 02640, ESP",
+                "lat": 38.874667,
+                "lon": -1.100105,
+                "amenities": []
+              },
+              {
+                "name": "ALMANSA I",
+                "stationName": "ALMANSA I",
+                "powerKw": 51,
+                "distanceKm": 1.13,
+                "connectorTypes": [
+                  "CCS2"
+                ],
+                "availableEvses": 1,
+                "address": "Ctra. Madrid-Alicante 10, 02640, ESP",
+                "lat": 38.87887,
+                "lon": -1.10026,
+                "amenities": []
+              }
+            ],
+            "id": "alt1",
+            "component": "AlternativeStopsList",
+            "version": 1
+          },
+          {
+            "level": "medio",
+            "text": "Los datos proceden de puntos de carga autorizados importados. Confirma acceso final, tarifa y disponibilidad antes de depender de ellos. Los EVSEs mostrados son trazados, no disponibilidad en vivo.",
+            "id": "risk1",
+            "component": "RiskExplanationCard",
+            "version": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateDataModel": {
+        "surfaceId": "kalmio-chat",
+        "path": "/",
+        "value": {
+          "conversation": {
+            "surfaceId": "kalmio-chat",
+            "componentOrder": [
+              {
+                "id": "assistant-initial",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "preference-starters",
+                "component": "PreferenceChips"
+              },
+              {
+                "id": "user-a05a0005df",
+                "component": "UserMessage"
+              },
+              {
+                "id": "msg1",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "rec1",
+                "component": "RecommendedStopCard"
+              },
+              {
+                "id": "alt1",
+                "component": "AlternativeStopsList"
+              },
+              {
+                "id": "risk1",
+                "component": "RiskExplanationCard"
+              }
+            ]
+          },
+          "facts": {
+            "locations": [],
+            "routes": [],
+            "stops": [
+              {
+                "name": "Consum Almansa",
+                "stationName": "Consum Almansa",
+                "powerKw": 100,
+                "distanceKm": 0.49,
+                "connectorTypes": [
+                  "CCS2",
+                  "TYPE2"
+                ],
+                "availableEvses": 0,
+                "address": "C. Corredera, 47, 02640 Almansa, Albacete, Es, 02640, ESP",
+                "lat": 38.865567,
+                "lon": -1.093625,
+                "amenities": [],
+                "detourMin": null,
+                "confidence": "media",
+                "sourceComponentId": "rec1"
+              },
+              {
+                "name": "Repsol ES, CRED Almansa",
+                "stationName": "Repsol ES, CRED Almansa",
+                "powerKw": 50,
+                "distanceKm": 0.68,
+                "connectorTypes": [
+                  "CCS2",
+                  "CHAdeMO",
+                  "TYPE2"
+                ],
+                "availableEvses": 3,
+                "address": "AV. AYORA, 20, 02640, ESP",
+                "lat": 38.874667,
+                "lon": -1.100105,
+                "amenities": [],
+                "sourceComponentId": "alt1"
+              },
+              {
+                "name": "ALMANSA I",
+                "stationName": "ALMANSA I",
+                "powerKw": 51,
+                "distanceKm": 1.13,
+                "connectorTypes": [
+                  "CCS2"
+                ],
+                "availableEvses": 1,
+                "address": "Ctra. Madrid-Alicante 10, 02640, ESP",
+                "lat": 38.87887,
+                "lon": -1.10026,
+                "amenities": [],
+                "sourceComponentId": "alt1"
+              }
+            ],
+            "risks": [
+              {
+                "level": "medio",
+                "text": "Los datos proceden de puntos de carga autorizados importados. Confirma acceso final, tarifa y disponibilidad antes de depender de ellos. Los EVSEs mostrados son trazados, no disponibilidad en vivo.",
+                "sourceComponentId": "risk1"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

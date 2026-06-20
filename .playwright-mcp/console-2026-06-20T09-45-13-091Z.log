@@ -1,0 +1,13 @@
+[    3722ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5175/node_modules/.vite/deps/react-dom_client.js?v=8ad17695:14337
+[   44354ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5175/node_modules/.vite/deps/react-dom_client.js?v=8ad17695:14337
+[  105602ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5175/node_modules/.vite/deps/react-dom_client.js?v=8ad17695:14337
+[  139391ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5175/node_modules/.vite/deps/react-dom_client.js?v=8ad17695:14337
+[  229738ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5175/node_modules/.vite/deps/react-dom_client.js?v=8ad17695:14337
+[  273174ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5175/node_modules/.vite/deps/react-dom_client.js?v=8ad17695:14337
+[  297229ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5175/node_modules/.vite/deps/react-dom_client.js?v=8ad17695:14337
+[  339823ms] [ERROR] pt: AJAXError: Failed to fetch (0): https://tiles.openfreemap.org/styles/positron
+    at http://127.0.0.1:5175/node_modules/.vite/deps/maplibre-gl.js?v=ebbc7cfb:494:16
+    at Generator.throw (<anonymous>)
+    at a (http://127.0.0.1:5175/node_modules/.vite/deps/maplibre-gl.js?v=ebbc7cfb:37:17) @ http://127.0.0.1:5175/@vite/client:524
+[  339934ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5175/node_modules/.vite/deps/react-dom_client.js?v=8ad17695:14337
+[  359651ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5175/node_modules/.vite/deps/react-dom_client.js?v=8ad17695:14337

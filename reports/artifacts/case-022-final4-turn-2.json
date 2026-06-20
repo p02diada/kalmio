@@ -1,0 +1,179 @@
+{
+  "messages": [
+    {
+      "version": "v0.9.1",
+      "createSurface": {
+        "surfaceId": "kalmio-chat",
+        "catalogId": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
+        "sendDataModel": true
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateComponents": {
+        "surfaceId": "kalmio-chat",
+        "components": [
+          {
+            "text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré.",
+            "id": "assistant-initial",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "chips": [
+              "Necesito cargar ya",
+              "Ruta con parada segura",
+              "Parada cerca del hotel",
+              "Priorizar servicios"
+            ],
+            "id": "preference-starters",
+            "component": "PreferenceChips",
+            "version": 1
+          },
+          {
+            "text": "Estoy cerca de Almansa",
+            "id": "user-db3deaff42",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "destination": "Almansa",
+            "needsConfirmation": true,
+            "id": "destination-738cd5f4f0",
+            "component": "DestinationChargingCard",
+            "version": 1
+          },
+          {
+            "label": "Almansa",
+            "lat": 38.869,
+            "lon": -1.0971,
+            "precision": "approximate",
+            "context": "Destino usado para buscar paradas de carga",
+            "needsConfirmation": true,
+            "id": "location-detail-90a1c12c4a",
+            "component": "LocationDetailCard",
+            "version": 1
+          },
+          {
+            "stops": [
+              {
+                "name": "Consum Almansa",
+                "stationName": "Consum Almansa",
+                "powerKw": 100,
+                "distanceKm": 0.49
+              },
+              {
+                "name": "Repsol ES, CRED Almansa",
+                "stationName": "Repsol ES, CRED Almansa",
+                "powerKw": 50,
+                "distanceKm": 0.68
+              },
+              {
+                "name": "ALMANSA I",
+                "stationName": "ALMANSA I",
+                "powerKw": 51,
+                "distanceKm": 1.13
+              }
+            ],
+            "id": "stops-66104539c0",
+            "component": "AlternativeStopsList",
+            "version": 1
+          },
+          {
+            "level": "medio",
+            "text": "Muestro paradas con puntos de carga autorizados cerca del destino. Confirma acceso final, tarifa y disponibilidad antes de depender de ellos.",
+            "id": "risk-31a1013991",
+            "component": "RiskExplanationCard",
+            "version": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateDataModel": {
+        "surfaceId": "kalmio-chat",
+        "path": "/",
+        "value": {
+          "conversation": {
+            "surfaceId": "kalmio-chat",
+            "componentOrder": [
+              {
+                "id": "assistant-initial",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "preference-starters",
+                "component": "PreferenceChips"
+              },
+              {
+                "id": "user-db3deaff42",
+                "component": "UserMessage"
+              },
+              {
+                "id": "destination-738cd5f4f0",
+                "component": "DestinationChargingCard"
+              },
+              {
+                "id": "location-detail-90a1c12c4a",
+                "component": "LocationDetailCard"
+              },
+              {
+                "id": "stops-66104539c0",
+                "component": "AlternativeStopsList"
+              },
+              {
+                "id": "risk-31a1013991",
+                "component": "RiskExplanationCard"
+              }
+            ]
+          },
+          "facts": {
+            "locations": [
+              {
+                "label": "Almansa",
+                "lat": 38.869,
+                "lon": -1.0971,
+                "precision": "approximate",
+                "context": "Destino usado para buscar paradas de carga",
+                "needsConfirmation": true,
+                "sourceComponentId": "location-detail-90a1c12c4a"
+              }
+            ],
+            "routes": [],
+            "stops": [
+              {
+                "name": "Consum Almansa",
+                "stationName": "Consum Almansa",
+                "powerKw": 100,
+                "distanceKm": 0.49,
+                "sourceComponentId": "stops-66104539c0"
+              },
+              {
+                "name": "Repsol ES, CRED Almansa",
+                "stationName": "Repsol ES, CRED Almansa",
+                "powerKw": 50,
+                "distanceKm": 0.68,
+                "sourceComponentId": "stops-66104539c0"
+              },
+              {
+                "name": "ALMANSA I",
+                "stationName": "ALMANSA I",
+                "powerKw": 51,
+                "distanceKm": 1.13,
+                "sourceComponentId": "stops-66104539c0"
+              }
+            ],
+            "risks": [
+              {
+                "level": "medio",
+                "text": "Muestro paradas con puntos de carga autorizados cerca del destino. Confirma acceso final, tarifa y disponibilidad antes de depender de ellos.",
+                "sourceComponentId": "risk-31a1013991"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

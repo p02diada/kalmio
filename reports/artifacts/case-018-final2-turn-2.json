@@ -1,0 +1,253 @@
+{
+  "messages": [
+    {
+      "version": "v0.9.1",
+      "createSurface": {
+        "surfaceId": "kalmio-chat",
+        "catalogId": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
+        "sendDataModel": true
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateComponents": {
+        "surfaceId": "kalmio-chat",
+        "components": [
+          {
+            "text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré.",
+            "id": "assistant-initial",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "chips": [
+              "Necesito cargar ya",
+              "Ruta con parada segura",
+              "Parada cerca del hotel",
+              "Priorizar servicios"
+            ],
+            "id": "preference-starters",
+            "component": "PreferenceChips",
+            "version": 1
+          },
+          {
+            "text": "Voy a un hotel sin cargador, necesito cargar durante la estancia",
+            "id": "user-811241cfed",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "text": "¿En qué ciudad o zona estará el hotel? Dime la ciudad o el nombre del hotel y busco puntos de carga cerca para que puedas cargar durante la estancia.",
+            "id": "msg_1",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "text": "En Valencia centro",
+            "id": "user-255cb483f4",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "text": "He buscado puntos de carga cerca de Valencia centro. Como no tengo la dirección exacta de tu hotel, uso Valencia centro como aproximación. Estos son los resultados trazados:",
+            "id": "msg1",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "destination": "Valencia centro",
+            "needsConfirmation": true,
+            "id": "dest1",
+            "component": "DestinationChargingCard",
+            "version": 1
+          },
+          {
+            "name": "E-V-Valencia-091",
+            "stationName": "E-V-Valencia-091",
+            "address": "Roger de Lauria,10, 46002, ESP",
+            "lat": 39.46912,
+            "lon": -0.37463,
+            "distanceKm": 0.17,
+            "powerKw": 100,
+            "connectorTypes": [
+              "CCS2",
+              "TYPE2"
+            ],
+            "availableEvses": 4,
+            "amenities": [],
+            "detourMin": null,
+            "confidence": "media",
+            "id": "rec1",
+            "component": "RecommendedStopCard",
+            "version": 1
+          },
+          {
+            "stops": [
+              {
+                "name": "E-V-Valencia-076",
+                "stationName": "E-V-Valencia-076",
+                "address": "San Vicente Mártir,57, 46002, ESP",
+                "lat": 39.47008,
+                "lon": -0.37838,
+                "distanceKm": 0.18,
+                "powerKw": 22,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "availableEvses": 2
+              },
+              {
+                "name": "APK2 Lys",
+                "stationName": "APK2 Lys",
+                "address": "Calle del Pintor, Calle de Martínez Cubells 3, 46002, ESP",
+                "lat": 39.468331,
+                "lon": -0.374505,
+                "distanceKm": 0.23,
+                "powerKw": 7,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "availableEvses": 2
+              }
+            ],
+            "id": "alt1",
+            "component": "AlternativeStopsList",
+            "version": 1
+          },
+          {
+            "nights": null,
+            "city": "Valencia centro",
+            "recommendation": "Controlar carga cerca del alojamiento y confirmar antes de depender de ella.",
+            "id": "stay1",
+            "component": "StayPlanningCard",
+            "version": 1
+          },
+          {
+            "level": "medio",
+            "text": "Estos datos proceden de puntos de carga autorizados importados. Confirma acceso final, tarifa y disponibilidad antes de depender de ellos. Si me dices la dirección exacta de tu hotel, puedo refinar la búsqueda.",
+            "id": "risk1",
+            "component": "RiskExplanationCard",
+            "version": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateDataModel": {
+        "surfaceId": "kalmio-chat",
+        "path": "/",
+        "value": {
+          "conversation": {
+            "surfaceId": "kalmio-chat",
+            "componentOrder": [
+              {
+                "id": "assistant-initial",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "preference-starters",
+                "component": "PreferenceChips"
+              },
+              {
+                "id": "user-811241cfed",
+                "component": "UserMessage"
+              },
+              {
+                "id": "msg_1",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "user-255cb483f4",
+                "component": "UserMessage"
+              },
+              {
+                "id": "msg1",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "dest1",
+                "component": "DestinationChargingCard"
+              },
+              {
+                "id": "rec1",
+                "component": "RecommendedStopCard"
+              },
+              {
+                "id": "alt1",
+                "component": "AlternativeStopsList"
+              },
+              {
+                "id": "stay1",
+                "component": "StayPlanningCard"
+              },
+              {
+                "id": "risk1",
+                "component": "RiskExplanationCard"
+              }
+            ]
+          },
+          "facts": {
+            "locations": [],
+            "routes": [],
+            "stops": [
+              {
+                "name": "E-V-Valencia-091",
+                "stationName": "E-V-Valencia-091",
+                "address": "Roger de Lauria,10, 46002, ESP",
+                "lat": 39.46912,
+                "lon": -0.37463,
+                "distanceKm": 0.17,
+                "powerKw": 100,
+                "connectorTypes": [
+                  "CCS2",
+                  "TYPE2"
+                ],
+                "availableEvses": 4,
+                "amenities": [],
+                "detourMin": null,
+                "confidence": "media",
+                "sourceComponentId": "rec1"
+              },
+              {
+                "name": "E-V-Valencia-076",
+                "stationName": "E-V-Valencia-076",
+                "address": "San Vicente Mártir,57, 46002, ESP",
+                "lat": 39.47008,
+                "lon": -0.37838,
+                "distanceKm": 0.18,
+                "powerKw": 22,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "availableEvses": 2,
+                "sourceComponentId": "alt1"
+              },
+              {
+                "name": "APK2 Lys",
+                "stationName": "APK2 Lys",
+                "address": "Calle del Pintor, Calle de Martínez Cubells 3, 46002, ESP",
+                "lat": 39.468331,
+                "lon": -0.374505,
+                "distanceKm": 0.23,
+                "powerKw": 7,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "availableEvses": 2,
+                "sourceComponentId": "alt1"
+              }
+            ],
+            "risks": [
+              {
+                "level": "medio",
+                "text": "Estos datos proceden de puntos de carga autorizados importados. Confirma acceso final, tarifa y disponibilidad antes de depender de ellos. Si me dices la dirección exacta de tu hotel, puedo refinar la búsqueda.",
+                "sourceComponentId": "risk1"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

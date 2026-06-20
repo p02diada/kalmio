@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 
 import { A2UIRenderer } from '@/components/a2ui/a2ui-renderer'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import type { A2UIBlock } from '@/lib/a2ui/types'
 
@@ -20,15 +21,15 @@ const scenarios: ExperienceScenario[] = [
   {
     id: 'urgent',
     title: 'Carga urgente',
-    focus: 'El conductor necesita una decision rapida, margen claro y una forma segura de corregir ubicacion.',
+    focus: 'El conductor necesita una decisión rápida, margen claro y una forma segura de corregir la ubicación.',
     blocks: [
       block('urgent-user', 'UserMessage', {
         text: 'Estoy en Zaragoza con 9%, no conozco la zona y necesito cargar ya.',
       }),
       block('urgent-position-request', 'PositionRequestCard', {
         reason: 'urgent_charge',
-        title: 'Necesito tu ubicacion',
-        body: 'Comparte una ubicacion aproximada o escribe ciudad y carretera para buscar cargadores cercanos.',
+        title: 'Necesito tu ubicación',
+        body: 'Comparte una ubicación aproximada o escribe ciudad y carretera para buscar cargadores cercanos.',
         precision: 'approximate',
         manualFields: ['Ciudad', 'Coordenadas', 'Carretera o salida'],
       }),
@@ -37,12 +38,12 @@ const scenarios: ExperienceScenario[] = [
         lat: 41.6488,
         lon: -0.8891,
         precision: 'approximate',
-        context: 'Ubicacion aproximada usada para orientar la busqueda.',
+        context: 'Ubicación aproximada usada para orientar la búsqueda.',
         needsConfirmation: true,
       }),
       block('urgent-station', 'StationDetailCard', {
         title: 'Estación cercana',
-        stationName: 'Demo Charge Urgente',
+        stationName: 'Punto de muestra Zaragoza',
         address: 'Salida 245, entorno urbano',
         distanceKm: 7.6,
         powerKw: 150,
@@ -51,7 +52,7 @@ const scenarios: ExperienceScenario[] = [
       }),
       block('urgent-risk', 'RiskExplanationCard', {
         level: 'alto',
-        text: 'La bateria actual deja poco margen. Esta revision usa datos de muestra; no confirma disponibilidad ni precio.',
+        text: 'La batería actual deja poco margen. Esta revisión usa datos de muestra; no confirma disponibilidad ni precio.',
       }),
       block('urgent-actions', 'ActionButtons', {
         actions: [
@@ -70,28 +71,37 @@ const scenarios: ExperienceScenario[] = [
   },
   {
     id: 'route',
-    title: 'Ruta con parada comoda',
+    title: 'Ruta con parada cómoda',
     focus: 'La experiencia debe explicar la parada principal, alternativas, riesgo y coste sin obligar a interpretar un mapa.',
     blocks: [
       block('route-assistant', 'AssistantMessage', {
-        text: 'Voy a priorizar una parada con margen conservador y servicios utiles. Si faltan datos reales del proveedor, lo dire explicitamente.',
+        text: 'Voy a priorizar una parada con margen conservador y servicios útiles. Si faltan datos del proveedor, lo diré explícitamente.',
       }),
       block('route-trip', 'TripSummaryCard', {
         origin: { label: 'Zaragoza' },
         destination: { label: 'Valencia' },
         battery: 24,
         arrivalReservePercent: 12,
+        takeaway: 'Plan para llegar con al menos un 12% de batería.',
+        why: 'La parada se evalúa para evitar llegar al destino con margen demasiado justo.',
       }),
       block('route-summary', 'RouteSummaryCard', {
         distanceKm: 309,
         durationMin: 204,
         energyKwh: 55.6,
         arrivalBattery: 17,
+        takeaway: 'Llegada estimada con margen utilizable.',
+        uncertainty: {
+          level: 'medium',
+          text: 'La estimación depende del consumo real y del tráfico.',
+        },
       }),
       block('route-stop', 'StationDetailCard', {
         title: 'Estación recomendada',
-        stationName: 'Kalmio demo HPC',
-        address: 'Area de servicio La Plana',
+        stationName: 'Punto de muestra La Plana',
+        address: 'Área de servicio La Plana',
+        takeaway: 'Mejor equilibrio entre margen, desvío y servicios.',
+        why: 'Está dentro del corredor, tiene CCS2 y reduce el riesgo de llegar con batería baja.',
         powerKw: 150,
         pricePerKwhEur: 0.39,
         currency: 'EUR',
@@ -106,7 +116,7 @@ const scenarios: ExperienceScenario[] = [
         origin: { label: 'Zaragoza', lat: 41.6488, lon: -0.8891 },
         destination: { label: 'Valencia', lat: 39.4699, lon: -0.3763 },
         primaryStation: {
-          stationName: 'Kalmio demo HPC',
+          stationName: 'Punto de muestra La Plana',
           lat: 40.345,
           lon: -0.997,
           powerKw: 150,
@@ -115,7 +125,7 @@ const scenarios: ExperienceScenario[] = [
         },
         stations: [
           {
-            stationName: 'Demo Charge 1',
+            stationName: 'Punto de muestra Mudéjar',
             lat: 40.583,
             lon: -1.268,
             powerKw: 100,
@@ -123,11 +133,11 @@ const scenarios: ExperienceScenario[] = [
             connectorTypes: ['CCS2'],
           },
           {
-            stationName: 'Demo Charge 2',
+            stationName: 'Punto de muestra Teruel norte',
             lat: 40.421,
             lon: -1.094,
             powerKw: 60,
-            connectorCount: 3,
+            totalEvses: 3,
             connectorTypes: ['TYPE2'],
           },
         ],
@@ -142,15 +152,14 @@ const scenarios: ExperienceScenario[] = [
           ],
         },
         corridorRadiusKm: 25,
-        geometryPrecision: 'provider',
-        source: 'demo',
+        geometryPrecision: 'schematic',
       }),
       block('route-alternative-stations', 'StationList', {
         title: 'Otras estaciones viables',
         stations: [
           {
-            stationName: 'Demo Charge 1',
-            address: 'Area Mudejar',
+            stationName: 'Punto de muestra Mudéjar',
+            address: 'Área Mudéjar',
             powerKw: 100,
             pricePerKwhEur: 0.52,
             currency: 'EUR',
@@ -162,21 +171,23 @@ const scenarios: ExperienceScenario[] = [
             amenities: ['CAFE', 'TOILETS'],
           },
           {
-            stationName: 'Demo Charge 2',
+            stationName: 'Punto de muestra Teruel norte',
             address: 'Teruel norte',
             powerKw: 60,
             distanceKm: 147,
             detourMin: 9,
-            connectorCount: 3,
+            totalEvses: 3,
             connectorTypes: ['TYPE2'],
             amenities: ['SUPERMARKET', 'PARKING_LOT'],
           },
         ],
       }),
       block('route-cost', 'CostComparisonCard', {
-        best: { label: 'Kalmio demo HPC' },
+        best: { label: 'Punto de muestra La Plana' },
+        takeaway: 'Tarifa más baja entre las opciones verificadas.',
+        why: 'La comparación solo se muestra cuando ambas tarifas están verificadas.',
         pricePerKwhEur: 0.39,
-        comparedWith: { label: 'Demo Charge 1' },
+        comparedWith: { label: 'Punto de muestra Mudéjar' },
         comparedWithPricePerKwhEur: 0.52,
         savingPerKwhEur: 0.13,
         currency: 'EUR',
@@ -184,21 +195,21 @@ const scenarios: ExperienceScenario[] = [
       }),
       block('route-preferences', 'PreferenceChips', {
         title: 'Preferencias',
-        chips: ['Parada con restaurante', 'Menos desvio', 'Mas margen de bateria', 'Solo carga rapida'],
+        chips: ['Parada con restaurante', 'Menos desvío', 'Más margen de batería', 'Solo carga rápida'],
       }),
     ],
   },
   {
     id: 'destination',
     title: 'Llegada y estancia',
-    focus: 'El conductor no necesita una parada inmediata; necesita saber que falta, que debe confirmar y como queda el plan al llegar.',
+    focus: 'El conductor no necesita una parada inmediata; necesita saber qué falta, qué debe confirmar y cómo queda el plan al llegar.',
     blocks: [
       block('destination-user', 'UserMessage', {
-        text: 'Llegare a un hotel en Valencia y estare dos noches. Quiero cargar sin perder la manana.',
+        text: 'Llegaré a un hotel en Valencia y estaré dos noches. Quiero cargar sin perder la mañana.',
       }),
       block('destination-question', 'ClarifyingQuestionCard', {
-        question: 'Para cerrar el plan necesito un dato mas.',
-        fields: ['Direccion del hotel', 'Bateria al llegar', 'Conector'],
+        question: 'Para cerrar el plan necesito un dato más.',
+        fields: ['Dirección del hotel', 'Batería al llegar', 'Conector'],
       }),
       block('destination-location', 'PlaceDetailCard', {
         label: { label: 'Valencia centro' },
@@ -235,7 +246,7 @@ const scenarios: ExperienceScenario[] = [
           {
             label: 'Reservar plaza',
             disabled: true,
-            reason: 'La reserva no esta disponible en esta demo.',
+            reason: 'La reserva todavía no está disponible.',
           },
         ],
       }),
@@ -243,12 +254,12 @@ const scenarios: ExperienceScenario[] = [
   },
   {
     id: 'fallback',
-    title: 'Bloque no renderizable',
-    focus: 'La experiencia debe fallar de forma minima y permitir que el chat continue.',
+    title: 'Respuesta parcial',
+    focus: 'La experiencia debe fallar de forma mínima y permitir que el chat continúe.',
     blocks: [
       block('fallback-error', 'ErrorFallbackCard', {
-        originalType: 'DemoBrokenCard',
-        message: 'Bloque de demo no renderizable.',
+        originalType: 'BloqueDeMuestra',
+        message: 'Una parte de esta respuesta no se pudo mostrar.',
       }),
     ],
   },
@@ -258,7 +269,43 @@ const uniqueComponentTypes = Array.from(
   new Set(scenarios.flatMap((scenario) => scenario.blocks.map((item) => item.type))),
 )
 
+const componentCases = uniqueComponentTypes.map((type) => {
+  const scenario = scenarios.find((item) => item.blocks.some((blockItem) => blockItem.type === type))
+  const sample = scenario?.blocks.find((blockItem) => blockItem.type === type)
+
+  return {
+    id: String(type),
+    type: String(type),
+    scenarioTitle: scenario?.title ?? 'Sin escenario',
+    focus: componentFocus(String(type)),
+    block: sample ? { ...sample, id: `component-${sample.type}` } : block(`component-${type}`, type, {}),
+  }
+})
+
+function componentFocus(type: string) {
+  const focusByType: Record<string, string> = {
+    AssistantMessage: 'Debe sonar como copiloto: breve, honesto y sin convertir la respuesta en un panel técnico.',
+    UserMessage: 'Debe mantener claro qué dijo el conductor sin competir con la recomendación del asistente.',
+    TripSummaryCard: 'Debe confirmar origen, destino y margen sin parecer una tabla administrativa.',
+    RouteSummaryCard: 'Debe explicar esfuerzo, duración y llegada con números legibles en móvil.',
+    StationDetailCard: 'Debe ser la decisión principal: estación, margen útil y datos disponibles sin prometer disponibilidad.',
+    StationList: 'Debe permitir comparar alternativas rápido sin obligar a leer párrafos largos.',
+    RiskExplanationCard: 'Debe bajar ansiedad explicando incertidumbre concreta y el siguiente comportamiento seguro.',
+    CostComparisonCard: 'Debe mostrar ahorro solo cuando el precio está verificado y dejar clara la comparación.',
+    MapPreviewCard: 'Debe apoyar la ruta, no convertirse en la tarea principal del conductor.',
+    ActionButtons: 'Debe separar acción primaria, corrección y acciones bloqueadas sin ambigüedad.',
+    ClarifyingQuestionCard: 'Debe pedir el mínimo dato crítico y hacerlo parecer una continuación natural del chat.',
+    PositionRequestCard: 'Debe obtener ubicación con permiso explícito y ofrecer alternativa manual equivalente.',
+    PlaceDetailCard: 'Debe mostrar precisión y necesidad de confirmación sin exponer coordenadas como dato dominante.',
+    PreferenceChips: 'Debe ofrecer correcciones rápidas con textos que quepan y no desplacen el layout.',
+    ErrorFallbackCard: 'Debe fallar de forma tranquila: ocultar lo inseguro y mantener vivo el chat.',
+  }
+
+  return focusByType[type] ?? 'Bloque de respuesta renderizado de forma aislada para revisar encaje visual y estados.'
+}
+
 export function A2UIShowcasePage() {
+  const [viewMode, setViewMode] = useState<'components' | 'scenarios'>('scenarios')
   const [showTechnical, setShowTechnical] = useState(false)
   const [lastAction, setLastAction] = useState<string | null>(null)
   const blockCount = useMemo(
@@ -271,26 +318,46 @@ export function A2UIShowcasePage() {
       <div className="sticky top-0 z-10 -mx-6 border-b border-border bg-surface/95 px-6 py-3 backdrop-blur md:-mx-14 md:px-14">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="font-mono text-xs leading-4 text-muted-foreground">A2UI review surface</p>
-            <h1 className="text-2xl font-semibold tracking-normal">Revision de experiencia</h1>
+            <p className="font-mono text-xs leading-4 text-muted-foreground">Revisión de respuestas</p>
+            <h1 className="text-2xl font-semibold tracking-normal">Claridad de la experiencia</h1>
           </div>
           <Badge variant="secondary" className="shrink-0">
-            {uniqueComponentTypes.length} tipos
+            {showTechnical ? `${uniqueComponentTypes.length} tipos` : `${scenarios.length} escenarios`}
           </Badge>
         </div>
 
-        <div className="mt-3 flex items-center justify-between gap-3">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex rounded-full bg-muted p-1" aria-label="Modo de revisión">
+            <Button
+              type="button"
+              variant={viewMode === 'components' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 rounded-full px-3"
+              onClick={() => setViewMode('components')}
+            >
+              Componentes
+            </Button>
+            <Button
+              type="button"
+              variant={viewMode === 'scenarios' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 rounded-full px-3"
+              onClick={() => setViewMode('scenarios')}
+            >
+              Escenarios
+            </Button>
+          </div>
           <label className="flex min-w-0 items-center gap-2 text-xs leading-5 text-muted-foreground">
             <Switch
-              aria-label="Mostrar metadatos A2UI"
+              aria-label="Mostrar datos técnicos"
               checked={showTechnical}
               onCheckedChange={setShowTechnical}
             />
-            Mostrar IDs tecnicos
+            Mostrar datos técnicos
           </label>
           {lastAction ? (
             <span className="truncate text-right text-xs leading-5 text-muted-foreground">
-              Accion: {lastAction}
+              Acción: {lastAction}
             </span>
           ) : null}
         </div>
@@ -300,70 +367,111 @@ export function A2UIShowcasePage() {
         Datos de muestra para revisar flujo, responsive y claridad. No representan disponibilidad, precio, estaciones reales ni una ruta calculada.
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        {scenarios.map((scenario) => (
+      <div className="flex flex-wrap gap-2">
+        {(viewMode === 'components' ? componentCases : scenarios).map((item) => (
           <a
-            key={scenario.id}
-            href={`#${scenario.id}`}
-            className="rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+            key={item.id}
+            href={`#${item.id}`}
+            className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
           >
-            {scenario.title}
+            {'type' in item ? item.type : item.title}
           </a>
         ))}
       </div>
 
-      <div className="flex flex-col gap-8">
-        {scenarios.map((scenario, index) => (
-          <article id={scenario.id} key={scenario.id} className="scroll-mt-24 space-y-3 border-t border-border pt-5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 space-y-1">
-                <p className="font-mono text-xs leading-4 text-muted-foreground">
-                  Escenario {index + 1}
-                </p>
-                <h2 className="text-xl font-semibold tracking-normal">{scenario.title}</h2>
-                <p className="text-sm leading-6 text-body">{scenario.focus}</p>
+      {viewMode === 'components' ? (
+        <div className="flex flex-col gap-7">
+          {componentCases.map((item) => (
+            <article id={item.id} key={item.id} className="scroll-mt-28 space-y-3 border-t border-border pt-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 space-y-1">
+                  <p className="font-mono text-xs leading-4 text-muted-foreground">{item.scenarioTitle}</p>
+                  <h2 className="break-words text-xl font-semibold tracking-normal">{item.type}</h2>
+                  <p className="text-sm leading-6 text-body">{item.focus}</p>
+                </div>
+                <Badge variant="secondary" className="shrink-0 font-mono text-[0.68rem]">
+                  Vista aislada
+                </Badge>
               </div>
-              <Badge variant="secondary" className="shrink-0">
-                {scenario.blocks.length} bloques
-              </Badge>
-            </div>
 
-            {showTechnical ? (
-              <div className="flex flex-wrap gap-1.5">
-                {scenario.blocks.map((item) => (
-                  <Badge key={item.id} variant="secondary" className="font-mono text-[0.68rem]">
-                    {item.type}
-                  </Badge>
-                ))}
-              </div>
-            ) : null}
+              {showTechnical ? (
+                <Badge variant="secondary" className="font-mono text-[0.68rem]">
+                  {item.block.id}
+                </Badge>
+              ) : null}
 
-            <A2UIRenderer
-              blocks={scenario.blocks}
-              onChipClick={(value) => setLastAction(`chip:${value}`)}
-              onActionEvent={(name) => setLastAction(`event:${name}`)}
-              onPositionSubmit={(value) => setLastAction(`position:${value}`)}
-              onManualPositionRequest={() => setLastAction('manual-position')}
-            />
-          </article>
-        ))}
-      </div>
-
-      <div className="border-t border-border pt-4">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold">Cobertura del catalogo</p>
-          <span className="text-xs text-muted-foreground">
-            {blockCount} bloques / {uniqueComponentTypes.length} tipos
-          </span>
-        </div>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {uniqueComponentTypes.map((type) => (
-            <Badge key={type} variant="secondary" className="font-mono text-[0.68rem]">
-              {type}
-            </Badge>
+              <A2UIRenderer
+                blocks={[item.block]}
+                onChipClick={(value) => setLastAction(`chip:${value}`)}
+                onActionEvent={(name) => setLastAction(`event:${name}`)}
+                onPositionSubmit={(value) => setLastAction(`position:${value}`)}
+                onManualPositionRequest={() => setLastAction('manual-position')}
+              />
+            </article>
           ))}
         </div>
-      </div>
+      ) : (
+        <div className="flex flex-col gap-8">
+          {scenarios.map((scenario, index) => (
+            <article id={scenario.id} key={scenario.id} className="scroll-mt-28 space-y-3 border-t border-border pt-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 space-y-1">
+                  <p className="font-mono text-xs leading-4 text-muted-foreground">
+                    Escenario {index + 1}
+                  </p>
+                  <h2 className="text-xl font-semibold tracking-normal">{scenario.title}</h2>
+                  <p className="text-sm leading-6 text-body">{scenario.focus}</p>
+                </div>
+                <Badge variant="secondary" className="shrink-0">
+                  {showTechnical
+                    ? countLabel(scenario.blocks.length, 'bloque', 'bloques')
+                    : countLabel(scenario.blocks.length, 'parte', 'partes')}
+                </Badge>
+              </div>
+
+              {showTechnical ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {scenario.blocks.map((item) => (
+                    <Badge key={item.id} variant="secondary" className="font-mono text-[0.68rem]">
+                      {item.type}
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
+
+              <A2UIRenderer
+                blocks={scenario.blocks}
+                onChipClick={(value) => setLastAction(`chip:${value}`)}
+                onActionEvent={(name) => setLastAction(`event:${name}`)}
+                onPositionSubmit={(value) => setLastAction(`position:${value}`)}
+                onManualPositionRequest={() => setLastAction('manual-position')}
+              />
+            </article>
+          ))}
+        </div>
+      )}
+
+      {showTechnical ? (
+        <div className="border-t border-border pt-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold">Cobertura del catálogo</p>
+            <span className="text-xs text-muted-foreground">
+              {blockCount} bloques / {uniqueComponentTypes.length} tipos
+            </span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {uniqueComponentTypes.map((type) => (
+              <Badge key={type} variant="secondary" className="font-mono text-[0.68rem]">
+                {type}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </section>
   )
+}
+
+function countLabel(count: number, singular: string, plural: string) {
+  return `${count} ${count === 1 ? singular : plural}`
 }

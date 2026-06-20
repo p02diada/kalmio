@@ -1,0 +1,230 @@
+{
+  "messages": [
+    {
+      "version": "v0.9.1",
+      "createSurface": {
+        "surfaceId": "kalmio-chat",
+        "catalogId": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
+        "sendDataModel": true
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateComponents": {
+        "surfaceId": "kalmio-chat",
+        "components": [
+          {
+            "text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré.",
+            "id": "assistant-initial",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "chips": [
+              "Necesito cargar ya",
+              "Ruta con parada segura",
+              "Parada cerca del hotel",
+              "Priorizar servicios"
+            ],
+            "id": "preference-starters",
+            "component": "PreferenceChips",
+            "version": 1
+          },
+          {
+            "text": "No quiero cargar en sitios solitarios de noche",
+            "id": "user-7ad6083e70",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "text": "Entendido, evitar sitios solitarios de noche. ¿Para qué ubicación o ruta necesitas buscar puntos de carga? Dime ciudad, zona o coordenadas donde estarás.",
+            "id": "msg1",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "text": "Estoy en Valencia centro",
+            "id": "user-ae053d058c",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "text": "He buscado puntos de carga autorizados en Valencia centro. Ten en cuenta que Kalmio no valida seguridad, iluminación ni afluencia en vivo; al llegar de noche, verifica el entorno por tu cuenta.",
+            "id": "msg1",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "level": "medio",
+            "text": "No validamos seguridad, vigilancia ni actividad en los puntos mostrados. Confirma el entorno al llegar de noche.",
+            "id": "risk1",
+            "component": "RiskExplanationCard",
+            "version": 1
+          },
+          {
+            "name": "E-V-Valencia-091",
+            "stationName": "E-V-Valencia-091",
+            "address": "Roger de Lauria,10, 46002, ESP",
+            "distanceKm": 0.17,
+            "powerKw": 100,
+            "connectorTypes": [
+              "CCS2",
+              "TYPE2"
+            ],
+            "availableEvses": 4,
+            "lat": 39.46912,
+            "lon": -0.37463,
+            "amenities": [],
+            "detourMin": null,
+            "confidence": "media",
+            "id": "rec1",
+            "component": "RecommendedStopCard",
+            "version": 1
+          },
+          {
+            "stops": [
+              {
+                "name": "E-V-Valencia-076",
+                "stationName": "E-V-Valencia-076",
+                "address": "San Vicente Mártir,57, 46002, ESP",
+                "distanceKm": 0.18,
+                "powerKw": 22,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "availableEvses": 2,
+                "lat": 39.47008,
+                "lon": -0.37838
+              },
+              {
+                "name": "APK2 Lys",
+                "stationName": "APK2 Lys",
+                "address": "Calle del Pintor, Calle de Martínez Cubells 3, 46002, ESP",
+                "distanceKm": 0.23,
+                "powerKw": 7,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "availableEvses": 2,
+                "lat": 39.468331,
+                "lon": -0.374505
+              }
+            ],
+            "id": "alt1",
+            "component": "AlternativeStopsList",
+            "version": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateDataModel": {
+        "surfaceId": "kalmio-chat",
+        "path": "/",
+        "value": {
+          "conversation": {
+            "surfaceId": "kalmio-chat",
+            "componentOrder": [
+              {
+                "id": "assistant-initial",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "preference-starters",
+                "component": "PreferenceChips"
+              },
+              {
+                "id": "user-7ad6083e70",
+                "component": "UserMessage"
+              },
+              {
+                "id": "msg1",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "user-ae053d058c",
+                "component": "UserMessage"
+              },
+              {
+                "id": "msg1",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "risk1",
+                "component": "RiskExplanationCard"
+              },
+              {
+                "id": "rec1",
+                "component": "RecommendedStopCard"
+              },
+              {
+                "id": "alt1",
+                "component": "AlternativeStopsList"
+              }
+            ]
+          },
+          "facts": {
+            "locations": [],
+            "routes": [],
+            "stops": [
+              {
+                "name": "E-V-Valencia-091",
+                "stationName": "E-V-Valencia-091",
+                "address": "Roger de Lauria,10, 46002, ESP",
+                "distanceKm": 0.17,
+                "powerKw": 100,
+                "connectorTypes": [
+                  "CCS2",
+                  "TYPE2"
+                ],
+                "availableEvses": 4,
+                "lat": 39.46912,
+                "lon": -0.37463,
+                "amenities": [],
+                "detourMin": null,
+                "confidence": "media",
+                "sourceComponentId": "rec1"
+              },
+              {
+                "name": "E-V-Valencia-076",
+                "stationName": "E-V-Valencia-076",
+                "address": "San Vicente Mártir,57, 46002, ESP",
+                "distanceKm": 0.18,
+                "powerKw": 22,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "availableEvses": 2,
+                "lat": 39.47008,
+                "lon": -0.37838,
+                "sourceComponentId": "alt1"
+              },
+              {
+                "name": "APK2 Lys",
+                "stationName": "APK2 Lys",
+                "address": "Calle del Pintor, Calle de Martínez Cubells 3, 46002, ESP",
+                "distanceKm": 0.23,
+                "powerKw": 7,
+                "connectorTypes": [
+                  "TYPE2"
+                ],
+                "availableEvses": 2,
+                "lat": 39.468331,
+                "lon": -0.374505,
+                "sourceComponentId": "alt1"
+              }
+            ],
+            "risks": [
+              {
+                "level": "medio",
+                "text": "No validamos seguridad, vigilancia ni actividad en los puntos mostrados. Confirma el entorno al llegar de noche.",
+                "sourceComponentId": "risk1"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

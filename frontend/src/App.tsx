@@ -167,7 +167,7 @@ function DesktopSidebar({ pathname }: { pathname: string }) {
                 </span>
                 <span className="flex flex-col gap-0.5 leading-none">
                   <span className="font-semibold">Kalmio</span>
-                  <span className="text-xs text-sidebar-foreground/70">EV assistant</span>
+                  <span className="text-xs text-sidebar-foreground/70">Asistente de viaje</span>
                 </span>
               </Link>
             </SidebarMenuButton>

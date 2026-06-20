@@ -1,0 +1,105 @@
+{
+  "messages": [
+    {
+      "version": "v0.9.1",
+      "createSurface": {
+        "surfaceId": "kalmio-chat",
+        "catalogId": "https://kalmio.app/a2ui/catalogs/ev-assistant/v1/catalog.json",
+        "sendDataModel": true
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateComponents": {
+        "surfaceId": "kalmio-chat",
+        "components": [
+          {
+            "text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré.",
+            "id": "assistant-initial",
+            "component": "AssistantMessage",
+            "version": 1
+          },
+          {
+            "chips": [
+              "Necesito cargar ya",
+              "Ruta con parada segura",
+              "Parada cerca del hotel",
+              "Priorizar servicios"
+            ],
+            "id": "preference-starters",
+            "component": "PreferenceChips",
+            "version": 1
+          },
+          {
+            "text": "Estoy en carretera con 18%, no quiero desviarme mucho",
+            "id": "user-3fc421196b",
+            "component": "UserMessage",
+            "version": 1
+          },
+          {
+            "question": "¿Por qué carretera vas y cuál es tu zona actual o destino? Así busco puntos de carga con poco desvío.",
+            "fields": [
+              {
+                "key": "carretera_o_zona_actual",
+                "label": "Carretera o zona actual",
+                "type": "text",
+                "required": true
+              },
+              {
+                "key": "destino",
+                "label": "Destino (si lo tienes)",
+                "type": "text",
+                "required": false
+              },
+              {
+                "key": "coordenadas",
+                "label": "Coordenadas (opcional)",
+                "type": "text",
+                "required": false
+              }
+            ],
+            "id": "1",
+            "component": "ClarifyingQuestionCard",
+            "version": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "v0.9.1",
+      "updateDataModel": {
+        "surfaceId": "kalmio-chat",
+        "path": "/",
+        "value": {
+          "conversation": {
+            "surfaceId": "kalmio-chat",
+            "componentOrder": [
+              {
+                "id": "assistant-initial",
+                "component": "AssistantMessage"
+              },
+              {
+                "id": "preference-starters",
+                "component": "PreferenceChips"
+              },
+              {
+                "id": "user-3fc421196b",
+                "component": "UserMessage"
+              },
+              {
+                "id": "1",
+                "component": "ClarifyingQuestionCard"
+              }
+            ]
+          },
+          "facts": {
+            "locations": [],
+            "routes": [],
+            "stops": [],
+            "risks": []
+          }
+        }
+      }
+    }
+  ]
+}

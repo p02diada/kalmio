@@ -1,0 +1,63 @@
+{
+  "ready": {
+    "status": "ready",
+    "service": "kalmio-backend",
+    "time": "2026-06-16T01:53:21.654445+00:00",
+    "checks": [
+      {
+        "name": "database",
+        "ok": true
+      },
+      {
+        "name": "migrations",
+        "ok": true
+      },
+      {
+        "name": "route_provider",
+        "ok": true,
+        "detail": {
+          "provider": "osrm"
+        }
+      },
+      {
+        "name": "authorized_charger_data",
+        "ok": true,
+        "detail": {
+          "stations": 13541
+        }
+      }
+    ]
+  },
+  "turns": [
+    {
+      "idx": 1,
+      "input": "No quiero cargar en sitios solitarios de noche",
+      "status": 200,
+      "components": [
+        "AssistantMessage",
+        "PreferenceChips",
+        "UserMessage",
+        "AssistantMessage",
+        "RiskExplanationCard"
+      ],
+      "visible_text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Necesito cargar ya Ruta con parada segura Parada cerca del hotel Priorizar servicios preference-starters PreferenceChips  No quiero cargar en sitios solitarios de noche user-f92313a483 UserMessage  No he podido cerrar una respuesta fiable con los datos validados. No voy a completar estaciones, coordenadas, precios ni disponibilidad por mi cuenta. assistant-8cc28fcbee AssistantMessage  medio No he podido completar esta respuesta con fiabilidad. Reintenta con menos datos ambiguos o corrige origen, destino, batería y conector. risk-df6c9b853a RiskExplanationCard "
+    },
+    {
+      "idx": 2,
+      "input": "Estoy en Valencia centro",
+      "status": 200,
+      "components": [
+        "AssistantMessage",
+        "PreferenceChips",
+        "UserMessage",
+        "AssistantMessage",
+        "RiskExplanationCard",
+        "UserMessage",
+        "AssistantMessage",
+        "RiskExplanationCard"
+      ],
+      "visible_text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Necesito cargar ya Ruta con parada segura Parada cerca del hotel Priorizar servicios preference-starters PreferenceChips  No quiero cargar en sitios solitarios de noche user-f92313a483 UserMessage  No he podido cerrar una respuesta fiable con los datos validados. No voy a completar estaciones, coordenadas, precios ni disponibilidad por mi cuenta. assistant-8cc28fcbee AssistantMessage  medio No he podido completar esta respuesta con fiabilidad. Reintenta con menos datos ambiguos o corrige origen, destino, batería y conector. risk-df6c9b853a RiskExplanationCard  Estoy en Valencia centro user-47352682d0 UserMessage  No he podido cerrar una respuesta fiable con los datos validados. No voy a completar estaciones, coordenadas, precios ni disponibilidad por mi cuenta. assistant-1008b0576d AssistantMessage  medio No he podido completar esta respuesta con fiabilidad. Reintenta con menos datos ambiguos o corrige origen, destino, batería y conector. risk-a28ab91a4e RiskExplanationCard "
+    }
+  ],
+  "delete_status": 200
+}

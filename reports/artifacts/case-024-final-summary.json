@@ -1,0 +1,50 @@
+{
+  "ready": {
+    "status": "ready",
+    "service": "kalmio-backend",
+    "time": "2026-06-16T02:04:20.960579+00:00",
+    "checks": [
+      {
+        "name": "database",
+        "ok": true
+      },
+      {
+        "name": "migrations",
+        "ok": true
+      },
+      {
+        "name": "route_provider",
+        "ok": true,
+        "detail": {
+          "provider": "osrm"
+        }
+      },
+      {
+        "name": "authorized_charger_data",
+        "ok": true,
+        "detail": {
+          "stations": 13541
+        }
+      }
+    ]
+  },
+  "turns": [
+    {
+      "idx": 1,
+      "input": "Prefiero desviarme 10 minutos si el sitio es más cómodo. Voy de Madrid a Valencia con 60%",
+      "status": 200,
+      "components": [
+        "AssistantMessage",
+        "PreferenceChips",
+        "UserMessage",
+        "AssistantMessage",
+        "RouteSummaryCard",
+        "RecommendedStopCard",
+        "RiskExplanationCard",
+        "AlternativeStopsList"
+      ],
+      "visible_text": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Necesito cargar ya Ruta con parada segura Parada cerca del hotel Priorizar servicios preference-starters PreferenceChips  Prefiero desviarme 10 minutos si el sitio es más cómodo. Voy de Madrid a Valencia con 60% user-b13bdd0e45 UserMessage  Perfecto, tienes la ruta de Madrid a Valencia con 356,7 km y unos 4 horas de viaje. Como no tengo datos de tu autonomía ni consumo, no puedo calcular la batería de llegada ni optimizar paradas, pero aquí tienes una parada de carga en el corredor con buenos servicios. msg1 AssistantMessage  Madrid Valencia     route1 RouteSummaryCard  Moya Hub Honrubia Moya Hub Honrubia      HOTEL RESTAURANT PARKING_LOT FUEL_STATION WIFI CAFE SUPERMARKET NATURE   media Punto de carga en el corredor Alta potencia Disponibilidad declarada Hub grande Dato antiguo Fiabilidad ponderada Servicios cercanos stop1 RecommendedStopCard  medio Sin datos de autonomía ni consumo, no puedo validar la batería de llegada ni la reserva. Cargar en esta parada te ayudará a recuperar margen operativo, pero no está garantizado. Te recomiendo confirmar disponibilidad antes de desviarte. risk1 RiskExplanationCard  Aparcamiento CTM Aparcamiento CTM      HOTEL RESTAURANT CAFE RECREATION_AREA BUS_STOP TAXI_STAND CARPOOL_PARKING FUEL_STATION   media Punto de carga en el corredor Alta potencia Disponibilidad declarada Hub grande Dato antiguo Fiabilidad ponderada Servicios cercanos V-VALENCIA-022-2 V-VALENCIA-022-2      SUPERMARKET MALL SPORT BUS_STOP PARKING_LOT FUEL_STATION RESTAURANT CAFE HOTEL WIFI   media Punto de carga en el corredor Disponibilidad declarada Hub grande Dato antiguo Fiabilidad ponderada Servicios cercanos alt1 AlternativeStopsList "
+    }
+  ],
+  "delete_status": 200
+}
