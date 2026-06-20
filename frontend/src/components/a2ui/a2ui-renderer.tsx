@@ -16,6 +16,7 @@ import { Component, type ReactNode, useEffect, useMemo, useRef, useState } from 
 import { createPortal } from 'react-dom'
 import type { Map as MapLibreMap, Marker as MapLibreMarker } from 'maplibre-gl'
 
+import { StationConnectorBadge } from '@/components/a2ui/station-connector-badge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -496,12 +497,7 @@ function StationDetailCard({ block }: { block: A2UIBlock }) {
           </span>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {connectors.map((connector) => (
-              <span
-                key={connector}
-                className="max-w-full rounded-full bg-primary px-2 py-1 text-caption font-semibold leading-4 text-primary-foreground [overflow-wrap:anywhere]"
-              >
-                {connector}
-              </span>
+              <StationConnectorBadge key={connector} connector={connector} />
             ))}
           </div>
         </div>
@@ -596,7 +592,7 @@ function StationListCard({ title, stations }: { title: string; stations: RecordL
       ) : (
         <ol className="flex flex-col gap-2">
           {stations.map((station, index) => (
-            <StationListItem key={`${stationTitle(station, 'Estación')}-${index}`} station={station} index={index} />
+            <StationListItem key={`${stationTitle(station, 'Estación')}-${index}`} station={station} />
           ))}
         </ol>
       )}
@@ -604,73 +600,98 @@ function StationListCard({ title, stations }: { title: string; stations: RecordL
   )
 }
 
-function StationListItem({ station, index }: { station: Record<string, unknown>; index: number }) {
+function StationListItem({ station }: { station: Record<string, unknown> }) {
   const address = text(station.address, '')
   const connectors = connectorLabels(station.connectorTypes)
   const amenities = amenityLabels(station.amenities)
-  const metrics = compactRows([
-    isKnownNumber(station.powerKw) ? [STATION_POWER_LABEL, metric(station.powerKw, 'kW')] : null,
+  const power = isKnownNumber(station.powerKw) ? metric(station.powerKw, 'kW') : ''
+  const capacity = stationListCapacity(station)
+  const comparisonMetrics = compactRows([
     isKnownNumber(station.detourMin) ? ['Desvío', metric(station.detourMin, 'min')] : null,
     isKnownNumber(station.distanceKm) ? ['Distancia', metric(station.distanceKm, 'km')] : null,
     stationPriceListRow(station),
-    stationCapacity(station) ? ['Puestos', stationCapacity(station)] : null,
-  ])
+  ]).slice(0, 3)
 
   return (
-    <li className="rounded-md bg-muted px-3 py-3">
-      <div className="flex min-w-0 items-start gap-3">
-        <span className="grid size-7 shrink-0 place-items-center rounded-full bg-surface text-xs font-semibold text-foreground">
-          {index + 1}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 flex-col gap-1">
-            <div className="min-w-0">
-              <div className="break-words text-sm font-semibold leading-5 tracking-tight text-foreground">
-                {stationTitle(station, 'Estación')}
+    <li className="rounded-md border border-border bg-muted px-2.5 py-2">
+      <div className="min-w-0">
+        <div className="flex min-w-0 items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="break-words text-sm font-semibold leading-5 tracking-tight text-foreground [overflow-wrap:anywhere]">
+              {stationTitle(station, 'Estación')}
+            </div>
+            {address ? (
+              <div className="mt-0.5 break-words text-caption font-medium leading-4 text-muted-foreground [overflow-wrap:anywhere]">
+                {address}
               </div>
-              {address ? (
-                <div className="mt-0.5 break-words text-caption font-medium leading-4 text-muted-foreground">
-                  {address}
-                </div>
-              ) : null}
-            </div>
+            ) : null}
           </div>
-          {metrics.length > 0 ? (
-            <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(min(7rem,100%),1fr))] gap-1.5">
-              {metrics.map(([label, value]) => (
-                <StationMetric key={label} label={label} value={value} />
-              ))}
-            </div>
-          ) : null}
-          {connectors.length > 0 || amenities.length > 0 ? (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {connectors.length > 0 ? <StationTagList label="Conectores" values={connectors} strong /> : null}
-              {amenities.length > 0 ? <StationTagList label="Servicios" values={amenities} /> : null}
+          {power || capacity ? (
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              {power ? (
+                <span className="rounded-sm bg-surface px-1.5 py-0.5 text-caption font-semibold leading-4 text-foreground">
+                  {power}
+                </span>
+              ) : null}
+              {capacity ? (
+                <span className="rounded-sm bg-surface px-1.5 py-0.5 text-[0.6875rem] font-semibold leading-3 text-body">
+                  <span className="sr-only">Puestos </span>
+                  {capacity}
+                </span>
+              ) : null}
             </div>
           ) : null}
         </div>
+        {comparisonMetrics.length > 0 ? (
+          <div className={cn('mt-2 grid overflow-hidden rounded-md border border-border bg-border', comparisonMetrics.length === 2 ? 'grid-cols-2' : 'grid-cols-3')}>
+            {comparisonMetrics.map(([label, value]) => (
+              <StationListMetric key={label} label={label} value={value} />
+            ))}
+          </div>
+        ) : null}
+        {connectors.length > 0 || amenities.length > 0 ? (
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 overflow-hidden text-caption font-medium leading-4 text-muted-foreground">
+            {connectors.length > 0 ? <StationConnectorBadges connectors={connectors} /> : null}
+            {connectors.length > 0 && amenities.length > 0 ? <span aria-hidden="true">·</span> : null}
+            {amenities.length > 0 ? <StationListInlineValues label="Servicios" values={amenities} /> : null}
+          </div>
+        ) : null}
       </div>
     </li>
   )
 }
 
-function StationMetric({ label, value }: { label: string; value: string }) {
+function StationListMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-sm bg-surface px-2 py-1.5">
-      <span className="block whitespace-normal text-caption font-medium leading-4 text-muted-foreground [overflow-wrap:anywhere]">{label}</span>
-      <span className="block break-words text-compact font-semibold leading-5 tracking-tight text-foreground [overflow-wrap:anywhere]">{value}</span>
+    <div className="min-w-0 bg-surface px-1.5 py-1.5">
+      <span className="block text-[0.6875rem] font-medium leading-3 text-muted-foreground [overflow-wrap:anywhere]">{label}</span>
+      <span className="mt-0.5 block overflow-hidden text-ellipsis whitespace-nowrap text-[0.72rem] font-semibold leading-4 tracking-tight text-foreground">{value}</span>
     </div>
   )
 }
 
-function StationTagList({ label, values, strong = false }: { label: string; values: string[]; strong?: boolean }) {
+function StationConnectorBadges({ connectors }: { connectors: string[] }) {
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-      <span className="text-caption font-medium leading-4 text-muted-foreground">{label}</span>
-      {values.map((value) => (
-        <Badge key={value} variant={strong ? 'default' : 'secondary'} className="max-w-full whitespace-normal rounded-full text-left leading-4 [overflow-wrap:anywhere]">
-          {value}
-        </Badge>
+      <span className="sr-only">Conectores</span>
+      {connectors.map((connector) => (
+        <StationConnectorBadge key={connector} connector={connector} />
+      ))}
+    </div>
+  )
+}
+
+function StationListInlineValues({ label, values }: { label: string; values: string[] }) {
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5">
+      <span className="sr-only">{label}</span>
+      {values.map((value, index) => (
+        <span key={value} className="inline-flex min-w-0 items-center gap-1">
+          {index > 0 ? <span className="text-muted-foreground" aria-hidden="true">·</span> : null}
+          <span className="break-words text-body [overflow-wrap:anywhere]">
+            {value}
+          </span>
+        </span>
       ))}
     </div>
   )
@@ -938,9 +959,7 @@ function RouteMapStationDetails({ station, onClose }: { station: RouteMapPoint; 
       {station.connectorLabels && station.connectorLabels.length > 0 ? (
         <div className="flex flex-wrap gap-1.5">
           {station.connectorLabels.map((connector) => (
-            <Badge key={connector} variant="secondary" className="rounded-full">
-              {connector}
-            </Badge>
+            <StationConnectorBadge key={connector} connector={connector} />
           ))}
         </div>
       ) : null}
@@ -1401,6 +1420,22 @@ function stationCapacity(item: Record<string, unknown>) {
   return ''
 }
 
+function stationListCapacity(item: Record<string, unknown>) {
+  const evseRatio = stationEvseRatio(item)
+  if (evseRatio) {
+    return `${evseRatio} puestos`
+  }
+  const evses = knownNumber(item.availableEvses)
+  if (evses !== null) {
+    return `${formatNumber(evses)} puestos libres`
+  }
+  const totalEvses = stationTotalEvses(item)
+  if (totalEvses !== null) {
+    return `${formatNumber(totalEvses)} puestos`
+  }
+  return ''
+}
+
 function stationEvseRatio(item: Record<string, unknown>) {
   const availableEvses = knownNumber(item.availableEvses)
   const totalEvses = stationTotalEvses(item)
@@ -1475,7 +1510,8 @@ function stationPriceListRow(item: Record<string, unknown>): [string, string] | 
   if (bool(item.priceIsEstimated)) {
     return ['Precio', 'Sin verificar']
   }
-  return stationPriceRow(item)
+  const row = stationPriceRow(item)
+  return row ? [row[0], row[1].replace(' €/kWh', '€/kWh')] : null
 }
 
 function priceNote(props: Record<string, unknown>) {
