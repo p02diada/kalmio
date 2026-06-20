@@ -27,8 +27,8 @@ export default defineConfig({
         name: 'Kalmio',
         short_name: 'Kalmio',
         description: 'Viaja sin ansiedad de carga.',
-        theme_color: '#eef8ef',
-        background_color: '#fbfaf7',
+        theme_color: '#00315b',
+        background_color: '#f2f9fd',
         display: 'standalone',
         start_url: '/',
         icons: [

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="220" viewBox="0 0 760 220" role="img" aria-labelledby="title desc">
+  <title id="title">Kalmio logo</title>
+  <desc id="desc">Kalmio logo with a refined dark K route monogram, assistant node, and charging endpoint.</desc>
+  <rect width="760" height="220" rx="32" fill="#ffffff"/>
+
+  <g transform="translate(36 40)">
+    <rect width="140" height="140" rx="28" fill="#00315b"/>
+    <path d="M49 34V110" fill="none" stroke="#ffffff" stroke-width="13" stroke-linecap="round"/>
+    <path d="M49 74L96 38" fill="none" stroke="#bbe7ff" stroke-width="13" stroke-linecap="round"/>
+    <path d="M49 74C68 83 88 101 113 110" fill="none" stroke="#bbe7ff" stroke-width="13" stroke-linecap="round"/>
+    <circle cx="49" cy="74" r="15" fill="#00315b" stroke="#f1d6fe" stroke-width="5"/>
+    <circle cx="49" cy="74" r="5.5" fill="#f1d6fe"/>
+    <circle cx="96" cy="38" r="6.5" fill="#ffffff"/>
+    <circle cx="113" cy="110" r="7.5" fill="#52cf5e"/>
+  </g>
+
+  <g transform="translate(214 70)">
+    <text x="0" y="54" fill="#00315b" font-family="Geist, Inter, ui-sans-serif, system-ui, sans-serif" font-size="68" font-weight="650" letter-spacing="-1.5">kalmio</text>
+    <text x="4" y="92" fill="#37444f" font-family="Geist, Inter, ui-sans-serif, system-ui, sans-serif" font-size="21" font-weight="450">Viaja sin ansiedad de carga</text>
+    <g transform="translate(5 112)" fill="none" stroke-linecap="round">
+      <path d="M0 0H42" stroke="#00315b" stroke-width="5"/>
+      <path d="M54 0H96" stroke="#0083d0" stroke-width="5"/>
+      <path d="M108 0H132" stroke="#962bbd" stroke-width="5"/>
+      <path d="M144 0H168" stroke="#52cf5e" stroke-width="5"/>
+    </g>
+  </g>
+</svg>

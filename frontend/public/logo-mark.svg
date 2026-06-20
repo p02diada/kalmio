@@ -1,5 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
-  <rect width="180" height="180" fill="#00315b"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180" role="img" aria-labelledby="title desc">
+  <title id="title">Kalmio logo mark</title>
+  <desc id="desc">Refined dark Kalmio K route monogram with assistant node and charging endpoint.</desc>
+  <rect x="20" y="20" width="140" height="140" rx="28" fill="#00315b"/>
   <path d="M69 54V130" fill="none" stroke="#ffffff" stroke-width="13" stroke-linecap="round"/>
   <path d="M69 94L116 58" fill="none" stroke="#bbe7ff" stroke-width="13" stroke-linecap="round"/>
   <path d="M69 94C88 103 108 121 133 130" fill="none" stroke="#bbe7ff" stroke-width="13" stroke-linecap="round"/>
