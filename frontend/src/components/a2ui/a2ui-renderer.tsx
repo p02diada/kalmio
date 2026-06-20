@@ -10,6 +10,7 @@ import {
   MessageCircle,
   Navigation,
   Route,
+  X,
   type LucideIcon,
 } from 'lucide-react'
 import { Component, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
@@ -41,6 +42,7 @@ type RouteMapPoint = {
   priceLabel?: string
   connectorLabels?: string[]
   roleLabel?: string
+  station?: Record<string, unknown>
 }
 type RouteMapData = {
   originLabel: string
@@ -213,6 +215,8 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
           ]}
         />
       )
+    case 'StationPreviewCard':
+      return <StationPreviewCard block={block} />
     case 'StationDetailCard':
       return <StationDetailCard block={block} />
     case 'StationList':
@@ -464,30 +468,60 @@ function MetricCard({
   )
 }
 
-function StationDetailCard({ block }: { block: A2UIBlock }) {
+function StationPreviewCard({ block }: { block: A2UIBlock }) {
+  const [isDetailOpen, setIsDetailOpen] = useState(false)
   const station = stationLabel(block.props) || stationTitle(block.props)
-  const address = text(block.props.address, '')
-  const capacity = stationCapacity(block.props)
-  const connectors = connectorLabels(block.props.connectorTypes)
-  const amenities = amenityLabels(block.props.amenities)
-  const title = text(block.props.title, 'Estación de carga')
+
+  return (
+    <>
+      <button
+        type="button"
+        className="group block w-full rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        aria-label={`Ver detalle completo de ${station || 'la estación'}`}
+        aria-haspopup="dialog"
+        onClick={() => setIsDetailOpen(true)}
+      >
+        <StationDetailSummary station={block.props} />
+      </button>
+      <StationDetailSheet
+        open={isDetailOpen}
+        station={block.props}
+        onOpenChange={setIsDetailOpen}
+      />
+    </>
+  )
+}
+
+function StationDetailCard({ block }: { block: A2UIBlock }) {
+  return <StationDetailPanel station={block.props} mode="inline" />
+}
+
+function StationDetailSummary({ station }: { station: Record<string, unknown> }) {
+  const stationName = stationLabel(station) || stationTitle(station)
+  const address = text(station.address, '')
+  const capacity = stationCapacity(station)
+  const connectors = connectorLabels(station.connectorTypes)
+  const amenities = amenityLabels(station.amenities)
+  const title = text(station.title, 'Estación de carga')
 
   return (
     <A2UICard
       icon={BatteryCharging}
       tone="primary"
-      title={<span className="break-words [overflow-wrap:anywhere]">{station || 'Estación por confirmar'}</span>}
+      title={<span className="break-words [overflow-wrap:anywhere]">{stationName || 'Estación por confirmar'}</span>}
       subtitle={compactParts([title, address]).join(' · ')}
+      className="transition-colors group-hover:border-border-strong group-hover:bg-muted/30"
       titleClassName="text-base"
+      headerAction={<span className="rounded-full bg-muted px-2 py-1 text-caption font-semibold text-body">Detalle</span>}
     >
-      <DecisionNarrative props={block.props} />
+      <DecisionNarrative props={station} />
       <MetricGridRows
         rows={compactRows([
-          isKnownNumber(block.props.distanceKm) ? ['Distancia', metric(block.props.distanceKm, 'km')] : null,
-          isKnownNumber(block.props.powerKw) ? [STATION_POWER_LABEL, metric(block.props.powerKw, 'kW')] : null,
-          stationPriceRow(block.props),
-          capacity ? ['Puestos', capacity] : ['Confianza', text(block.props.confidence)],
-          isKnownNumber(block.props.detourMin) ? ['Desvío', metric(block.props.detourMin, 'min')] : null,
+          isKnownNumber(station.distanceKm) ? ['Distancia', metric(station.distanceKm, 'km')] : null,
+          isKnownNumber(station.powerKw) ? [STATION_POWER_LABEL, metric(station.powerKw, 'kW')] : null,
+          stationPriceRow(station),
+          capacity ? ['Puestos', capacity] : ['Confianza', text(station.confidence)],
+          isKnownNumber(station.detourMin) ? ['Desvío', metric(station.detourMin, 'min')] : null,
         ])}
       />
       {connectors.length > 0 ? (
@@ -520,6 +554,173 @@ function StationDetailCard({ block }: { block: A2UIBlock }) {
         </div>
       ) : null}
     </A2UICard>
+  )
+}
+
+function StationDetailSheet({
+  open,
+  station,
+  onOpenChange,
+}: {
+  open: boolean
+  station: Record<string, unknown>
+  onOpenChange: (open: boolean) => void
+}) {
+  useEffect(() => {
+    if (!open || typeof document === 'undefined') {
+      return
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onOpenChange(false)
+      }
+    }
+
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [onOpenChange, open])
+
+  if (!open || typeof document === 'undefined') {
+    return null
+  }
+
+  return createPortal(
+    <div className="a2ui-station-sheet-backdrop" onClick={() => onOpenChange(false)}>
+      <StationDetailPanel
+        station={station}
+        onClose={() => onOpenChange(false)}
+      />
+    </div>,
+    document.body,
+  )
+}
+
+function StationDetailPanel({
+  station,
+  titleOverride,
+  mode = 'sheet',
+  onClose,
+}: {
+  station: Record<string, unknown>
+  titleOverride?: string
+  mode?: 'sheet' | 'inline'
+  onClose?: () => void
+}) {
+  const stationName = stationLabel(station) || stationTitle(station)
+  const address = text(station.address, '')
+  const title = titleOverride || text(station.title, 'Estación de carga')
+  const capacity = stationCapacity(station)
+  const connectors = connectorLabels(station.connectorTypes)
+  const amenities = amenityLabels(station.amenities, 12)
+  const availabilityRows = stationAvailabilityRows(station)
+  const chargingRows = compactRows([
+    isKnownNumber(station.powerKw) ? [STATION_POWER_LABEL, metric(station.powerKw, 'kW')] : null,
+    connectors.length > 0 ? ['Conectores', connectors.join(', ')] : null,
+    stationPriceDetailRow(station),
+  ])
+  const routeRows = compactRows([
+    isKnownNumber(station.distanceKm) ? ['Distancia', metric(station.distanceKm, 'km')] : null,
+    isKnownNumber(station.detourMin) ? ['Desvío', metric(station.detourMin, 'min')] : null,
+    capacity ? ['Puestos', capacity] : null,
+  ])
+  const notes = stationDetailNotes(station)
+  const isSheet = mode === 'sheet'
+
+  return (
+    <section
+      className={isSheet ? 'a2ui-station-bottom-sheet' : 'a2ui-station-detail-card'}
+      role={isSheet ? 'dialog' : undefined}
+      aria-modal={isSheet ? true : undefined}
+      aria-label="Detalle de estación"
+      onClick={(event) => event.stopPropagation()}
+    >
+      {isSheet ? <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-border-strong/70" aria-hidden="true" /> : null}
+      <div className="flex min-w-0 items-start justify-between gap-3 border-b border-border px-4 pb-3 pt-2">
+        <div className="min-w-0">
+          <p className="text-caption font-semibold leading-4 text-muted-foreground">{title}</p>
+          <h2 className="mt-1 break-words text-lg font-semibold leading-6 tracking-tight text-foreground [overflow-wrap:anywhere]">
+            {stationName || 'Estación por confirmar'}
+          </h2>
+          {address ? (
+            <p className="mt-1 break-words text-sm leading-5 text-body [overflow-wrap:anywhere]">{address}</p>
+          ) : null}
+        </div>
+        {onClose ? (
+          <button
+            type="button"
+            className="grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+            onClick={onClose}
+          >
+            <X className="size-4" aria-hidden="true" />
+            <span className="sr-only">Cerrar detalle</span>
+          </button>
+        ) : null}
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto px-4 py-4">
+        <div className="flex flex-col gap-4">
+          <DecisionNarrative props={station} />
+          {routeRows.length > 0 ? <MetricGridRows rows={routeRows} /> : null}
+          {availabilityRows.length > 0 ? (
+            <StationDetailSection title="Puestos de carga">
+              <MetricGridRows rows={availabilityRows} />
+            </StationDetailSection>
+          ) : null}
+          {chargingRows.length > 0 ? (
+            <StationDetailSection title="Carga y tarifa">
+              <MetricGridRows rows={chargingRows} />
+            </StationDetailSection>
+          ) : null}
+          {connectors.length > 0 ? (
+            <StationDetailSection title="Conectores">
+              <div className="flex flex-wrap gap-1.5">
+                {connectors.map((connector) => (
+                  <StationConnectorBadge key={connector} connector={connector} />
+                ))}
+              </div>
+            </StationDetailSection>
+          ) : null}
+          {amenities.length > 0 ? (
+            <StationDetailSection title="Servicios indicados">
+              <div className="flex flex-wrap gap-1.5">
+                {amenities.map((amenity) => (
+                  <span
+                    key={amenity}
+                    className="max-w-full rounded-full bg-muted px-2 py-1 text-caption font-semibold leading-4 text-foreground [overflow-wrap:anywhere]"
+                  >
+                    {amenity}
+                  </span>
+                ))}
+              </div>
+            </StationDetailSection>
+          ) : null}
+          {notes.length > 0 ? (
+            <StationDetailSection title="Datos y cautelas">
+              <ul className="flex flex-col gap-2 text-sm leading-5 text-body">
+                {notes.map((note) => (
+                  <li key={note} className="rounded-md bg-muted px-3 py-2">{note}</li>
+                ))}
+              </ul>
+            </StationDetailSection>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function StationDetailSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="text-caption font-semibold leading-4 text-muted-foreground">{title}</h3>
+      {children}
+    </section>
   )
 }
 
@@ -936,35 +1137,20 @@ function StaticRouteMap({ data }: { data: RouteMapData }) {
 }
 
 function RouteMapStationDetails({ station, onClose }: { station: RouteMapPoint; onClose: () => void }) {
-  const details = compactRows([
-    station.powerLabel ? [STATION_POWER_LABEL, station.powerLabel] : null,
-    station.distanceLabel ? ['Distancia', station.distanceLabel] : null,
-    station.detourLabel ? ['Desvío', station.detourLabel] : null,
-    station.capacityLabel ? ['Puestos', station.capacityLabel] : null,
-    station.priceLabel ? ['Precio', station.priceLabel] : null,
-  ])
+  const stationProps = station.station ?? mapPointStationProps(station)
 
   return (
-    <section className="a2ui-map-station-popover" aria-label="Detalle de estación">
-      <div className="flex min-w-0 items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="break-words text-sm font-semibold tracking-tight">{station.label}</div>
-          <div className="mt-0.5 text-xs leading-5 text-muted-foreground">{station.roleLabel}</div>
-        </div>
-        <button type="button" className="rounded-md px-2 py-1 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground" onClick={onClose}>
-          Cerrar
-        </button>
-      </div>
-      {details.length > 0 ? <MetricGridRows rows={details} /> : null}
-      {station.connectorLabels && station.connectorLabels.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
-          {station.connectorLabels.map((connector) => (
-            <StationConnectorBadge key={connector} connector={connector} />
-          ))}
-        </div>
-      ) : null}
-    </section>
+    <div className="a2ui-map-station-popover">
+      <StationDetailPanel station={stationProps} titleOverride={station.roleLabel} onClose={onClose} />
+    </div>
   )
+}
+
+function mapPointStationProps(station: RouteMapPoint): Record<string, unknown> {
+  return {
+    stationName: station.label,
+    connectorTypes: station.connectorLabels,
+  }
 }
 
 function routeMapData(props: Record<string, unknown>): RouteMapData {
@@ -1059,6 +1245,7 @@ function stationMapPoint(item: Record<string, unknown>, kind: 'primary' | 'stati
     priceLabel: stationPrice(item) === 'No disponible' ? '' : stationPrice(item),
     connectorLabels: connectorLabels(item.connectorTypes),
     roleLabel: kind === 'primary' ? 'Parada principal' : 'Alternativa cerca de la ruta',
+    station: item,
   }
 }
 
@@ -1418,6 +1605,32 @@ function stationCapacity(item: Record<string, unknown>) {
     return `${formatNumber(totalEvses)} puestos`
   }
   return ''
+}
+
+function stationAvailabilityRows(item: Record<string, unknown>) {
+  const availableEvses = knownNumber(item.availableEvses)
+  const totalEvses = stationTotalEvses(item)
+  return compactRows([
+    availableEvses !== null ? ['Disponibles', formatNumber(availableEvses)] : null,
+    totalEvses !== null ? ['Total', formatNumber(totalEvses)] : null,
+    text(item.confidence, '') ? ['Confianza', text(item.confidence)] : null,
+  ])
+}
+
+function stationPriceDetailRow(item: Record<string, unknown>): [string, string] | null {
+  if (bool(item.priceIsEstimated)) {
+    return knownNumber(item.pricePerKwhEur) === null ? null : ['Precio', 'Sin verificar']
+  }
+  return stationPriceRow(item)
+}
+
+function stationDetailNotes(item: Record<string, unknown>) {
+  return compactParts([
+    bool(item.priceIsEstimated)
+      ? 'La tarifa recibida no está verificada; no la uso para comparar costes.'
+      : '',
+    uncertaintyText(item.uncertainty),
+  ])
 }
 
 function stationListCapacity(item: Record<string, unknown>) {

@@ -41,7 +41,7 @@ const scenarios: ExperienceScenario[] = [
         context: 'Ubicación aproximada usada para orientar la búsqueda.',
         needsConfirmation: true,
       }),
-      block('urgent-station', 'StationDetailCard', {
+      block('urgent-station', 'StationPreviewCard', {
         title: 'Estación cercana',
         stationName: 'Punto de muestra Zaragoza salida 245',
         address: 'Salida 245, entorno urbano con acceso por vía de servicio',
@@ -96,7 +96,7 @@ const scenarios: ExperienceScenario[] = [
           text: 'La estimación depende del consumo real y del tráfico.',
         },
       }),
-      block('route-stop', 'StationDetailCard', {
+      block('route-stop', 'StationPreviewCard', {
         title: 'Estación recomendada',
         stationName: 'Punto de muestra La Plana',
         address: 'Área de servicio La Plana',
@@ -229,7 +229,7 @@ const scenarios: ExperienceScenario[] = [
         level: 'medio',
         text: 'El hotel exacto no está confirmado. Usa estos resultados como aproximación y confirma acceso, tarifa y disponibilidad antes de depender de ellos.',
       }),
-      block('destination-station', 'StationDetailCard', {
+      block('destination-station', 'StationPreviewCard', {
         title: 'Estación cerca del destino',
         stationName: 'Valencia Centro AC',
         address: 'Parking Centro Valencia',
@@ -294,7 +294,8 @@ function componentFocus(type: string) {
     UserMessage: 'Debe mantener claro qué dijo el conductor sin competir con la recomendación del asistente.',
     TripSummaryCard: 'Debe confirmar origen, destino y margen sin parecer una tabla administrativa.',
     RouteSummaryCard: 'Debe explicar esfuerzo, duración y llegada con números legibles en móvil.',
-    StationDetailCard: 'Debe ser la decisión principal: estación, margen útil y datos disponibles sin prometer disponibilidad.',
+    StationPreviewCard: 'Debe ser una recomendación escaneable que abre el detalle completo de la estación.',
+    StationDetailCard: 'Debe estructurar toda la información disponible de una estación sin prometer disponibilidad ni precios no verificados.',
     StationList: 'Debe permitir comparar alternativas rápido sin obligar a leer párrafos largos.',
     RiskExplanationCard: 'Debe bajar ansiedad explicando incertidumbre concreta y el siguiente comportamiento seguro.',
     CostComparisonCard: 'Debe mostrar ahorro solo cuando el precio está verificado y dejar clara la comparación.',

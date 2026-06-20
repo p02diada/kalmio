@@ -413,20 +413,19 @@ select {
 
   .a2ui-map-station-popover {
     position: absolute;
-    left: 1rem;
-    right: 1rem;
-    bottom: 1rem;
+    left: 0;
+    right: 0;
+    bottom: 0;
     z-index: 4;
     display: flex;
-    max-height: min(44svh, 18rem);
-    flex-direction: column;
-    gap: 0.75rem;
-    overflow: auto;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    background: var(--color-surface);
-    padding: 0.875rem;
-    box-shadow: 0 8px 12px -8px color-mix(in oklch, var(--color-foreground) 18%, transparent);
+    justify-content: center;
+    padding: 0 0.75rem 0.75rem;
+    pointer-events: none;
+  }
+
+  .a2ui-map-station-popover .a2ui-station-bottom-sheet {
+    max-height: min(68svh, 34rem);
+    pointer-events: auto;
   }
 
   @media (min-width: 48rem) {
@@ -434,7 +433,54 @@ select {
       left: auto;
       right: 1rem;
       bottom: 1rem;
-      width: min(22rem, calc(100vw - 2rem));
+      width: min(25rem, calc(100vw - 2rem));
+      padding: 0;
+    }
+  }
+
+  .a2ui-station-sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    background: color-mix(in oklch, var(--color-foreground) 28%, transparent);
+    padding-inline: 0.75rem;
+  }
+
+  .a2ui-station-bottom-sheet,
+  .a2ui-station-detail-card {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-foreground);
+  }
+
+  .a2ui-station-bottom-sheet {
+    max-height: min(86svh, 42rem);
+    width: min(100%, 32rem);
+    border-bottom: 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    box-shadow: 0 24px 32px -20px color-mix(in oklch, var(--color-foreground) 28%, transparent);
+  }
+
+  .a2ui-station-detail-card {
+    border-radius: var(--radius-md);
+  }
+
+  @media (min-width: 48rem) {
+    .a2ui-station-sheet-backdrop {
+      align-items: center;
+      padding: 1rem;
+    }
+
+    .a2ui-station-bottom-sheet {
+      border-bottom: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
     }
   }
 

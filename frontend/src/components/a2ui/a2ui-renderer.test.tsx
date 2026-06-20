@@ -171,13 +171,13 @@ describe('A2UIRenderer', () => {
     expect(screen.queryByText('240 min')).not.toBeInTheDocument()
   })
 
-  it('renders a station detail as the primary charging decision', () => {
+  it('renders a station preview as the primary charging decision', () => {
     render(
       <A2UIRenderer
         blocks={[
           {
             id: 'recommended',
-            type: 'StationDetailCard',
+            type: 'StationPreviewCard',
             version: 1,
             props: {
               stationName: 'Almansa HPC',
@@ -203,6 +203,78 @@ describe('A2UIRenderer', () => {
     expect(screen.getByText('CCS2')).toBeInTheDocument()
   })
 
+  it('opens the full station detail from a station preview card', () => {
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'recommended',
+            type: 'StationPreviewCard',
+            version: 1,
+            props: {
+              stationName: 'Almansa HPC',
+              address: 'Área de servicio Almansa',
+              powerKw: 180,
+              pricePerKwhEur: 0.49,
+              currency: 'EUR',
+              priceIsEstimated: false,
+              distanceKm: 1.2,
+              detourMin: 8,
+              availableEvses: 2,
+              totalEvses: 6,
+              connectorTypes: ['CCS2'],
+              amenities: ['RESTAURANT', 'CAFE'],
+              uncertainty: {
+                level: 'medium',
+                text: 'Confirma acceso antes de desviarte.',
+                source: 'authorized_chargers',
+              },
+            },
+          },
+        ]}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ver detalle completo de Almansa HPC' }))
+
+    expect(screen.getByRole('dialog', { name: 'Detalle de estación' })).toBeInTheDocument()
+    expect(screen.getByText('Puestos de carga')).toBeInTheDocument()
+    expect(screen.getByText('Carga y tarifa')).toBeInTheDocument()
+    expect(screen.getAllByText('Servicios indicados').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Confirma acceso antes de desviarte. Fuente: datos autorizados de carga.').length).toBeGreaterThan(0)
+  })
+
+  it('renders a full station detail card inline', () => {
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'station-detail',
+            type: 'StationDetailCard',
+            version: 1,
+            props: {
+              stationName: 'Almansa HPC',
+              address: 'Área de servicio Almansa',
+              powerKw: 180,
+              distanceKm: 1.2,
+              detourMin: 8,
+              availableEvses: 2,
+              totalEvses: 6,
+              connectorTypes: ['CCS2', 'TYPE2'],
+              amenities: ['RESTAURANT'],
+            },
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByLabelText('Detalle de estación')).toHaveClass('a2ui-station-detail-card')
+    expect(screen.getByText('Almansa HPC')).toBeInTheDocument()
+    expect(screen.getByText('Puestos de carga')).toBeInTheDocument()
+    expect(screen.getByText('Carga y tarifa')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Ver detalle completo de Almansa HPC' })).not.toBeInTheDocument()
+  })
+
   it('renders urgent station data without repeating the user battery as a primary metric', () => {
     const stationName = 'BALLENOIL-ES336090-COLON'
 
@@ -211,7 +283,7 @@ describe('A2UIRenderer', () => {
         blocks={[
           {
             id: 'urgent',
-            type: 'StationDetailCard',
+            type: 'StationPreviewCard',
             version: 1,
             props: {
               title: 'Estación cercana',
@@ -249,7 +321,7 @@ describe('A2UIRenderer', () => {
         blocks={[
           {
             id: 'urgent-long',
-            type: 'StationDetailCard',
+            type: 'StationPreviewCard',
             version: 1,
             props: {
               title: 'Estación cercana con confirmación pendiente',
@@ -279,7 +351,7 @@ describe('A2UIRenderer', () => {
         blocks={[
           {
             id: 'recommended',
-            type: 'StationDetailCard',
+            type: 'StationPreviewCard',
             version: 1,
             props: {
               stationName: 'Almansa HPC',
@@ -483,7 +555,7 @@ describe('A2UIRenderer', () => {
     expect(screen.getByText('Parada principal')).toBeInTheDocument()
     expect(screen.getByText('180 kW')).toBeInTheDocument()
     expect(screen.getByText('2/5 disponibles')).toBeInTheDocument()
-    expect(screen.getByText('CCS2')).toBeInTheDocument()
+    expect(screen.getAllByText('CCS2').length).toBeGreaterThan(0)
   })
 
   it('hides station prices marked as estimated', () => {
@@ -492,7 +564,7 @@ describe('A2UIRenderer', () => {
         blocks={[
           {
             id: 'station',
-            type: 'StationDetailCard',
+            type: 'StationPreviewCard',
             version: 1,
             props: {
               stationName: 'Almansa HPC',
@@ -569,7 +641,7 @@ describe('A2UIRenderer', () => {
         blocks={[
           {
             id: 'recommended',
-            type: 'StationDetailCard',
+            type: 'StationPreviewCard',
             version: 1,
             props: {
               stationName: 'Moya Hub Honrubia',
