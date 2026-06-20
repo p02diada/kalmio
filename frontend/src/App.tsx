@@ -172,8 +172,8 @@ function DesktopSidebar({ pathname }: { pathname: string }) {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild tooltip="Kalmio">
               <Link to="/" aria-label="Kalmio home">
-                <span className="grid size-8 place-items-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-                  <MapPinned aria-hidden="true" />
+                <span className="grid size-8 place-items-center rounded-md" aria-hidden="true">
+                  <KalmioBrandMark className="size-8" />
                 </span>
                 <span className="flex flex-col gap-0.5 leading-none">
                   <span className="font-semibold">Kalmio</span>
@@ -220,8 +220,8 @@ function MobileTopBar({ pathname }: { pathname: string }) {
           <SheetContent side="left" className="mobile-menu-sheet">
             <SheetHeader className="mobile-menu-header">
               <SheetTitle className="flex min-w-0 items-center gap-2 text-base">
-                <span className="grid size-8 place-items-center rounded-md bg-primary text-primary-foreground">
-                  <MapPinned aria-hidden="true" />
+                <span className="grid size-8 place-items-center rounded-md" aria-hidden="true">
+                  <KalmioBrandMark className="size-8" />
                 </span>
                 <span className="font-semibold">Kalmio</span>
               </SheetTitle>
@@ -281,6 +281,17 @@ function MobileMenuItem({
         <span>{label}</span>
       </Link>
     </SheetClose>
+  )
+}
+
+function KalmioBrandMark({ className }: { className?: string }) {
+  return (
+    <img
+      src="/logo-mark.svg"
+      alt=""
+      aria-hidden="true"
+      className={cn('block', className)}
+    />
   )
 }
 
@@ -945,8 +956,8 @@ function ThemePhonePreview() {
     <div className="design-phone-preview mx-auto flex w-full max-w-[24rem] flex-col gap-4 rounded-lg border border-border bg-background p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="grid size-9 place-items-center rounded-md bg-primary text-primary-foreground">
-            <MapPinned aria-hidden="true" />
+          <span className="grid size-9 place-items-center rounded-md" aria-hidden="true">
+            <KalmioBrandMark className="size-9" />
           </span>
           <div>
             <p className="text-sm font-semibold leading-5">Kalmio</p>
