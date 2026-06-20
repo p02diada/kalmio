@@ -13,6 +13,9 @@ import {
   Activity,
   AlertTriangle,
   ArrowUp,
+  BatteryCharging,
+  Bot,
+  CheckCircle2,
   ClipboardList,
   Home,
   Loader2,
@@ -25,7 +28,7 @@ import {
   Zap,
   type LucideIcon,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 
 import { A2UIRenderer } from '@/components/a2ui/a2ui-renderer'
 import { A2UIShowcasePage } from '@/components/a2ui/a2ui-showcase'
@@ -609,6 +612,374 @@ function SettingsPage() {
   )
 }
 
+type ThemePreview = {
+  name: string
+  stance: string
+  use: string
+  visual?: 'trace' | 'agentic-trace'
+  variables: Record<string, string>
+}
+
+const themePreviews: ThemePreview[] = [
+  {
+    name: 'Agentic Signal',
+    stance: 'La IA se nota sin convertir la app en una demo.',
+    use: 'Referencia AI: más expresiva, útil para medir cuánta presencia agente tolera la app.',
+    variables: {
+      '--font-sans': '"Geist", "Inter", ui-sans-serif, system-ui, sans-serif',
+      '--font-mono': '"Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+      '--color-background': 'oklch(97.8% 0.009 235)',
+      '--color-surface': 'oklch(100% 0 0)',
+      '--color-foreground': 'oklch(18% 0.018 250)',
+      '--color-body': 'oklch(38% 0.025 245)',
+      '--color-muted': 'oklch(95.8% 0.017 240)',
+      '--color-muted-strong': 'oklch(92.2% 0.024 240)',
+      '--color-muted-foreground': 'oklch(45% 0.029 245)',
+      '--color-border': 'oklch(88.4% 0.023 240)',
+      '--color-border-strong': 'oklch(61% 0.038 245)',
+      '--color-primary': 'oklch(31% 0.09 250)',
+      '--color-primary-foreground': 'oklch(99% 0.003 250)',
+      '--color-primary-soft': 'oklch(92.2% 0.04 250)',
+      '--color-link': 'oklch(56% 0.19 240)',
+      '--color-link-soft': 'oklch(91% 0.055 240)',
+      '--color-warning': 'oklch(72% 0.17 70)',
+      '--color-warning-soft': 'oklch(93.5% 0.061 76)',
+      '--color-error': 'oklch(58% 0.23 28)',
+      '--color-error-soft': 'oklch(91.5% 0.052 20)',
+      '--color-route': 'oklch(57% 0.18 235)',
+      '--color-route-soft': 'oklch(90.5% 0.059 235)',
+      '--color-assistant': 'oklch(52% 0.22 315)',
+      '--color-assistant-soft': 'oklch(91% 0.062 315)',
+      '--color-cyan': 'oklch(76% 0.19 145)',
+      '--radius-sm': '0.625rem',
+      '--radius-md': '0.75rem',
+      '--radius-lg': '1rem',
+      '--radius-full': '9999px',
+      '--spacing-app-width': '430px',
+      '--spacing-app-height': '880px',
+      '--spacing-hero-width': '13ch',
+      '--spacing-chat-panel': 'calc(100svh - 9rem)',
+      '--text-caption': '0.75rem',
+      '--text-caption--line-height': '1rem',
+      '--text-compact': '0.875rem',
+      '--text-compact--line-height': '1.28rem',
+      '--text-input': '0.975rem',
+      '--text-input--line-height': '1.3rem',
+      '--text-hero': '2.55rem',
+      '--text-hero--line-height': '1',
+      '--tracking-display': '-0.035em',
+    },
+  },
+  {
+    name: 'Signal Trace',
+    stance: 'Wow sobrio: la inteligencia aparece como traza verificable de ruta, riesgo y siguiente acción.',
+    use: 'Referencia trazable: prioriza ruta, reserva y confianza sobre presencia AI explícita.',
+    visual: 'trace',
+    variables: {
+      '--font-sans': '"Geist", "Inter", ui-sans-serif, system-ui, sans-serif',
+      '--font-mono': '"Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+      '--color-background': 'oklch(97.8% 0.008 225)',
+      '--color-surface': 'oklch(99.8% 0.002 225)',
+      '--color-foreground': 'oklch(18% 0.018 245)',
+      '--color-body': 'oklch(36% 0.026 245)',
+      '--color-muted': 'oklch(95.4% 0.014 225)',
+      '--color-muted-strong': 'oklch(91.8% 0.02 225)',
+      '--color-muted-foreground': 'oklch(42% 0.028 245)',
+      '--color-border': 'oklch(87.8% 0.02 225)',
+      '--color-border-strong': 'oklch(58% 0.04 235)',
+      '--color-primary': 'oklch(25% 0.055 245)',
+      '--color-primary-foreground': 'oklch(99% 0.003 250)',
+      '--color-primary-soft': 'oklch(92.5% 0.028 245)',
+      '--color-link': 'oklch(56% 0.18 225)',
+      '--color-link-soft': 'oklch(90.8% 0.056 225)',
+      '--color-warning': 'oklch(76% 0.15 76)',
+      '--color-warning-soft': 'oklch(94% 0.056 78)',
+      '--color-error': 'oklch(58% 0.23 28)',
+      '--color-error-soft': 'oklch(91.5% 0.052 20)',
+      '--color-route': 'oklch(56% 0.18 225)',
+      '--color-route-soft': 'oklch(90.8% 0.056 225)',
+      '--color-assistant': 'oklch(36% 0.08 260)',
+      '--color-assistant-soft': 'oklch(91.5% 0.035 260)',
+      '--color-cyan': 'oklch(69% 0.16 165)',
+      '--radius-sm': '0.625rem',
+      '--radius-md': '0.75rem',
+      '--radius-lg': '0.875rem',
+      '--radius-full': '9999px',
+      '--spacing-app-width': '430px',
+      '--spacing-app-height': '880px',
+      '--spacing-hero-width': '13ch',
+      '--spacing-chat-panel': 'calc(100svh - 9rem)',
+      '--text-caption': '0.75rem',
+      '--text-caption--line-height': '1rem',
+      '--text-compact': '0.875rem',
+      '--text-compact--line-height': '1.28rem',
+      '--text-input': '0.975rem',
+      '--text-input--line-height': '1.3rem',
+      '--text-hero': '2.5rem',
+      '--text-hero--line-height': '1',
+      '--tracking-display': '-0.03em',
+    },
+  },
+  {
+    name: 'Agentic Trace',
+    stance: 'Híbrido: traza verificable como base, con señal agente solo donde ayuda a leer la decisión.',
+    use: 'Candidata principal: conserva confianza y añade una capa AI reconocible pero contenida.',
+    visual: 'agentic-trace',
+    variables: {
+      '--font-sans': '"Geist", "Inter", ui-sans-serif, system-ui, sans-serif',
+      '--font-mono': '"Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+      '--color-background': 'oklch(97.7% 0.009 230)',
+      '--color-surface': 'oklch(99.8% 0.002 230)',
+      '--color-foreground': 'oklch(18% 0.018 248)',
+      '--color-body': 'oklch(36.5% 0.026 245)',
+      '--color-muted': 'oklch(95.3% 0.015 230)',
+      '--color-muted-strong': 'oklch(91.6% 0.022 232)',
+      '--color-muted-foreground': 'oklch(42.5% 0.029 246)',
+      '--color-border': 'oklch(87.7% 0.021 230)',
+      '--color-border-strong': 'oklch(58.5% 0.041 238)',
+      '--color-primary': 'oklch(27% 0.07 248)',
+      '--color-primary-foreground': 'oklch(99% 0.003 250)',
+      '--color-primary-soft': 'oklch(92.4% 0.034 248)',
+      '--color-link': 'oklch(56% 0.18 228)',
+      '--color-link-soft': 'oklch(90.8% 0.056 228)',
+      '--color-warning': 'oklch(75% 0.16 74)',
+      '--color-warning-soft': 'oklch(93.8% 0.058 78)',
+      '--color-error': 'oklch(58% 0.23 28)',
+      '--color-error-soft': 'oklch(91.5% 0.052 20)',
+      '--color-route': 'oklch(56% 0.18 228)',
+      '--color-route-soft': 'oklch(90.8% 0.056 228)',
+      '--color-assistant': 'oklch(50% 0.19 305)',
+      '--color-assistant-soft': 'oklch(91.2% 0.052 305)',
+      '--color-cyan': 'oklch(72% 0.17 155)',
+      '--radius-sm': '0.625rem',
+      '--radius-md': '0.75rem',
+      '--radius-lg': '0.875rem',
+      '--radius-full': '9999px',
+      '--spacing-app-width': '430px',
+      '--spacing-app-height': '880px',
+      '--spacing-hero-width': '13ch',
+      '--spacing-chat-panel': 'calc(100svh - 9rem)',
+      '--text-caption': '0.75rem',
+      '--text-caption--line-height': '1rem',
+      '--text-compact': '0.875rem',
+      '--text-compact--line-height': '1.28rem',
+      '--text-input': '0.975rem',
+      '--text-input--line-height': '1.3rem',
+      '--text-hero': '2.5rem',
+      '--text-hero--line-height': '1',
+      '--tracking-display': '-0.03em',
+    },
+  },
+]
+
+const previewTokens = [
+  '--color-background',
+  '--color-surface',
+  '--color-foreground',
+  '--color-primary',
+  '--color-route',
+  '--color-assistant',
+  '--color-cyan',
+  '--color-warning',
+  '--color-error',
+  '--radius-md',
+  '--text-hero',
+  '--tracking-display',
+] as const
+
+function DesignSystemPreviewPage() {
+  return (
+    <section className="design-system-page flex w-full max-w-none flex-col gap-6">
+      <PageHeading
+        title="Sistemas visuales"
+        text="Comparativa local de variables Tailwind/shadcn para Kalmio. Cada bloque redefine las mismas custom properties sin cambiar todavía el tema global."
+      />
+      <div className="grid gap-5 xl:grid-cols-2">
+        {themePreviews.map((theme) => (
+          <ThemePreviewPanel key={theme.name} theme={theme} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function ThemePreviewPanel({ theme }: { theme: ThemePreview }) {
+  return (
+    <article
+      className={cn(
+        'design-preview overflow-hidden rounded-lg border border-border bg-background text-foreground',
+        theme.visual && `design-preview-${theme.visual}`,
+      )}
+      style={theme.variables as CSSProperties}
+    >
+      <div className="flex flex-col gap-4 border-b border-border bg-surface p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex max-w-xl flex-col gap-1">
+            <h2 className="text-xl font-semibold tracking-normal">{theme.name}</h2>
+            <p className="text-sm leading-6 text-body">{theme.stance}</p>
+          </div>
+          <span className="rounded-full bg-primary-soft px-3 py-1 text-caption font-semibold leading-4 text-primary">
+            {theme.use}
+          </span>
+        </div>
+        <ThemeTokenStrip theme={theme} />
+      </div>
+      <div className="grid gap-4 p-4">
+        <ThemePhonePreview />
+        <ThemeDecisionPreview />
+      </div>
+    </article>
+  )
+}
+
+function ThemeTokenStrip({ theme }: { theme: ThemePreview }) {
+  return (
+    <div className="design-token-strip grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      {previewTokens.map((token) => {
+        const value = theme.variables[token]
+        const isColor = token.startsWith('--color')
+
+        return (
+          <div key={token} className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-background px-2 py-1.5">
+            {isColor ? (
+              <span
+                className="size-5 shrink-0 rounded-full border border-border"
+                style={{ background: value }}
+                aria-hidden="true"
+              />
+            ) : null}
+            <div className="min-w-0">
+              <p className="truncate font-mono text-[0.68rem] leading-3 text-muted-foreground">{token}</p>
+              <p className="truncate font-mono text-[0.68rem] leading-3 text-foreground">{value}</p>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function ThemePhonePreview() {
+  return (
+    <div className="design-phone-preview mx-auto flex w-full max-w-[24rem] flex-col gap-4 rounded-lg border border-border bg-background p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="grid size-9 place-items-center rounded-md bg-primary text-primary-foreground">
+            <MapPinned aria-hidden="true" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold leading-5">Kalmio</p>
+            <p className="text-caption font-medium leading-4 text-muted-foreground">Asistente de viaje</p>
+          </div>
+        </div>
+        <span className="rounded-full bg-muted px-2.5 py-1 text-caption font-semibold leading-4 text-body">18%</span>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <p className="font-mono text-caption leading-4 text-muted-foreground">Viaja sin ansiedad de carga</p>
+        <h3 className="max-w-hero-width text-hero font-semibold leading-none tracking-display text-foreground">
+          Cuenta tu ruta o urgencia
+        </h3>
+        <p className="text-sm leading-6 text-body">
+          El agente preguntará lo que falte antes de recomendar una parada.
+        </p>
+      </div>
+
+      <div className="flex items-center gap-2 rounded-md border border-border bg-surface p-2">
+        <span className="min-w-0 flex-1 truncate text-input leading-5 text-muted-foreground">Estoy en A-2, 18%, CCS2...</span>
+        <Button type="button" size="icon" className="size-9 shrink-0">
+          <ArrowUp aria-hidden="true" />
+        </Button>
+      </div>
+
+      <div className="grid gap-2">
+        <button className="flex items-center gap-3 rounded-md border border-border bg-surface p-3 text-left transition-colors hover:bg-muted">
+          <Zap aria-hidden="true" />
+          <span className="min-w-0">
+            <span className="block text-compact font-semibold leading-5">Carga urgente</span>
+            <span className="block text-caption leading-4 text-muted-foreground">Decidir una parada ahora.</span>
+          </span>
+        </button>
+        <button className="flex items-center gap-3 rounded-md border border-border bg-surface p-3 text-left transition-colors hover:bg-muted">
+          <Navigation aria-hidden="true" />
+          <span className="min-w-0">
+            <span className="block text-compact font-semibold leading-5">Planificar ruta larga</span>
+            <span className="block text-caption leading-4 text-muted-foreground">Ruta, autonomía y paradas cómodas.</span>
+          </span>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function ThemeDecisionPreview() {
+  return (
+    <div className="design-decision-preview flex flex-col gap-3">
+      <Card>
+        <CardContent className="flex flex-col gap-3 p-4">
+          <div className="flex items-start gap-3">
+            <span className="grid size-9 shrink-0 place-items-center rounded-md bg-assistant-soft text-assistant">
+              <Bot aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold leading-5">Necesito confirmar un dato</p>
+              <p className="text-caption font-medium leading-4 text-muted-foreground">Antes de buscar estaciones autorizadas.</p>
+            </div>
+          </div>
+          <p className="text-sm leading-6 text-body">
+            ¿Tu conector es CCS2 y quieres priorizar una parada con cafetería?
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <span className="rounded-full bg-muted px-2.5 py-1 text-caption font-semibold leading-4 text-body">CCS2</span>
+            <span className="rounded-full bg-muted px-2.5 py-1 text-caption font-semibold leading-4 text-body">Cafetería</span>
+            <span className="rounded-full bg-muted px-2.5 py-1 text-caption font-semibold leading-4 text-body">10% reserva</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="flex flex-col gap-4 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <span className="grid size-9 shrink-0 place-items-center rounded-md bg-route-soft text-route">
+                <BatteryCharging aria-hidden="true" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold leading-5">Parada recomendada</p>
+                <p className="text-caption font-medium leading-4 text-muted-foreground">Área A-2 · 12 km de desvío</p>
+              </div>
+            </div>
+            <span className="rounded-full bg-warning-soft px-2.5 py-1 text-caption font-bold leading-4 text-foreground">4/10 puestos</span>
+          </div>
+          <div className="grid gap-2 rounded-md bg-muted p-3 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">Potencia máx.</span>
+              <span className="font-semibold">150 kW</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">Llegada estimada</span>
+              <span className="font-semibold">11%</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">Confianza</span>
+              <span className="font-semibold">Media</span>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button type="button" className="flex-1">
+              <CheckCircle2 aria-hidden="true" />
+              Usar parada
+            </Button>
+            <Button type="button" variant="outline" className="flex-1">
+              Ver mapa
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 function RoutePlanHistory({ plans }: { plans: RoutePlanResponse[] }) {
   return (
     <div className="space-y-3">
@@ -868,12 +1239,19 @@ const a2uiRoute = createRoute({
   component: A2UIShowcasePage,
 })
 
+const designSystemRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/design-system',
+  component: DesignSystemPreviewPage,
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   chatRoute,
   activityRoute,
   settingsRoute,
   a2uiRoute,
+  designSystemRoute,
 ])
 
 const router = createRouter({ routeTree })

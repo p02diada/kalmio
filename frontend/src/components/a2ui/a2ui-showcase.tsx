@@ -310,6 +310,13 @@ function componentFocus(type: string) {
   return focusByType[type] ?? 'Bloque de respuesta renderizado de forma aislada para revisar encaje visual y estados.'
 }
 
+const catalogStats = [
+  ['Dirección visual', 'Agentic Signal'],
+  ['Componentes', `${uniqueComponentTypes.length} tipos`],
+  ['Escenarios', String(scenarios.length)],
+  ['Contrato A2UI', 'v0.9.1'],
+] as const
+
 export function A2UIShowcasePage() {
   const [viewMode, setViewMode] = useState<'components' | 'scenarios'>('scenarios')
   const [reviewLayout, setReviewLayout] = useState<'detail' | 'mobile-grid'>('detail')
@@ -321,16 +328,30 @@ export function A2UIShowcasePage() {
   )
 
   return (
-    <section className="flex flex-col gap-5 pb-4">
-      <div className="sticky top-0 z-10 -mx-4 border-b border-border bg-surface/95 px-4 py-3 backdrop-blur">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="font-mono text-xs leading-4 text-muted-foreground">Revisión de respuestas</p>
-            <h1 className="text-2xl font-semibold tracking-normal">Claridad de la experiencia</h1>
+    <section className="a2ui-showcase-page flex flex-col gap-5 pb-4">
+      <div className="sticky top-0 z-10 -mx-6 border-b border-border bg-background/95 px-6 py-4 backdrop-blur md:-mx-14 md:px-14">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+          <div className="min-w-0 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="default">Agentic Signal</Badge>
+              <Badge variant="secondary">Catálogo v1.0</Badge>
+            </div>
+            <div className="space-y-1">
+              <h1 className="text-2xl font-semibold tracking-normal">Catálogo A2UI</h1>
+              <p className="max-w-3xl text-sm leading-6 text-body">
+                Componentes dinámicos permitidos para respuestas de viaje EV. Esta página revisa cómo se ven con la dirección visual elegida y mantiene los datos de muestra separados del contrato real.
+              </p>
+            </div>
           </div>
-          <Badge variant="secondary" className="shrink-0">
-            {showTechnical ? `${uniqueComponentTypes.length} tipos` : `${scenarios.length} escenarios`}
-          </Badge>
+
+          <div className="grid grid-cols-2 gap-2 lg:w-[28rem]">
+            {catalogStats.map(([label, value]) => (
+              <div key={label} className="rounded-md border border-border bg-surface px-3 py-2">
+                <p className="text-caption font-medium leading-4 text-muted-foreground">{label}</p>
+                <p className="mt-1 text-sm font-semibold leading-5 text-foreground">{value}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
@@ -392,8 +413,13 @@ export function A2UIShowcasePage() {
         </div>
       </div>
 
-      <div className="rounded-md border border-warning bg-warning-soft px-3 py-2 text-xs leading-5 text-foreground">
-        Datos de muestra para revisar flujo, responsive y claridad. No representan disponibilidad, precio, estaciones reales ni una ruta calculada.
+      <div className="flex flex-col gap-2 rounded-md border border-warning bg-warning-soft px-3 py-2 text-xs leading-5 text-foreground sm:flex-row sm:items-start">
+        <Badge variant="warning" className="shrink-0 border-foreground/10 bg-surface">
+          Muestra
+        </Badge>
+        <p>
+          Estos datos sirven para revisar flujo, responsive y claridad. No representan disponibilidad, precio, estaciones reales ni una ruta calculada.
+        </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
