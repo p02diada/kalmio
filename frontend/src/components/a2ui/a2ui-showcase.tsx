@@ -66,52 +66,40 @@ const scenarios: ExperienceScenario[] = [
   {
     id: 'route',
     title: 'Ruta con parada cómoda',
-    focus: 'La experiencia debe explicar la parada principal, alternativas, riesgo y coste sin obligar a interpretar un mapa.',
+    focus: 'La experiencia debe mostrar el corredor, estaciones cercanas, riesgo y coste sin obligar a interpretar pins.',
     blocks: [
       block('route-assistant', 'AssistantMessage', {
-        text: 'Zaragoza a Valencia con 24% de batería. Priorizaré una parada con margen conservador y servicios útiles; si faltan datos del proveedor, lo diré explícitamente.',
+        text: 'Zaragoza a Valencia con 24% de batería. Mostraré el corredor con estaciones cercanas y marcaré lo que no pueda validar con los datos disponibles.',
       }),
-      block('route-summary', 'RouteSummaryCard', {
+      block('route-plan', 'RouteCorridorCard', {
         distanceKm: 309,
         durationMin: 204,
-        energyKwh: 55.6,
-        arrivalBattery: 17,
-        takeaway: 'Llegada estimada con margen utilizable.',
+        energyKwh: null,
+        arrivalBattery: null,
+        takeaway: 'Corredor con puntos de carga trazados.',
         uncertainty: {
           level: 'medium',
-          text: 'La estimación depende del consumo real y del tráfico.',
+          text: 'La batería de llegada no se valida sin consumo o perfil completo del vehículo.',
         },
-      }),
-      block('route-stop', 'StationPreviewCard', {
-        title: 'Estación recomendada',
-        stationName: 'Punto de muestra La Plana',
-        address: 'Área de servicio La Plana',
-        takeaway: 'Mejor equilibrio entre margen, desvío y servicios.',
-        why: 'Queda cerca de la ruta, tiene CCS2 y reduce el riesgo de llegar con batería baja.',
-        powerKw: 150,
-        pricePerKwhEur: 0.39,
-        currency: 'EUR',
-        priceIsEstimated: false,
-        distanceKm: 118,
-        detourMin: 6,
-        availableEvses: 4,
-        totalEvses: 8,
-        connectorTypes: ['CCS2'],
-        amenities: ['RESTAURANT', 'TOILETS', 'WIFI', 'PARKING_LOT'],
-      }),
-      block('route-map', 'MapPreviewCard', {
         origin: { label: 'Zaragoza', lat: 41.6488, lon: -0.8891 },
         destination: { label: 'Valencia', lat: 39.4699, lon: -0.3763 },
-        primaryStation: {
-          stationName: 'Punto de muestra La Plana',
-          lat: 40.345,
-          lon: -0.997,
-          powerKw: 150,
-          availableEvses: 4,
-          totalEvses: 8,
-          connectorTypes: ['CCS2'],
-        },
         stations: [
+          {
+            stationName: 'Punto de muestra La Plana',
+            address: 'Área de servicio La Plana',
+            lat: 40.345,
+            lon: -0.997,
+            powerKw: 150,
+            pricePerKwhEur: 0.39,
+            currency: 'EUR',
+            priceIsEstimated: false,
+            distanceKm: 118,
+            detourMin: 6,
+            availableEvses: 4,
+            totalEvses: 8,
+            connectorTypes: ['CCS2'],
+            amenities: ['RESTAURANT', 'TOILETS', 'WIFI', 'PARKING_LOT'],
+          },
           {
             stationName: 'Punto de muestra Mudéjar',
             lat: 40.583,
@@ -268,7 +256,7 @@ function componentFocus(type: string) {
   const focusByType: Record<string, string> = {
     AssistantMessage: 'Debe sonar como copiloto: breve, honesto y sin convertir la respuesta en un panel técnico.',
     UserMessage: 'Debe mantener claro qué dijo el conductor sin competir con la recomendación del asistente.',
-    RouteSummaryCard: 'Debe explicar esfuerzo, duración y llegada con números legibles en móvil.',
+    RouteCorridorCard: 'Debe mostrar ruta y estaciones cercanas al corredor sin convertirlo en una recomendación única.',
     StationPreviewCard: 'Debe ser una recomendación escaneable que abre el detalle completo de la estación.',
     StationDetailCard: 'Debe estructurar toda la información disponible de una estación sin prometer disponibilidad ni precios no verificados.',
     StationList: 'Debe permitir comparar alternativas rápido sin obligar a leer párrafos largos.',
@@ -302,7 +290,7 @@ export function A2UIShowcasePage() {
 
   return (
     <section className="a2ui-showcase-page flex flex-col gap-5 pb-4">
-      <div className="sticky top-0 z-10 -mx-6 border-b border-border bg-background/95 px-6 py-4 backdrop-blur md:-mx-14 md:px-14">
+      <div className="-mx-4 border-b border-border bg-background/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6 md:sticky md:top-0 md:z-10 md:-mx-14 md:px-14">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap items-center gap-2">

@@ -118,7 +118,7 @@ function canHostActionFooter(block: A2UIBlock) {
   return (
     block.type === 'StationPreviewCard' ||
     block.type === 'StationDetailCard' ||
-    block.type === 'RouteSummaryCard' ||
+    block.type === 'RouteCorridorCard' ||
     block.type === 'MapPreviewCard'
   )
 }
@@ -237,20 +237,8 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
       return <MessageCard icon={Bot} tone="assistant" text={text(block.props.text)} />
     case 'UserMessage':
       return <MessageCard icon={MessageCircle} tone="route" text={text(block.props.text)} align="right" />
-    case 'RouteSummaryCard':
-      return (
-        <MetricCard
-          icon={Navigation}
-          title="Ruta estimada"
-          tone="route"
-          rows={[
-            ['Distancia', metric(block.props.distanceKm, 'km')],
-            ['Duración', duration(block.props.durationText, block.props.durationMin)],
-            ['Energía', metric(block.props.energyKwh, 'kWh', { zeroUnknown: true })],
-            ['Llegada', percent(block.props.arrivalBattery, { zeroUnknown: true })],
-          ]}
-        />
-      )
+    case 'RouteCorridorCard':
+      return <RouteCorridorCard block={block} />
     case 'StationPreviewCard':
       return <StationPreviewCard block={block} />
     case 'StationDetailCard':
@@ -737,6 +725,172 @@ function CostComparisonCard({ block }: { block: A2UIBlock }) {
   )
 }
 
+function RouteCorridorCard({ block }: { block: A2UIBlock }) {
+  const mapData = useMemo(() => routeMapData(block.props), [block.props])
+  const [isExpanded, setIsExpanded] = useState(false)
+  const stations = routeCorridorStations(block.props)
+  const stationCount = stations.length
+  const arrivalBattery = knownNumber(block.props.arrivalBattery, { zeroUnknown: true })
+  const arrivalValue = arrivalBattery === null ? null : `${formatNumber(arrivalBattery)}%`
+  const routeMeta = compactParts([
+    `${formatNumber(stationCount)} estaciones cerca de la ruta`,
+    metric(block.props.distanceKm, 'km'),
+    compactDuration(block.props.durationText, block.props.durationMin),
+  ]).join(' · ')
+  const geometryLabel = mapData.geometryPrecision === 'provider' ? 'Ruta calculada' : 'Mapa orientativo'
+  const expandedMap = isExpanded && typeof document !== 'undefined'
+    ? createPortal(
+      <section className="a2ui-map-fullscreen" aria-label="Detalle de ruta">
+        <div className="a2ui-map-fullscreen-header">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold tracking-tight">Detalle de ruta</h2>
+            <p className="truncate text-sm text-muted-foreground">
+              {`${mapData.originLabel} → ${mapData.destinationLabel}`}
+            </p>
+          </div>
+          <Button type="button" variant="outline" size="sm" className="h-9 shrink-0" onClick={() => setIsExpanded(false)}>
+            <ArrowLeft className="size-4" aria-hidden="true" />
+            Volver
+          </Button>
+        </div>
+        <div className="a2ui-map-fullscreen-body">
+          <div className="a2ui-route-corridor-detail">
+            <RouteCorridorDetailSummary props={block.props} stations={stations} geometryLabel={geometryLabel} />
+            <RouteMapCanvas data={mapData} variant="expanded" />
+          </div>
+        </div>
+      </section>,
+      document.body,
+    )
+    : null
+
+  useEffect(() => {
+    if (!isExpanded || typeof document === 'undefined') {
+      return
+    }
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isExpanded])
+
+  return (
+    <>
+      <Card className="overflow-hidden">
+        <CardHeader className="p-3 pb-2">
+          <div className="flex min-w-0 items-start justify-between gap-3">
+            <div className="flex min-w-0 items-start gap-2.5">
+              <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-md bg-route-soft text-route">
+                <Navigation className="size-4" aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <CardTitle className="break-words text-sm font-semibold leading-5 tracking-tight text-foreground [overflow-wrap:anywhere]">
+                  Ruta y carga
+                </CardTitle>
+                <p className="mt-0.5 truncate text-caption font-medium leading-4 text-muted-foreground">
+                  {mapData.originLabel} → {mapData.destinationLabel}
+                </p>
+              </div>
+            </div>
+            <Button type="button" variant="outline" size="sm" className="h-8 shrink-0 px-2" aria-label="Abrir detalle de ruta" onClick={() => setIsExpanded(true)}>
+              <Maximize2 className="size-4" aria-hidden="true" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-2 px-3 pb-3 pt-0">
+          <button type="button" className="block w-full rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Abrir detalle de ruta" onClick={() => setIsExpanded(true)}>
+            <RouteMapCanvas data={mapData} variant="compact" density="mini" />
+          </button>
+          {arrivalValue ? (
+            <div className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-border bg-muted/45 px-2.5 py-2">
+              <div className="min-w-0">
+                <span className="block text-[0.6875rem] font-medium leading-3 text-muted-foreground">Llegada directa</span>
+                <span className={cn(
+                  'mt-0.5 block text-base font-semibold leading-5 tracking-tight',
+                  arrivalBattery !== null && arrivalBattery <= 20 ? 'text-warning' : 'text-foreground',
+                )}>{arrivalValue}</span>
+              </div>
+              <p className="min-w-0 truncate text-right text-[0.8125rem] font-medium leading-4 text-body">
+                {routeMeta}
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-md border border-border bg-muted/45 px-2.5 py-2">
+              <p className="truncate text-sm font-semibold leading-5 text-foreground">
+                {routeCorridorStationCountLabel(stationCount)}
+              </p>
+              <p className="mt-0.5 truncate text-[0.8125rem] font-medium leading-4 text-body">
+                {metric(block.props.distanceKm, 'km')} · {compactDuration(block.props.durationText, block.props.durationMin)}
+              </p>
+              <p className="mt-1 text-[0.6875rem] font-medium leading-3 text-muted-foreground">
+                Batería de llegada no validada
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      {expandedMap}
+    </>
+  )
+}
+
+function RouteCorridorDetailSummary({
+  props,
+  stations,
+  geometryLabel,
+}: {
+  props: Record<string, unknown>
+  stations: RecordList
+  geometryLabel: string
+}) {
+  const rows = compactRows([
+    ['Estaciones', routeCorridorStationCountLabel(stations.length)],
+    ['Batería al llegar', percent(props.arrivalBattery, { zeroUnknown: true })],
+    ['Distancia', metric(props.distanceKm, 'km')],
+    ['Duración', duration(props.durationText, props.durationMin)],
+    ['Energía', metric(props.energyKwh, 'kWh', { zeroUnknown: true })],
+  ])
+
+  return (
+    <div className="a2ui-route-corridor-detail-summary">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="secondary">{geometryLabel}</Badge>
+        <Badge variant="secondary">{routeCorridorStationCountShortLabel(stations.length)}</Badge>
+      </div>
+      <MetricGridRows rows={rows} />
+    </div>
+  )
+}
+
+function routeCorridorStations(props: Record<string, unknown>): RecordList {
+  const primaryStation = record(props.primaryStation)
+  return [
+    primaryStation,
+    ...list(props.stations),
+  ].filter((station): station is Record<string, unknown> => station !== null)
+}
+
+function routeCorridorStationCountLabel(count: number) {
+  if (count === 0) {
+    return 'Sin estaciones trazadas'
+  }
+  if (count === 1) {
+    return '1 estación cerca de la ruta'
+  }
+  return `${formatNumber(count)} estaciones cerca de la ruta`
+}
+
+function routeCorridorStationCountShortLabel(count: number) {
+  if (count === 0) {
+    return 'Sin estaciones'
+  }
+  if (count === 1) {
+    return '1 estación'
+  }
+  return `${formatNumber(count)} estaciones`
+}
+
 function DecisionNarrative({ props }: { props: Record<string, unknown> }) {
   const takeaway = text(props.takeaway, '')
   const why = text(props.why, '')
@@ -761,7 +915,7 @@ function MetricGrid({ rows }: { rows: Array<[string, string]> }) {
 
 function MetricGridRows({ rows, inverted = false }: { rows: Array<[string, string]>; inverted?: boolean }) {
   return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(7rem,100%),1fr))] gap-2 text-sm">
+    <div className="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(7rem,100%),1fr))] gap-2 text-sm">
       {rows.map(([label, value]) => (
         <div key={label} className="min-w-0 rounded-md bg-muted px-2.5 py-2">
           <span className={`block whitespace-normal text-caption font-medium leading-4 [overflow-wrap:anywhere] ${inverted ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{label}</span>
@@ -855,7 +1009,7 @@ function StationListMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 bg-surface px-1.5 py-1.5">
       <span className="block text-[0.6875rem] font-medium leading-3 text-muted-foreground [overflow-wrap:anywhere]">{label}</span>
-      <span className="mt-0.5 block overflow-hidden text-ellipsis whitespace-nowrap text-[0.72rem] font-semibold leading-4 tracking-tight text-foreground">{value}</span>
+      <span className="mt-0.5 block break-words text-[0.72rem] font-semibold leading-4 tracking-tight text-foreground [overflow-wrap:anywhere]">{value}</span>
     </div>
   )
 }
@@ -890,7 +1044,7 @@ function StationListInlineValues({ label, values }: { label: string; values: str
 function MapPreviewCard({ block }: { block: A2UIBlock }) {
   const mapData = useMemo(() => routeMapData(block.props), [block.props])
   const [isExpanded, setIsExpanded] = useState(false)
-  const stationCount = mapData.stationPoints.length
+  const stationCount = routeCorridorStations(block.props).length
   const geometryLabel = mapData.geometryPrecision === 'provider' ? 'Ruta calculada' : 'Mapa orientativo'
   const expandedMap = isExpanded && typeof document !== 'undefined'
     ? createPortal(
@@ -899,10 +1053,7 @@ function MapPreviewCard({ block }: { block: A2UIBlock }) {
           <div className="min-w-0">
             <h2 className="text-lg font-semibold tracking-tight">Mapa de ruta</h2>
             <p className="truncate text-sm text-muted-foreground">
-              {compactParts([
-                `${mapData.originLabel} → ${mapData.destinationLabel}`,
-                stationCount > 0 ? `${stationCount} estaciones cerca de la ruta` : '',
-              ]).join(' · ')}
+              {`${mapData.originLabel} → ${mapData.destinationLabel}`}
             </p>
           </div>
           <Button type="button" variant="outline" size="sm" className="h-9 shrink-0" onClick={() => setIsExpanded(false)}>
@@ -947,12 +1098,12 @@ function MapPreviewCard({ block }: { block: A2UIBlock }) {
         </button>
         <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
           <span className="truncate">{mapData.originLabel}</span>
-          <span className="truncate text-center">{mapData.primaryLabel || 'Parada sugerida'}</span>
+          <span className="truncate text-center">Estaciones</span>
           <span className="truncate text-right">{mapData.destinationLabel}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
+          <Badge variant="secondary">{routeCorridorStationCountLabel(stationCount)}</Badge>
           <Badge variant="secondary">{geometryLabel}</Badge>
-          {stationCount > 0 ? <Badge variant="secondary">{stationCount} estaciones</Badge> : null}
         </div>
       </A2UICard>
       {expandedMap}
@@ -960,7 +1111,15 @@ function MapPreviewCard({ block }: { block: A2UIBlock }) {
   )
 }
 
-function RouteMapCanvas({ data, variant }: { data: RouteMapData; variant: 'compact' | 'expanded' }) {
+function RouteMapCanvas({
+  data,
+  variant,
+  density = 'default',
+}: {
+  data: RouteMapData
+  variant: 'compact' | 'expanded'
+  density?: 'default' | 'mini'
+}) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const [status, setStatus] = useState<'idle' | 'static' | 'failed'>('idle')
@@ -1020,14 +1179,14 @@ function RouteMapCanvas({ data, variant }: { data: RouteMapData; variant: 'compa
             type: 'line',
             source: 'route',
             layout: { 'line-cap': 'round', 'line-join': 'round' },
-            paint: { 'line-color': '#ffffff', 'line-width': 8, 'line-opacity': 0.92 },
+            paint: { 'line-color': '#ffffff', 'line-width': isExpanded ? 8 : density === 'mini' ? 10 : 9, 'line-opacity': 0.92 },
           })
           map.addLayer({
             id: 'route-line',
             type: 'line',
             source: 'route',
             layout: { 'line-cap': 'round', 'line-join': 'round' },
-            paint: { 'line-color': '#146c5f', 'line-width': 4 },
+            paint: { 'line-color': '#146c5f', 'line-width': isExpanded ? 4 : density === 'mini' ? 5.5 : 4.75 },
           })
           for (const point of data.points) {
             const isClickableStation = isExpanded && isStationMapPoint(point)
@@ -1043,8 +1202,8 @@ function RouteMapCanvas({ data, variant }: { data: RouteMapData; variant: 'compa
           const bounds = routeBounds(data)
           if (bounds) {
             map.fitBounds(bounds, {
-              padding: isExpanded ? 72 : 28,
-              maxZoom: isExpanded ? 11 : 7,
+              padding: mapFitPadding(variant, density),
+              maxZoom: mapFitMaxZoom(variant, density),
               duration: 0,
             })
           }
@@ -1066,10 +1225,10 @@ function RouteMapCanvas({ data, variant }: { data: RouteMapData; variant: 'compa
       mapRef.current?.remove()
       mapRef.current = null
     }
-  }, [data, dataKey, isExpanded, usesDefaultStyle])
+  }, [data, dataKey, density, isExpanded, usesDefaultStyle, variant])
 
   return (
-    <div className={cn('a2ui-map-shell', isExpanded ? 'a2ui-map-shell-expanded' : 'a2ui-map-shell-compact')}>
+    <div className={cn('a2ui-map-shell', isExpanded ? 'a2ui-map-shell-expanded' : 'a2ui-map-shell-compact', !isExpanded && density === 'mini' && 'a2ui-map-shell-mini')}>
       <div ref={containerRef} className={cn('a2ui-maplibre-canvas', status !== 'idle' && 'opacity-0')} aria-label={isExpanded ? 'Mapa interactivo de ruta' : 'Vista previa de ruta'} />
       {!isExpanded && usesDefaultStyle && status === 'idle' ? (
         <a className="a2ui-map-attribution" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" aria-label="Atribución de OpenStreetMap">
@@ -1087,6 +1246,23 @@ function RouteMapCanvas({ data, variant }: { data: RouteMapData; variant: 'compa
       ) : null}
     </div>
   )
+}
+
+function mapFitPadding(variant: 'compact' | 'expanded', density: 'default' | 'mini') {
+  if (variant === 'expanded') {
+    return 72
+  }
+  if (density === 'mini') {
+    return { top: 10, bottom: 10, left: 12, right: 12 }
+  }
+  return { top: 22, bottom: 22, left: 28, right: 28 }
+}
+
+function mapFitMaxZoom(variant: 'compact' | 'expanded', density: 'default' | 'mini') {
+  if (variant === 'expanded') {
+    return 11
+  }
+  return density === 'mini' ? 8.8 : 7.6
 }
 
 function StaticRouteMap({ data }: { data: RouteMapData }) {
@@ -1136,7 +1312,7 @@ function routeMapData(props: Record<string, unknown>): RouteMapData {
     ?? pointFromGeometry(routeGeometry, -1, 'destination', text(props.destination, 'Destino'))
   const primary = primaryStation ? stationMapPoint(primaryStation, 'primary', 0) : null
   const alternativePoints = stations
-    .map((station, index) => stationMapPoint(station, 'station', index + 1))
+    .map((station, index) => stationMapPoint(station, 'station', primary ? index + 1 : index))
     .filter((point): point is RouteMapPoint => point !== null)
   const stationPoints = uniqueMapPoints(compactMapPoints([primary, ...alternativePoints]))
   const points = uniqueMapPoints(compactMapPoints([origin, destination, ...stationPoints]))
@@ -1337,7 +1513,7 @@ function mapMarkerElement(point: RouteMapPoint, isClickable = false) {
   dot.textContent = point.markerLabel ?? ''
   const label = document.createElement('span')
   label.className = 'a2ui-map-marker-label'
-  label.textContent = point.evseRatioLabel || point.capacityLabel || point.label
+  label.textContent = point.label
   element.append(dot, label)
   return element
 }
@@ -1850,6 +2026,24 @@ function duration(durationText: unknown, durationMin: unknown) {
   const hours = Math.floor(rounded / 60)
   const remaining = rounded % 60
   return remaining > 0 ? `${hours} h ${remaining} min` : `${hours} h`
+}
+
+function compactDuration(durationText: unknown, durationMin: unknown) {
+  const provided = text(durationText, '')
+  if (provided) {
+    return provided
+  }
+  const minutes = knownNumber(durationMin)
+  if (minutes === null) {
+    return 'No calculado'
+  }
+  if (minutes < 60) {
+    return `${formatNumber(minutes)} min`
+  }
+  const rounded = Math.round(minutes)
+  const hours = Math.floor(rounded / 60)
+  const remaining = rounded % 60
+  return remaining > 0 ? `${hours}h ${remaining}` : `${hours}h`
 }
 
 function isKnownNumber(value: unknown, options: { zeroUnknown?: boolean } = {}) {
