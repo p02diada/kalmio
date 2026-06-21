@@ -31,7 +31,7 @@ import { A2UIRenderer } from '@/components/a2ui/a2ui-renderer'
 import { A2UIShowcasePage } from '@/components/a2ui/a2ui-showcase'
 import { KalmioBrandMark } from '@/components/brand/kalmio-brand-mark'
 import { ChatPendingStatus } from '@/components/chat/chat-pending-status'
-import { chatWaitingMessages } from '@/components/chat/chat-waiting-messages'
+import { chatWaitingMessageScheduleMs } from '@/components/chat/chat-waiting-messages'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
@@ -557,10 +557,15 @@ function ChatPage() {
     if (!isSending) {
       return
     }
-    const timer = window.setInterval(() => {
-      setWaitMessageIndex((current) => Math.min(current + 1, chatWaitingMessages.length - 1))
-    }, 1800)
-    return () => window.clearInterval(timer)
+
+    const timers = chatWaitingMessageScheduleMs.slice(1).map((delayMs, index) => (
+      window.setTimeout(() => {
+        setWaitMessageIndex(index + 1)
+      }, delayMs)
+    ))
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer))
+    }
   }, [isSending])
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -21,6 +21,7 @@ function conversationBody(blocks: A2UIBlock[]) {
 }
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.restoreAllMocks()
   window.history.pushState(null, '', '/')
   sessionStorage.clear()
@@ -410,5 +411,88 @@ describe('App', () => {
     )
 
     expect(await screen.findByText('Necesito confirmar un dato antes de recomendar.')).toBeInTheDocument()
+  })
+
+  it.each([
+    {
+      label: 'respuesta rápida',
+      elapsedMs: 2000,
+      expectedCopy: 'Contactando con Kalmio',
+      hiddenCopy: ['Esperando la respuesta', 'Está tardando más de lo habitual', 'Si no llega, podrás reintentarlo'],
+    },
+    {
+      label: 'respuesta normal',
+      elapsedMs: 7000,
+      expectedCopy: 'Esperando la respuesta',
+      hiddenCopy: ['Está tardando más de lo habitual', 'Si no llega, podrás reintentarlo'],
+    },
+    {
+      label: 'respuesta lenta',
+      elapsedMs: 13000,
+      expectedCopy: 'Está tardando más de lo habitual',
+      hiddenCopy: ['Si no llega, podrás reintentarlo'],
+    },
+    {
+      label: 'respuesta muy lenta',
+      elapsedMs: 25000,
+      expectedCopy: 'Si no llega, podrás reintentarlo',
+      hiddenCopy: [],
+    },
+  ])('shows the right loader copy for $label after $elapsedMs ms', async ({ elapsedMs, expectedCopy, hiddenCopy }) => {
+    document.cookie = 'csrftoken=test-token'
+    const pendingMessage = new Promise<Response>(() => {})
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = input.toString()
+      if (url.includes('/api/conversation/messages')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify(conversationBody([
+                {
+                  id: 'assistant-initial',
+                  type: 'AssistantMessage',
+                  version: 1,
+                  props: { text: 'Cuéntame qué necesitas.' },
+                },
+              ])),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        )
+      }
+      if (url.includes('/api/auth/csrf')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ detail: 'csrf cookie set', csrf_token: 'test-token' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+      }
+      if (url.includes('/api/conversation/message')) {
+        return pendingMessage
+      }
+      return Promise.reject(new Error(`Unexpected request: ${url}`))
+    })
+
+    const { unmount } = render(<App />)
+    fireEvent.click((await screen.findAllByRole('link', { name: /Chat/i }))[0])
+    expect(await screen.findByText('Cuéntame qué necesitas.')).toBeInTheDocument()
+
+    vi.useFakeTimers()
+
+    fireEvent.change(screen.getByLabelText('Mensaje para Kalmio'), {
+      target: { value: 'Estoy en Córdoba con un 18%' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+
+    expect(screen.getByText('Contactando con Kalmio')).toBeInTheDocument()
+
+    act(() => {
+      vi.advanceTimersByTime(elapsedMs)
+    })
+    expect(screen.getByText(expectedCopy)).toBeInTheDocument()
+    hiddenCopy.forEach((copy) => {
+      expect(screen.queryByText(copy)).not.toBeInTheDocument()
+    })
+
+    unmount()
   })
 })

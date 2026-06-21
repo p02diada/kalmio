@@ -4,3 +4,10 @@ export const chatWaitingMessages = [
   'Está tardando más de lo habitual',
   'Si no llega, podrás reintentarlo',
 ] as const
+
+export const chatWaitingMessageScheduleMs = [
+  0,
+  3500,
+  12000,
+  24000,
+] as const
