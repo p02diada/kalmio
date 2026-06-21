@@ -34,7 +34,6 @@ from routing.instrumentation import (
 A2UI_COMPONENT_TYPES = {
     "AssistantMessage",
     "UserMessage",
-    "TripSummaryCard",
     "RouteSummaryCard",
     "StationPreviewCard",
     "StationDetailCard",
@@ -1142,7 +1141,7 @@ def conversation_agent_prompt(
     )
     catalog_instructions = (
         "Catálogo A2UI permitido por propósito, no por reglas rígidas de intención:\n"
-        "AssistantMessage texto breve; TripSummaryCard ruta clara con origin, destination, battery y arrivalReservePercent; RouteSummaryCard solo plan_route; "
+        "AssistantMessage texto breve para contexto conversacional como origen, destino, batería, margen, reserva e incertidumbre concreta; RouteSummaryCard solo plan_route; "
         "StationPreviewCard/StationList solo estaciones de carga respaldadas por herramientas; en esos bloques name/stationName debe ser una estación verificable; address puede ser dirección/zona de herramienta. AssistantMessage explica incertidumbre concreta; "
         "CostComparisonCard solo tarifas/costes de herramienta; para preferencias de precio usa pricePerKwhEur y savingPerKwhEur verificados y no estimados, no estimatedCostEur sin energía verificada. AssistantMessage muestra la ubicación/zona resuelta cuando aporte contexto; StationPreviewCard muestra estación concreta con distanceKm, powerKw, pricePerKwhEur, availableEvses, connectorTypes, lat/lon cuando vengan de herramienta; no muestres pricePerKwhEur si priceIsEstimated es true. "
         "si quieres mostrar alternativas, usa StationList solo cuando aporte una decisión distinta; si hay riesgo o límite crítico, explícalo en AssistantMessage antes de la card. "
@@ -3513,12 +3512,6 @@ def summarize_block_for_context(block_type: str, props: dict) -> str:
             f"distancia {props.get('distanceKm')} km, EVSEs {props.get('availableEvses')}, "
             f"conectores {props.get('connectorTypes')}, desvío {props.get('detourMin')} min{price_text}."
         )
-    if block_type == "TripSummaryCard":
-        return (
-            "Resumen previo de viaje: "
-            f"origen {props.get('origin')}, destino {props.get('destination')}, "
-            f"batería {props.get('battery')}, llegada mínima {props.get('arrivalReservePercent')}."
-        )
     if block_type == "RouteSummaryCard":
         return (
             "Resultado previo de ruta: "
@@ -3724,16 +3717,6 @@ def route_planning_blocks(intent: ParsedIntent) -> list[dict]:
             f"assistant-{uuid4().hex[:10]}",
             "AssistantMessage",
             {"text": assistant_text},
-        ),
-        block(
-            f"trip-{uuid4().hex[:10]}",
-            "TripSummaryCard",
-            {
-                "origin": {"label": intent.origin.label, "lat": intent.origin.lat, "lon": intent.origin.lon},
-                "destination": {"label": intent.destination.label, "lat": intent.destination.lat, "lon": intent.destination.lon},
-                "battery": intent.vehicle_fields.get("battery"),
-                "arrivalReservePercent": intent.preferences.reserve_min_percent,
-            },
         ),
         block(
             f"route-{uuid4().hex[:10]}",

@@ -119,7 +119,6 @@ function canHostActionFooter(block: A2UIBlock) {
     block.type === 'StationPreviewCard' ||
     block.type === 'StationDetailCard' ||
     block.type === 'RouteSummaryCard' ||
-    block.type === 'TripSummaryCard' ||
     block.type === 'MapPreviewCard'
   )
 }
@@ -238,8 +237,6 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
       return <MessageCard icon={Bot} tone="assistant" text={text(block.props.text)} />
     case 'UserMessage':
       return <MessageCard icon={MessageCircle} tone="route" text={text(block.props.text)} align="right" />
-    case 'TripSummaryCard':
-      return <TripSummaryCard block={block} />
     case 'RouteSummaryCard':
       return (
         <MetricCard
@@ -432,25 +429,6 @@ function MessageCard({
         {value}
       </div>
     </div>
-  )
-}
-
-function TripSummaryCard({ block }: { block: A2UIBlock }) {
-  return (
-    <A2UICard icon={Route} tone="route" title="Resumen de la ruta" contentClassName="space-y-4">
-      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-lg font-semibold tracking-tight">
-        <span className="min-w-0 break-words">{text(block.props.origin)}</span>
-        <span className="text-muted-foreground" aria-hidden="true">→</span>
-        <span className="min-w-0 break-words">{text(block.props.destination)}</span>
-      </div>
-      <DecisionNarrative props={block.props} />
-      <MetricGrid
-        rows={[
-          ['Batería actual', percentOrUnknown(block.props.battery)],
-          ['Llegar con al menos', percent(block.props.arrivalReservePercent)],
-        ]}
-      />
-    </A2UICard>
   )
 }
 
@@ -1760,11 +1738,6 @@ function compactRows(rows: Array<[string, string] | null>): Array<[string, strin
 
 function compactParts(parts: string[]) {
   return parts.map((part) => part.trim()).filter(Boolean)
-}
-
-function percentOrUnknown(value: unknown) {
-  const number = knownNumber(value)
-  return number === null ? 'No indicada' : `${formatNumber(number)}%`
 }
 
 function bool(value: unknown) {

@@ -163,34 +163,6 @@ describe('A2UIRenderer', () => {
     expect(screen.queryByText('240 min')).not.toBeInTheDocument()
   })
 
-  it('renders trip summary arrival threshold without internal plan type copy', () => {
-    render(
-      <A2UIRenderer
-        blocks={[
-          {
-            id: 'trip',
-            type: 'TripSummaryCard',
-            version: 1,
-            props: {
-              origin: { label: 'Zaragoza' },
-              destination: { label: 'Valencia' },
-              battery: 24,
-              arrivalReservePercent: 12,
-            },
-          },
-        ]}
-      />,
-    )
-
-    expect(screen.getByText('Batería actual')).toBeInTheDocument()
-    expect(screen.getByText('Llegar con al menos')).toBeInTheDocument()
-    expect(screen.getByText('12%')).toBeInTheDocument()
-    expect(screen.queryByText('Margen al llegar')).not.toBeInTheDocument()
-    expect(screen.queryByText('Reserva mínima')).not.toBeInTheDocument()
-    expect(screen.queryByText('Tipo')).not.toBeInTheDocument()
-    expect(screen.queryByText('Conservadora')).not.toBeInTheDocument()
-  })
-
   it('renders a station preview as the primary charging decision', () => {
     render(
       <A2UIRenderer
