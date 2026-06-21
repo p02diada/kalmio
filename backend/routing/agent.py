@@ -1547,6 +1547,8 @@ def blocks_from_tool_result(tool_result: dict[str, Any], message: str = "") -> l
 def fallback_from_tool_history(tool_history: list[dict[str, Any]], reason: str, message: str = "") -> list[dict]:
     latest_result = latest_tool_result(tool_history)
     if latest_result and latest_result.get("ok"):
+        if is_renderable_tool_result(latest_result):
+            return blocks_from_tool_result(latest_result, message)
         return [
             block(
                 f"assistant-{uuid4().hex[:10]}",
@@ -1573,6 +1575,10 @@ def fallback_from_tool_history(tool_history: list[dict[str, Any]], reason: str, 
             },
         ),
     ]
+
+
+def is_renderable_tool_result(tool_result: dict[str, Any]) -> bool:
+    return str(tool_result.get("tool") or "") in {"search_destination_chargers", "plan_route"}
 
 
 def user_facing_failure_text(reason: str) -> str:

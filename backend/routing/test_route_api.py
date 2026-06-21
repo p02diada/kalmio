@@ -18,6 +18,7 @@ from routing.agent import (
     conversation_agent_prompt,
     contextualized_prompt,
     decode_agent_json,
+    fallback_from_tool_history,
     parse_openai_compatible_decision,
     run_deepseek_decision,
     station_search_result_prompt,
@@ -202,6 +203,23 @@ def test_conversation_messages_initializes_a2ui_blocks(client):
 
 
 @pytest.mark.django_db
+def test_conversation_messages_repairs_duplicate_block_ids_on_read(client):
+    session = client.session
+    session[ACTIVE_CONVERSATION_BLOCKS_KEY] = [
+        {"id": "msg1", "type": "AssistantMessage", "version": 1, "props": {"text": "Primera respuesta."}},
+        {"id": "msg1", "type": "AssistantMessage", "version": 1, "props": {"text": "Segunda respuesta."}},
+    ]
+    session.save()
+
+    response = client.get("/api/conversation/messages")
+
+    assert response.status_code == 200
+    blocks = blocks_from_a2ui_response(response)
+    assert [block["id"] for block in blocks] == ["msg1", "msg1-2"]
+    assert [block["props"]["text"] for block in blocks] == ["Primera respuesta.", "Segunda respuesta."]
+
+
+@pytest.mark.django_db
 def test_conversation_message_accepts_a2ui_action_transport_without_visible_action_echo(client, settings, monkeypatch):
     settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
 
@@ -243,6 +261,54 @@ def test_conversation_message_accepts_a2ui_action_transport_without_visible_acti
         block["type"] == "UserMessage" and "Acción A2UI" in block["props"].get("text", "")
         for block in blocks_from_a2ui_response(body)
     )
+
+
+@pytest.mark.django_db
+def test_conversation_message_keeps_reused_agent_block_ids_unique(client, settings, monkeypatch):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
+    replies = iter(["Primera respuesta.", "Segunda respuesta."])
+
+    def fake_deepseek_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+        return {
+            "type": "final",
+            "blocks": [
+                {
+                    "id": "msg1",
+                    "type": "AssistantMessage",
+                    "version": 1,
+                    "props": {"text": next(replies)},
+                }
+            ],
+        }
+
+    monkeypatch.setattr("routing.agent.run_deepseek_decision", fake_deepseek_decision)
+
+    first_response = client.post(
+        "/api/conversation/message",
+        data={"text": "Necesito cargar ya"},
+        content_type="application/json",
+    )
+    assert first_response.status_code == 200
+
+    second_response = client.post(
+        "/api/conversation/message",
+        data={"text": "Estoy en Córdoba"},
+        content_type="application/json",
+    )
+
+    assert second_response.status_code == 200
+    blocks = blocks_from_a2ui_response(second_response)
+    block_ids = [block["id"] for block in blocks]
+    assistant_texts = [
+        block["props"]["text"]
+        for block in blocks
+        if block["type"] == "AssistantMessage"
+    ]
+
+    assert len(block_ids) == len(set(block_ids))
+    assert "msg1" in block_ids
+    assert "msg1-2" in block_ids
+    assert assistant_texts[-2:] == ["Primera respuesta.", "Segunda respuesta."]
 
 
 @pytest.mark.django_db
@@ -4620,6 +4686,49 @@ def test_deepseek_conversation_agent_stops_repeated_tool_call(client, settings, 
         for block in blocks_from_a2ui_response(response)
         if block["type"] == "AssistantMessage"
     )
+
+
+def test_fallback_from_successful_station_tool_does_not_stack_failure_message():
+    blocks = fallback_from_tool_history(
+        [
+            {
+                "call": {
+                    "tool": "search_destination_chargers",
+                    "args": {
+                        "location": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794},
+                        "limit": 3,
+                    },
+                },
+                "result": {
+                    "ok": True,
+                    "tool": "search_destination_chargers",
+                    "location": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794},
+                    "stops": [
+                        {
+                            "name": "BALLENOIL-ES336090-COLON",
+                            "stationName": "BALLENOIL-ES336090-COLON",
+                            "powerKw": 150,
+                            "distanceKm": 0.3,
+                            "connectorTypes": ["CCS2"],
+                            "availableEvses": 2,
+                            "totalEvses": 2,
+                            "lat": 37.890608,
+                            "lon": -4.777821,
+                        }
+                    ],
+                },
+            }
+        ],
+        "El agente no pudo reparar el contrato A2UI.",
+        "Necesito cargar ya. En la plaza de las Tendillas de Córdoba.",
+    )
+
+    assistant_messages = [block for block in blocks if block["type"] == "AssistantMessage"]
+    rendered_text = " ".join(block["props"]["text"] for block in assistant_messages)
+    assert len(assistant_messages) == 1
+    assert "No he podido completar esta respuesta con fiabilidad" not in rendered_text
+    assert "Muestro solo datos validados" not in rendered_text
+    assert "Uso Córdoba como ubicación aproximada" in rendered_text
 
 
 @pytest.mark.django_db

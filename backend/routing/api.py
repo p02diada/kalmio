@@ -38,6 +38,12 @@ def get_active_conversation_messages(request):
     if not blocks:
         blocks = initial_blocks()
         request.session[ACTIVE_CONVERSATION_BLOCKS_KEY] = blocks
+    else:
+        unique_blocks = with_unique_block_ids(blocks, [])
+        if unique_blocks != blocks:
+            blocks = unique_blocks
+            request.session[ACTIVE_CONVERSATION_BLOCKS_KEY] = blocks
+            request.session.modified = True
     return Response(conversation_a2ui_response(blocks), status=200)
 
 
@@ -84,7 +90,7 @@ def create_conversation_message(request, payload: ConversationMessageRequest):
     if is_action:
         new_blocks = without_action_echo(new_blocks, message_text)
 
-    blocks = [*current_blocks, *new_blocks]
+    blocks = with_unique_block_ids([*current_blocks, *new_blocks], [])
     request.session[ACTIVE_CONVERSATION_BLOCKS_KEY] = blocks[-80:]
     request.session.modified = True
     return Response(conversation_a2ui_response(request.session[ACTIVE_CONVERSATION_BLOCKS_KEY]), status=200)
@@ -117,6 +123,28 @@ def without_action_echo(blocks: list[dict], message_text: str) -> list[dict]:
             and str(block["props"].get("text") or "").strip() == message_text
         )
     ]
+
+
+def with_unique_block_ids(blocks: list[dict], existing_blocks: list[dict]) -> list[dict]:
+    used_ids = {
+        str(block.get("id") or "").strip()
+        for block in existing_blocks
+        if isinstance(block, dict) and str(block.get("id") or "").strip()
+    }
+    unique_blocks = []
+    for index, item in enumerate(blocks):
+        if not isinstance(item, dict):
+            unique_blocks.append(item)
+            continue
+        base_id = str(item.get("id") or f"block-{index}").strip() or f"block-{index}"
+        block_id = base_id
+        counter = 2
+        while block_id in used_ids:
+            block_id = f"{base_id}-{counter}"
+            counter += 1
+        used_ids.add(block_id)
+        unique_blocks.append({**item, "id": block_id})
+    return unique_blocks
 
 
 @router.get("/conversation", response={200: RoutePlanResponse, 404: RoutePlanError})
