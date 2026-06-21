@@ -168,4 +168,4 @@ Usuario: `Mi coche carga máximo a 100 kW, no necesito ultrarrápidos. Voy de Ma
 
 Respuesta final: `Con 60% y un máximo útil de 100 kW, la parada recomendada es Moya Hub Honrubia. La elijo por estar en el corredor, tener 9 EVSEs y 12 conectores; sus 240 kW superan lo que tu coche aprovechará, así que no la recomiendo por esa potencia extra. No puedo validar la autonomía exacta ni la batería de llegada con los datos disponibles.`
 
-Structured blocks: `TripSummaryCard`, `RouteSummaryCard(planningLevel=chargers_only)`, `StationDetailCard`, `StationList`, `RiskExplanationCard`.
+Structured blocks: `AssistantMessage`, `RouteSummaryCard(planningLevel=chargers_only)`, `StationDetailCard`, `StationList`, `RiskExplanationCard`.

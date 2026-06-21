@@ -75,15 +75,7 @@ const scenarios: ExperienceScenario[] = [
     focus: 'La experiencia debe explicar la parada principal, alternativas, riesgo y coste sin obligar a interpretar un mapa.',
     blocks: [
       block('route-assistant', 'AssistantMessage', {
-        text: 'Voy a priorizar una parada con margen conservador y servicios útiles. Si faltan datos del proveedor, lo diré explícitamente.',
-      }),
-      block('route-trip', 'TripSummaryCard', {
-        origin: { label: 'Zaragoza' },
-        destination: { label: 'Valencia' },
-        battery: 24,
-        arrivalReservePercent: 12,
-        takeaway: 'Plan para llegar con al menos un 12% de batería.',
-        why: 'La parada se evalúa para evitar llegar al destino con margen demasiado justo.',
+        text: 'Zaragoza a Valencia con 24% de batería. Priorizaré una parada con margen conservador y servicios útiles; si faltan datos del proveedor, lo diré explícitamente.',
       }),
       block('route-summary', 'RouteSummaryCard', {
         distanceKm: 309,
@@ -291,7 +283,6 @@ function componentFocus(type: string) {
   const focusByType: Record<string, string> = {
     AssistantMessage: 'Debe sonar como copiloto: breve, honesto y sin convertir la respuesta en un panel técnico.',
     UserMessage: 'Debe mantener claro qué dijo el conductor sin competir con la recomendación del asistente.',
-    TripSummaryCard: 'Debe confirmar origen, destino y margen sin parecer una tabla administrativa.',
     RouteSummaryCard: 'Debe explicar esfuerzo, duración y llegada con números legibles en móvil.',
     StationPreviewCard: 'Debe ser una recomendación escaneable que abre el detalle completo de la estación.',
     StationDetailCard: 'Debe estructurar toda la información disponible de una estación sin prometer disponibilidad ni precios no verificados.',

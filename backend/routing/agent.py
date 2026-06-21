@@ -34,7 +34,6 @@ from routing.instrumentation import (
 A2UI_COMPONENT_TYPES = {
     "AssistantMessage",
     "UserMessage",
-    "TripSummaryCard",
     "RouteSummaryCard",
     "StationPreviewCard",
     "StationDetailCard",
@@ -1144,7 +1143,7 @@ def conversation_agent_prompt(
     )
     catalog_instructions = (
         "Catálogo A2UI permitido por propósito, no por reglas rígidas de intención:\n"
-        "AssistantMessage texto breve; TripSummaryCard ruta clara con origin, destination, battery y arrivalReservePercent; RouteSummaryCard solo plan_route; "
+        "AssistantMessage texto breve para contexto conversacional como origen, destino, batería, margen o reserva; RouteSummaryCard solo plan_route; "
         "StationPreviewCard/StationList solo estaciones de carga respaldadas por herramientas; en esos bloques name/stationName debe ser una estación verificable; address puede ser dirección/zona de herramienta. RiskExplanationCard incertidumbre concreta; "
         "CostComparisonCard solo tarifas/costes de herramienta; para preferencias de precio usa pricePerKwhEur y savingPerKwhEur verificados y no estimados, no estimatedCostEur sin energía verificada. PlaceDetailCard muestra lugares o zonas resueltas; StationPreviewCard muestra estación concreta con distanceKm, powerKw, pricePerKwhEur, availableEvses, connectorTypes, lat/lon cuando vengan de herramienta; no muestres pricePerKwhEur si priceIsEstimated es true. "
         "si quieres mostrar alternativas o riesgo, usa bloques separados StationList y RiskExplanationCard elegidos por el agente. "
@@ -3605,12 +3604,6 @@ def summarize_block_for_context(block_type: str, props: dict) -> str:
             f"{props.get('label')} ({props.get('lat')}, {props.get('lon')}), "
             f"contexto {props.get('context')}, confirmar {props.get('needsConfirmation')}."
         )
-    if block_type == "TripSummaryCard":
-        return (
-            "Resumen previo de viaje: "
-            f"origen {props.get('origin')}, destino {props.get('destination')}, "
-            f"batería {props.get('battery')}, llegada mínima {props.get('arrivalReservePercent')}."
-        )
     if block_type == "RouteSummaryCard":
         return (
             "Resultado previo de ruta: "
@@ -3823,20 +3816,10 @@ def route_planning_blocks(intent: ParsedIntent) -> list[dict]:
             "AssistantMessage",
             {
                 "text": (
-                    "He decidido calcular ruta porque hay origen y destino. "
+                    f"He calculado la ruta de {intent.origin.label} a {intent.destination.label}. "
                     if intent.vehicle
-                    else "He decidido explorar paradas de carga en ruta. Sin datos completos del coche no calculo autonomía."
+                    else f"He explorado paradas de carga de {intent.origin.label} a {intent.destination.label}. Sin datos completos del coche no calculo autonomía."
                 )
-            },
-        ),
-        block(
-            f"trip-{uuid4().hex[:10]}",
-            "TripSummaryCard",
-            {
-                "origin": {"label": intent.origin.label, "lat": intent.origin.lat, "lon": intent.origin.lon},
-                "destination": {"label": intent.destination.label, "lat": intent.destination.lat, "lon": intent.destination.lon},
-                "battery": intent.vehicle_fields.get("battery"),
-                "arrivalReservePercent": intent.preferences.reserve_min_percent,
             },
         ),
         block(

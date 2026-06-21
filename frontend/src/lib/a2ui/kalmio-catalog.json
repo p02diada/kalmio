@@ -21,21 +21,6 @@
       "required": ["text"],
       "additionalProperties": false
     },
-    "TripSummaryCard": {
-      "allOf": [
-        { "$ref": "#/$defs/decisionProps" },
-        {
-          "type": "object",
-          "properties": {
-            "origin": { "$ref": "#/$defs/displayValue" },
-            "destination": { "$ref": "#/$defs/displayValue" },
-            "battery": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
-            "arrivalReservePercent": { "type": ["number", "null"], "minimum": 0, "maximum": 100 }
-          },
-          "additionalProperties": true
-        }
-      ]
-    },
     "RouteSummaryCard": {
       "allOf": [
         { "$ref": "#/$defs/decisionProps" },
