@@ -68,6 +68,31 @@ describe('A2UIRenderer', () => {
     expect(screen.getByText('UnknownCard')).toBeInTheDocument()
   })
 
+  it('uses neutral plural copy for clarifying questions with multiple fields', () => {
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'clarify-destination',
+            type: 'ClarifyingQuestionCard',
+            version: 1,
+            props: {
+              question: 'Para cerrar el plan necesito estos datos.',
+              fields: ['Dirección del hotel', 'Batería al llegar', 'Conector'],
+            },
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('Datos por confirmar')).toBeInTheDocument()
+    expect(screen.getByText('Confirma la información que falta antes de continuar.')).toBeInTheDocument()
+    expect(screen.queryByText('Dato necesario')).not.toBeInTheDocument()
+    expect(screen.getByText('Dirección del hotel')).toBeInTheDocument()
+    expect(screen.getByText('Batería al llegar')).toBeInTheDocument()
+    expect(screen.getByText('Conector')).toBeInTheDocument()
+  })
+
   it('normalizes object labels before rendering text', () => {
     render(
       <A2UIRenderer
@@ -741,12 +766,14 @@ describe('A2UIRenderer', () => {
             id: 'chips',
             type: 'PreferenceChips',
             version: 1,
-            props: { chips: [longChip] },
+            props: { title: 'Ajusta la búsqueda', chips: [longChip] },
           },
         ]}
       />,
     )
 
+    expect(screen.getByText('Ajusta la búsqueda')).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Ajusta la búsqueda' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: longChip })).toHaveClass('max-w-full', 'whitespace-normal', 'break-words', 'py-2')
   })
 

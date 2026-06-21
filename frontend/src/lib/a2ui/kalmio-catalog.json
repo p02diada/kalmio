@@ -193,7 +193,7 @@
           "items": { "type": "string", "minLength": 1 }
         }
       },
-      "required": ["chips"],
+      "required": ["title", "chips"],
       "additionalProperties": false
     },
     "ErrorFallbackCard": {
