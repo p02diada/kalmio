@@ -1,9 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 
 import { A2UIRenderer } from '@/components/a2ui/a2ui-renderer'
-import { ChatPendingStatus } from '@/components/chat/chat-pending-status'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import type { A2UIBlock } from '@/lib/a2ui/types'
 
@@ -172,6 +170,20 @@ const scenarios: ExperienceScenario[] = [
           },
         ],
       }),
+      block('route-station-detail', 'StationDetailCard', {
+        stationName: 'Punto de muestra La Plana',
+        address: 'Área de servicio La Plana',
+        powerKw: 150,
+        pricePerKwhEur: 0.39,
+        currency: 'EUR',
+        priceIsEstimated: false,
+        distanceKm: 118,
+        detourMin: 6,
+        availableEvses: 4,
+        totalEvses: 8,
+        connectorTypes: ['CCS2'],
+        amenities: ['RESTAURANT', 'TOILETS', 'WIFI', 'PARKING_LOT'],
+      }),
       block('route-preferences', 'PreferenceChips', {
         title: 'Preferencias',
         chips: ['Parada con restaurante', 'Menos desvío', 'Más margen de batería', 'Solo carga rápida'],
@@ -245,7 +257,6 @@ const componentCases = uniqueComponentTypes.map((type) => {
   return {
     id: String(type),
     type: String(type),
-    scenarioTitle: scenario?.title ?? 'Sin escenario',
     focus: componentFocus(String(type)),
     block: sample ? { ...sample, id: `component-${sample.type}` } : block(`component-${type}`, type, {}),
   }
@@ -268,106 +279,32 @@ function componentFocus(type: string) {
   return focusByType[type] ?? 'Bloque de respuesta renderizado de forma aislada para revisar encaje visual y estados.'
 }
 
-const catalogStats = [
-  ['Dirección visual', 'Agentic Signal'],
-  ['Componentes', `${uniqueComponentTypes.length} tipos`],
-  ['Escenarios', String(scenarios.length)],
-  ['Contrato A2UI', 'v0.9.1'],
-] as const
-
 export function A2UIShowcasePage() {
-  const [viewMode, setViewMode] = useState<'components' | 'scenarios'>('scenarios')
-  const [reviewLayout, setReviewLayout] = useState<'detail' | 'mobile-grid'>('detail')
   const [showTechnical, setShowTechnical] = useState(false)
   const [lastAction, setLastAction] = useState<string | null>(null)
-  const blockCount = useMemo(
-    () => scenarios.reduce((total, scenario) => total + scenario.blocks.length, 0),
-    [],
-  )
 
   return (
-    <section className="a2ui-showcase-page flex flex-col gap-5 pb-4">
-      <div className="-mx-4 border-b border-border bg-background/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6 md:sticky md:top-0 md:z-10 md:-mx-14 md:px-14">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-          <div className="min-w-0 space-y-2">
+    <section className="a2ui-showcase-page flex flex-col gap-4 pb-4">
+      <div className="-mx-4 border-b border-border bg-background/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 md:sticky md:top-0 md:z-10 md:-mx-14 md:px-14">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="default">Agentic Signal</Badge>
               <Badge variant="secondary">Catálogo v1.0</Badge>
             </div>
-            <div className="space-y-1">
-              <h1 className="text-2xl font-semibold tracking-normal">Catálogo A2UI</h1>
-              <p className="max-w-3xl text-sm leading-6 text-body">
-                Componentes dinámicos permitidos para respuestas de viaje EV. Esta página revisa cómo se ven con la dirección visual elegida y mantiene los datos de muestra separados del contrato real.
-              </p>
-            </div>
+            <h1 className="mt-2 text-xl font-semibold leading-7 tracking-normal">Catálogo A2UI</h1>
+            <p className="text-xs leading-5 text-muted-foreground">
+              {uniqueComponentTypes.length} componentes · contrato v0.9.1
+            </p>
           </div>
-
-          <div className="grid grid-cols-2 gap-2 lg:w-[28rem]">
-            {catalogStats.map(([label, value]) => (
-              <div key={label} className="rounded-md border border-border bg-surface px-3 py-2">
-                <p className="text-caption font-medium leading-4 text-muted-foreground">{label}</p>
-                <p className="mt-1 text-sm font-semibold leading-5 text-foreground">{value}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-2">
-            <div className="flex rounded-full bg-muted p-1" aria-label="Modo de revisión">
-              <Button
-                type="button"
-                variant={viewMode === 'components' ? 'default' : 'ghost'}
-                size="sm"
-                className="h-8 rounded-full px-3"
-                onClick={() => setViewMode('components')}
-              >
-                Componentes
-              </Button>
-              <Button
-                type="button"
-                variant={viewMode === 'scenarios' ? 'default' : 'ghost'}
-                size="sm"
-                className="h-8 rounded-full px-3"
-                onClick={() => setViewMode('scenarios')}
-              >
-                Escenarios
-              </Button>
-            </div>
-            <div className="flex rounded-full bg-muted p-1" aria-label="Presentación">
-              <Button
-                type="button"
-                variant={reviewLayout === 'detail' ? 'default' : 'ghost'}
-                size="sm"
-                className="h-8 rounded-full px-3"
-                onClick={() => setReviewLayout('detail')}
-              >
-                Detalle
-              </Button>
-              <Button
-                type="button"
-                variant={reviewLayout === 'mobile-grid' ? 'default' : 'ghost'}
-                size="sm"
-                className="h-8 rounded-full px-3"
-                onClick={() => setReviewLayout('mobile-grid')}
-              >
-                Galería M
-              </Button>
-            </div>
-          </div>
-          <label className="flex min-w-0 items-center gap-2 text-xs leading-5 text-muted-foreground">
+          <label className="flex shrink-0 items-center gap-2 text-xs leading-5 text-muted-foreground">
             <Switch
               aria-label="Mostrar datos técnicos"
               checked={showTechnical}
               onCheckedChange={setShowTechnical}
             />
-            Mostrar datos técnicos
+            Datos
           </label>
-          {lastAction ? (
-            <span className="truncate text-right text-xs leading-5 text-muted-foreground">
-              Acción: {lastAction}
-            </span>
-          ) : null}
         </div>
       </div>
 
@@ -380,139 +317,37 @@ export function A2UIShowcasePage() {
         </p>
       </div>
 
-      <article id="chat-waiting" className="scroll-mt-28 rounded-md border border-border bg-surface">
-        <div className="border-b border-border px-3 py-2">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="font-mono text-xs leading-4 text-muted-foreground">Estado operativo</p>
-              <h2 className="text-sm font-semibold leading-5 tracking-normal">Espera del chat</h2>
-            </div>
-            <Badge variant="secondary" className="shrink-0">
-              Nuevo
-            </Badge>
-          </div>
-          <p className="mt-1 text-xs leading-5 text-body">
-            Esto es lo que ve el conductor después de enviar un mensaje mientras Kalmio resuelve la respuesta.
-          </p>
-        </div>
-        <div className="mx-auto flex w-full max-w-[23.4375rem] flex-col gap-3 bg-background px-3 py-4">
-          <A2UIRenderer
-            blocks={[
-              block('waiting-preview-user', 'UserMessage', {
-                text: 'Estoy en Córdoba con un 18% y CCS2.',
-              }),
-            ]}
-          />
-          <ChatPendingStatus messageIndex={2} />
-        </div>
-      </article>
-
       <div className="flex flex-wrap gap-2">
-        <a
-          href="#chat-waiting"
-          className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
-        >
-          Espera del chat
-        </a>
-        {(viewMode === 'components' ? componentCases : scenarios).map((item) => (
+        {componentCases.map((item) => (
           <a
             key={item.id}
             href={`#${item.id}`}
             className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
           >
-            {'type' in item ? item.type : item.title}
+            {item.type}
           </a>
         ))}
       </div>
 
-      {reviewLayout === 'mobile-grid' ? (
-        <MobileGridReview
-          items={viewMode === 'components' ? componentCases : scenarios}
-          mode={viewMode}
-          showTechnical={showTechnical}
-          onChipClick={(value) => setLastAction(`chip:${value}`)}
-          onActionEvent={(name) => setLastAction(`event:${name}`)}
-          onPositionSubmit={(value) => setLastAction(`position:${value}`)}
-          onManualPositionRequest={() => setLastAction('manual-position')}
-        />
-      ) : viewMode === 'components' ? (
-        <div className="flex flex-col gap-7">
-          {componentCases.map((item) => (
-            <article id={item.id} key={item.id} className="scroll-mt-28 space-y-3 border-t border-border pt-5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 space-y-1">
-                  <p className="font-mono text-xs leading-4 text-muted-foreground">{item.scenarioTitle}</p>
-                  <h2 className="break-words text-xl font-semibold tracking-normal">{item.type}</h2>
-                  <p className="text-sm leading-6 text-body">{item.focus}</p>
-                </div>
-                <Badge variant="secondary" className="shrink-0 font-mono text-[0.68rem]">
-                  Vista aislada
-                </Badge>
-              </div>
+      {lastAction ? (
+        <p className="text-xs leading-5 text-muted-foreground">Acción: {lastAction}</p>
+      ) : null}
 
-              {showTechnical ? (
-                <Badge variant="secondary" className="font-mono text-[0.68rem]">
-                  {item.block.id}
-                </Badge>
-              ) : null}
-
-              <A2UIRenderer
-                blocks={[item.block]}
-                onChipClick={(value) => setLastAction(`chip:${value}`)}
-                onActionEvent={(name) => setLastAction(`event:${name}`)}
-                onPositionSubmit={(value) => setLastAction(`position:${value}`)}
-                onManualPositionRequest={() => setLastAction('manual-position')}
-              />
-            </article>
-          ))}
-        </div>
-      ) : (
-        <div className="flex flex-col gap-8">
-          {scenarios.map((scenario, index) => (
-            <article id={scenario.id} key={scenario.id} className="scroll-mt-28 space-y-3 border-t border-border pt-5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 space-y-1">
-                  <p className="font-mono text-xs leading-4 text-muted-foreground">
-                    Escenario {index + 1}
-                  </p>
-                  <h2 className="text-xl font-semibold tracking-normal">{scenario.title}</h2>
-                  <p className="text-sm leading-6 text-body">{scenario.focus}</p>
-                </div>
-                <Badge variant="secondary" className="shrink-0">
-                  {showTechnical
-                    ? countLabel(scenario.blocks.length, 'bloque', 'bloques')
-                    : countLabel(scenario.blocks.length, 'parte', 'partes')}
-                </Badge>
-              </div>
-
-              {showTechnical ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {scenario.blocks.map((item) => (
-                    <Badge key={item.id} variant="secondary" className="font-mono text-[0.68rem]">
-                      {item.type}
-                    </Badge>
-                  ))}
-                </div>
-              ) : null}
-
-              <A2UIRenderer
-                blocks={scenario.blocks}
-                onChipClick={(value) => setLastAction(`chip:${value}`)}
-                onActionEvent={(name) => setLastAction(`event:${name}`)}
-                onPositionSubmit={(value) => setLastAction(`position:${value}`)}
-                onManualPositionRequest={() => setLastAction('manual-position')}
-              />
-            </article>
-          ))}
-        </div>
-      )}
+      <ComponentCatalogGrid
+        items={componentCases}
+        showTechnical={showTechnical}
+        onChipClick={(value) => setLastAction(`chip:${value}`)}
+        onActionEvent={(name) => setLastAction(`event:${name}`)}
+        onPositionSubmit={(value) => setLastAction(`position:${value}`)}
+        onManualPositionRequest={() => setLastAction('manual-position')}
+      />
 
       {showTechnical ? (
         <div className="border-t border-border pt-4">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-semibold">Cobertura del catálogo</p>
             <span className="text-xs text-muted-foreground">
-              {blockCount} bloques / {uniqueComponentTypes.length} tipos
+              {uniqueComponentTypes.length} componentes
             </span>
           </div>
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -537,70 +372,56 @@ type ShowcaseActions = {
 
 type ComponentCase = (typeof componentCases)[number]
 
-function MobileGridReview({
+function ComponentCatalogGrid({
   items,
-  mode,
   showTechnical,
   onChipClick,
   onActionEvent,
   onPositionSubmit,
   onManualPositionRequest,
 }: {
-  items: ComponentCase[] | ExperienceScenario[]
-  mode: 'components' | 'scenarios'
+  items: ComponentCase[]
   showTechnical: boolean
 } & ShowcaseActions) {
   return (
-    <div className="mr-auto grid w-full max-w-[82.25rem] grid-cols-[repeat(auto-fit,minmax(20rem,1fr))] items-start gap-3 pb-2">
-      {items.map((item) => {
-        const isComponent = mode === 'components'
-        const title = isComponent ? (item as ComponentCase).type : (item as ExperienceScenario).title
-        const subtitle = isComponent ? (item as ComponentCase).scenarioTitle : 'Escenario completo'
-        const focus = item.focus
-        const blocks = isComponent ? [(item as ComponentCase).block] : (item as ExperienceScenario).blocks
-
-        return (
-          <article id={item.id} key={item.id} className="scroll-mt-28 rounded-lg border border-border bg-surface">
-            <div className="border-b border-border bg-muted px-3 py-2">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate font-mono text-[0.68rem] leading-4 text-muted-foreground">
-                    {subtitle}
-                  </p>
-                  <h2 className="truncate text-sm font-semibold leading-5 tracking-normal">{title}</h2>
-                </div>
-                <Badge variant="secondary" className="shrink-0 font-mono text-[0.68rem]">
-                  M
+    <div className="grid w-full grid-cols-1 items-start gap-3 pb-2 sm:grid-cols-[repeat(auto-fit,minmax(21.5rem,23.4375rem))] sm:justify-center lg:justify-start">
+      {items.map((item) => (
+        <article id={item.id} key={item.id} className="scroll-mt-28 rounded-lg border border-border bg-surface">
+          <div className="border-b border-border bg-muted px-3 py-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h2 className="truncate text-sm font-semibold leading-5 tracking-normal">{item.type}</h2>
+              </div>
+              <Badge variant="secondary" className="hidden shrink-0 font-mono text-[0.68rem] sm:inline-flex">
+                M
+              </Badge>
+            </div>
+            {showTechnical ? (
+              <div className="mt-2 flex flex-wrap gap-1">
+                <Badge variant="secondary" className="font-mono text-[0.62rem]">
+                  {item.block.id}
+                </Badge>
+                <Badge variant="secondary" className="font-mono text-[0.62rem]">
+                  {item.block.type}
                 </Badge>
               </div>
-              <p className="mt-1 line-clamp-2 text-xs leading-5 text-body">{focus}</p>
-              {showTechnical ? (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {blocks.map((blockItem) => (
-                    <Badge key={blockItem.id} variant="secondary" className="font-mono text-[0.62rem]">
-                      {blockItem.type}
-                    </Badge>
-                  ))}
-                </div>
-              ) : null}
-            </div>
+            ) : null}
+          </div>
 
-            <div className="mx-auto w-full max-w-[23.4375rem] bg-background px-3 py-3">
-              <A2UIRenderer
-                blocks={blocks}
-                onChipClick={onChipClick}
-                onActionEvent={onActionEvent}
-                onPositionSubmit={onPositionSubmit}
-                onManualPositionRequest={onManualPositionRequest}
-              />
-            </div>
-          </article>
-        )
-      })}
+          <div className="w-full bg-background px-3 py-3 sm:mx-auto sm:max-w-[23.4375rem]">
+            <A2UIRenderer
+              blocks={[item.block]}
+              onChipClick={onChipClick}
+              onActionEvent={onActionEvent}
+              onPositionSubmit={onPositionSubmit}
+              onManualPositionRequest={onManualPositionRequest}
+            />
+            {showTechnical ? (
+              <p className="mt-2 text-xs leading-5 text-body">{item.focus}</p>
+            ) : null}
+          </div>
+        </article>
+      ))}
     </div>
   )
-}
-
-function countLabel(count: number, singular: string, plural: string) {
-  return `${count} ${count === 1 ? singular : plural}`
 }
