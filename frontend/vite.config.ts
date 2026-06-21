@@ -4,12 +4,14 @@ import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath, URL } from 'node:url'
 import { VitePWA } from 'vite-plugin-pwa'
 
+const devApiProxyTarget = process.env.VITE_DEV_API_PROXY_TARGET ?? 'http://127.0.0.1:8000'
+
 export default defineConfig({
   server: {
-    allowedHosts: ['.trycloudflare.com'],
+    allowedHosts: true,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8000',
+        target: devApiProxyTarget,
         changeOrigin: true,
       },
     },

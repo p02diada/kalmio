@@ -10,6 +10,24 @@ The current build includes the React/Vite PWA, Django/Ninja API, anonymous sessi
 
 ## Local Setup
 
+Docker Compose development stack:
+
+```bash
+make dev
+```
+
+After the stack is up, bootstrap the authorized REVE data into the Postgres database:
+
+```bash
+make reve-import
+```
+
+The frontend is exposed on `http://<LAN_IP>:5173` and the browser talks to the API through the Vite dev proxy, so the same setup works from another device on your Wi-Fi. If you want the local-only variant, use:
+
+```bash
+make dev-local
+```
+
 Frontend:
 
 ```bash
@@ -85,6 +103,13 @@ Docker:
 
 ```bash
 docker compose up --build
+```
+
+For a Docker-only flow, use:
+
+```bash
+docker compose up --build
+docker compose --profile tools run --rm reve-import
 ```
 
 The Compose file is for local development. Production must run the backend image with `KALMIO_ENV=production`, `DJANGO_DEBUG=false`, a real `DJANGO_SECRET_KEY`, explicit `DJANGO_ALLOWED_HOSTS`, HTTPS origins in `CORS_ALLOWED_ORIGINS` and `CSRF_TRUSTED_ORIGINS`, `KALMIO_DB_ENGINE=postgis`, and an explicit absolute HTTP(S) production `KALMIO_OSRM_BASE_URL`. The backend image defaults to Gunicorn; the frontend image builds static assets and serves them with Nginx; OpenAPI/Swagger docs are disabled by default in production; do not use `runserver`, the Vite dev server, or the public OSRM development endpoint outside local development.

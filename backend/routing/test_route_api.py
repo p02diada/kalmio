@@ -1625,6 +1625,209 @@ def test_a2ui_contract_allows_price_followup_with_station_history_context():
     assert issues == []
 
 
+def test_a2ui_contract_requires_service_disclaimer_with_station_history_context():
+    history_blocks = validate_blocks(
+        [
+            {
+                "id": "previous-station",
+                "type": "StationPreviewCard",
+                "version": 1,
+                "props": {
+                    "name": "Parking Calle Sevilla Nº5 - Córdoba",
+                    "stationName": "Parking Calle Sevilla Nº5 - Córdoba",
+                    "distanceKm": 0.5,
+                    "powerKw": 22,
+                    "lat": 37.883857,
+                    "lon": -4.780831,
+                },
+            }
+        ]
+    )
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {"text": "Te mantengo esta estación como opción cercana."},
+            },
+            {
+                "id": "station",
+                "type": "StationPreviewCard",
+                "version": 1,
+                "props": {
+                    "name": "Parking Calle Sevilla Nº5 - Córdoba",
+                    "stationName": "Parking Calle Sevilla Nº5 - Córdoba",
+                    "distanceKm": 0.5,
+                    "powerKw": 22,
+                    "lat": 37.883857,
+                    "lon": -4.780831,
+                },
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history=[],
+        message="¿Tiene baños?",
+        history_blocks=history_blocks,
+    )
+
+    assert any("servicios no están verificados" in issue for issue in issues)
+
+
+def test_a2ui_contract_checks_single_connector_followup_against_station_history():
+    history_blocks = validate_blocks(
+        [
+            {
+                "id": "stations",
+                "type": "StationList",
+                "version": 1,
+                "props": {
+                    "stations": [
+                        {
+                            "name": "Solo Uno",
+                            "stationName": "Solo Uno",
+                            "availableEvses": 1,
+                            "totalEvses": 1,
+                            "powerKw": 150,
+                        },
+                        {
+                            "name": "Hub Cuatro",
+                            "stationName": "Hub Cuatro",
+                            "availableEvses": 4,
+                            "totalEvses": 4,
+                            "powerKw": 120,
+                        },
+                    ]
+                },
+            }
+        ]
+    )
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {"text": "Uso puestos de carga registrados; confirma acceso final."},
+            },
+            {
+                "id": "station",
+                "type": "StationPreviewCard",
+                "version": 1,
+                "props": {
+                    "name": "Solo Uno",
+                    "stationName": "Solo Uno",
+                    "availableEvses": 1,
+                    "totalEvses": 1,
+                    "powerKw": 150,
+                },
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history=[],
+        message="Evita cargadores con un solo conector",
+        history_blocks=history_blocks,
+    )
+
+    assert any("opcion multi-puesto" in issue for issue in issues)
+
+
+def test_a2ui_contract_checks_unvalidated_margin_followup_against_route_history():
+    history_blocks = validate_blocks(
+        [
+            {
+                "id": "route",
+                "type": "RouteCorridorCard",
+                "version": 1,
+                "props": {
+                    "planningLevel": "chargers_only",
+                    "distanceKm": 520.3,
+                    "durationMin": 343,
+                    "energyKwh": None,
+                    "arrivalBattery": None,
+                    "origin": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794},
+                    "destination": {"label": "Valencia", "lat": 39.4699, "lon": -0.3763},
+                },
+            }
+        ]
+    )
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {"text": "Sí, cargar ahí te ayudará a recuperar margen operativo."},
+            }
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history=[],
+        message="¿Entonces voy bien de margen?",
+        history_blocks=history_blocks,
+    )
+
+    assert any("da certeza sobre recuperar margen" in issue for issue in issues)
+
+
+def test_a2ui_contract_checks_max_power_followup_against_user_history():
+    history_blocks = validate_blocks(
+        [
+            {
+                "id": "user",
+                "type": "UserMessage",
+                "version": 1,
+                "props": {"text": "Mi coche carga máximo a 100 kW"},
+            },
+            {
+                "id": "previous-station",
+                "type": "StationPreviewCard",
+                "version": 1,
+                "props": {
+                    "name": "BALLENOIL-ES336090-COLON",
+                    "stationName": "BALLENOIL-ES336090-COLON",
+                    "powerKw": 150,
+                    "lat": 37.890608,
+                    "lon": -4.777821,
+                },
+            },
+        ]
+    )
+    blocks = validate_blocks(
+        [
+            {
+                "id": "station",
+                "type": "StationPreviewCard",
+                "version": 1,
+                "props": {
+                    "name": "BALLENOIL-ES336090-COLON",
+                    "stationName": "BALLENOIL-ES336090-COLON",
+                    "powerKw": 150,
+                    "lat": 37.890608,
+                    "lon": -4.777821,
+                },
+            }
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history=[],
+        message="¿Me sirve este cargador?",
+        history_blocks=history_blocks,
+    )
+
+    assert any("máximo útil del coche" in issue for issue in issues)
+
+
 def test_a2ui_contract_rejects_minimum_charge_without_vehicle_context():
     blocks = validate_blocks(
         [

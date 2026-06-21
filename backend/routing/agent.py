@@ -1711,23 +1711,23 @@ def a2ui_contract_issues(
         elif block_type == "ActionButtons":
             issues.extend(action_buttons_contract_issues(props, facts, explicit_coordinates))
     issues.extend(factual_charger_copy_contract_issues(blocks, facts))
-    issues.extend(destination_city_approximation_contract_issues(blocks, tool_history, user_context))
+    issues.extend(destination_city_approximation_contract_issues(blocks, tool_history, user_context, facts))
     issues.extend(approximate_location_contract_issues(blocks, facts))
     issues.extend(comfort_copy_contract_issues(blocks))
     issues.extend(night_safety_copy_contract_issues(blocks, user_context))
     issues.extend(night_safety_warning_order_contract_issues(blocks, user_context))
-    issues.extend(requested_service_data_contract_issues(blocks, tool_history, user_context))
-    issues.extend(default_reserve_copy_contract_issues(blocks, tool_history, user_context))
-    issues.extend(unvalidated_route_margin_copy_contract_issues(blocks, tool_history))
-    issues.extend(chargers_only_warning_order_contract_issues(blocks, tool_history))
-    issues.extend(max_useful_power_copy_contract_issues(blocks, tool_history))
+    issues.extend(requested_service_data_contract_issues(blocks, tool_history, user_context, facts))
+    issues.extend(default_reserve_copy_contract_issues(blocks, tool_history, user_context, facts))
+    issues.extend(unvalidated_route_margin_copy_contract_issues(blocks, tool_history, facts))
+    issues.extend(chargers_only_warning_order_contract_issues(blocks, tool_history, facts))
+    issues.extend(max_useful_power_copy_contract_issues(blocks, tool_history, facts))
     issues.extend(few_stops_copy_context_contract_issues(blocks, user_context))
     issues.extend(departure_battery_copy_contract_issues(blocks, user_context))
     issues.extend(future_trip_volatility_copy_contract_issues(blocks, user_context))
     issues.extend(cheap_route_reserve_context_contract_issues(blocks, user_context))
     issues.extend(price_preference_context_contract_issues(blocks, user_context, tool_history, facts))
     issues.extend(minimum_charge_context_contract_issues(blocks, user_context))
-    issues.extend(single_connector_preference_contract_issues(blocks, tool_history, user_context))
+    issues.extend(single_connector_preference_contract_issues(blocks, tool_history, user_context, facts))
     issues.extend(action_button_sequence_contract_issues(blocks))
     return dedupe_preserve_order(issues)
 
@@ -1753,6 +1753,7 @@ def tool_fact_index(tool_history: list[dict[str, Any]], history_blocks: list[dic
         "locations": [],
         "approximateLocations": [],
         "routes": [],
+        "routePreferences": [],
         "vehicle": {},
         "stationSearches": 0,
     }
@@ -1785,7 +1786,12 @@ def tool_fact_index(tool_history: list[dict[str, Any]], history_blocks: list[dic
                 add_station_fact(facts, stop)
         add_station_fact(facts, result.get("recommendation"))
         if tool_name == "plan_route":
-            facts["routes"].append(result)
+            route = dict(result)
+            preferences = args.get("preferences") if isinstance(args.get("preferences"), dict) else {}
+            if preferences:
+                route["preferences"] = preferences
+                facts["routePreferences"].append(preferences)
+            facts["routes"].append(route)
     return facts
 
 
@@ -1807,10 +1813,27 @@ def add_history_facts(facts: dict[str, Any], history_blocks: list[dict]) -> None
             add_station_fact(facts, props)
         elif block_type == "RouteCorridorCard":
             facts["routes"].append(props)
+            for key in ("origin", "destination"):
+                add_location_fact(facts, props.get(key))
             stations = props.get("stations")
             if isinstance(stations, list):
                 for station in stations:
                     add_station_fact(facts, station)
+        elif block_type == "ActionButtons":
+            actions = props.get("actions")
+            if isinstance(actions, list):
+                for action in actions:
+                    add_action_context_facts(facts, action)
+
+
+def add_action_context_facts(facts: dict[str, Any], action: Any) -> None:
+    if not isinstance(action, dict):
+        return
+    event = action.get("event") if isinstance(action.get("event"), dict) else {}
+    context = event.get("context") if isinstance(event.get("context"), dict) else {}
+    add_location_fact(facts, context.get("location"))
+    previous_search = context.get("previous_search") if isinstance(context.get("previous_search"), dict) else {}
+    add_location_fact(facts, previous_search.get("location"))
 
 
 def add_station_fact(facts: dict[str, Any], value: Any) -> None:
@@ -1835,9 +1858,13 @@ def add_station_fact(facts: dict[str, Any], value: Any) -> None:
         "pricePerKwhEur",
         "currency",
         "priceIsEstimated",
+        "amenities",
+        "address",
     ):
         if field in normalized_values:
             current[field] = normalized_values.get(field)
+        elif field in value:
+            current[field] = value.get(field)
 
 
 def station_value_aliases(value: dict[str, Any]) -> dict[str, Any]:
@@ -2090,14 +2117,12 @@ def requested_service_data_contract_issues(
     blocks: list[dict],
     tool_history: list[dict[str, Any]],
     message: str,
+    facts: dict[str, Any],
 ) -> list[str]:
     requested = requested_service_codes(message)
     if not requested:
         return []
-    result = latest_station_search_result(tool_history)
-    if not result:
-        return []
-    stops = station_search_result_stops(result)
+    stops = latest_station_candidates(tool_history, facts)
     if not stops:
         return []
     if any(stop_has_requested_service(stop, requested) for stop in stops):
@@ -2148,6 +2173,16 @@ def station_search_result_stops(result: dict[str, Any]) -> list[dict[str, Any]]:
     return stops
 
 
+def latest_station_candidates(tool_history: list[dict[str, Any]], facts: dict[str, Any]) -> list[dict[str, Any]]:
+    result = latest_station_search_result(tool_history)
+    if result:
+        stops = station_search_result_stops(result)
+        if stops:
+            return stops
+    stations = facts.get("stations") if isinstance(facts.get("stations"), dict) else {}
+    return [station for station in stations.values() if isinstance(station, dict)]
+
+
 def stop_has_requested_service(stop: dict[str, Any], requested: set[str]) -> bool:
     amenities = stop.get("amenities")
     if not isinstance(amenities, list):
@@ -2180,15 +2215,12 @@ def single_connector_preference_contract_issues(
     blocks: list[dict],
     tool_history: list[dict[str, Any]],
     message: str,
+    facts: dict[str, Any],
 ) -> list[str]:
     if not user_message_avoids_single_connector(message):
         return []
 
-    result = latest_successful_tool_result(tool_history)
-    if not result or result.get("tool") not in {"search_destination_chargers", "plan_route"}:
-        return []
-
-    candidates = station_candidates_from_tool_result(result)
+    candidates = latest_station_candidates(tool_history, facts)
     if not candidates:
         return []
 
@@ -2316,8 +2348,9 @@ def default_reserve_copy_contract_issues(
     blocks: list[dict],
     tool_history: list[dict[str, Any]],
     message: str,
+    facts: dict[str, Any],
 ) -> list[str]:
-    reserve = latest_plan_route_reserve(tool_history)
+    reserve = latest_plan_route_reserve(tool_history, facts)
     if reserve is None:
         return []
     normalized_message = normalize(message)
@@ -2352,11 +2385,12 @@ def default_reserve_copy_contract_issues(
 def unvalidated_route_margin_copy_contract_issues(
     blocks: list[dict],
     tool_history: list[dict[str, Any]],
+    facts: dict[str, Any],
 ) -> list[str]:
-    route = latest_plan_route_result(tool_history)
+    route = latest_plan_route_result(tool_history, facts)
     if not route:
         return []
-    if route.get("planningLevel") != "chargers_only" and route.get("arrivalBattery") is not None and route.get("energyKwh") is not None:
+    if not route_requires_unvalidated_arrival_warning(route):
         return []
     visible_text = normalize(" ".join(block_visible_text(block) for block in blocks))
     if not visible_text:
@@ -2382,9 +2416,10 @@ def unvalidated_route_margin_copy_contract_issues(
 def chargers_only_warning_order_contract_issues(
     blocks: list[dict],
     tool_history: list[dict[str, Any]],
+    facts: dict[str, Any],
 ) -> list[str]:
-    route = latest_plan_route_result(tool_history)
-    if not route or route.get("planningLevel") != "chargers_only":
+    route = latest_plan_route_result(tool_history, facts)
+    if not route or not route_requires_unvalidated_arrival_warning(route):
         return []
     if first_block_index(blocks, "RouteCorridorCard") is None and first_block_index(blocks, "StationList") is None:
         return []
@@ -2404,8 +2439,9 @@ def chargers_only_warning_order_contract_issues(
 def max_useful_power_copy_contract_issues(
     blocks: list[dict],
     tool_history: list[dict[str, Any]],
+    facts: dict[str, Any],
 ) -> list[str]:
-    cap = latest_plan_route_max_useful_power(tool_history)
+    cap = latest_plan_route_max_useful_power(tool_history, facts)
     if cap is None:
         return []
 
@@ -2742,16 +2778,21 @@ def minimum_charge_request(normalized_message: str) -> bool:
     return "cargar lo justo" in normalized_message or "sin pagar de mas" in normalized_message
 
 
-def latest_plan_route_result(tool_history: list[dict[str, Any]]) -> dict[str, Any] | None:
+def latest_plan_route_result(tool_history: list[dict[str, Any]], facts: dict[str, Any] | None = None) -> dict[str, Any] | None:
     for entry in reversed(tool_history):
         call = entry.get("call") if isinstance(entry.get("call"), dict) else {}
         result = entry.get("result") if isinstance(entry.get("result"), dict) else {}
         if call.get("tool") == "plan_route" and result.get("ok"):
             return result
+    if facts:
+        routes = facts.get("routes") if isinstance(facts.get("routes"), list) else []
+        for route in reversed(routes):
+            if isinstance(route, dict):
+                return route
     return None
 
 
-def latest_plan_route_reserve(tool_history: list[dict[str, Any]]) -> float | None:
+def latest_plan_route_reserve(tool_history: list[dict[str, Any]], facts: dict[str, Any] | None = None) -> float | None:
     for entry in reversed(tool_history):
         call = entry.get("call") if isinstance(entry.get("call"), dict) else {}
         if call.get("tool") != "plan_route":
@@ -2761,10 +2802,17 @@ def latest_plan_route_reserve(tool_history: list[dict[str, Any]]) -> float | Non
         reserve = optional_float(preferences.get("reserve_min_percent"))
         if reserve is not None:
             return reserve
+    if facts:
+        for preferences in reversed(facts.get("routePreferences") or []):
+            if not isinstance(preferences, dict):
+                continue
+            reserve = optional_float(preferences.get("reserve_min_percent"))
+            if reserve is not None:
+                return reserve
     return None
 
 
-def latest_plan_route_max_useful_power(tool_history: list[dict[str, Any]]) -> float | None:
+def latest_plan_route_max_useful_power(tool_history: list[dict[str, Any]], facts: dict[str, Any] | None = None) -> float | None:
     for entry in reversed(tool_history):
         call = entry.get("call") if isinstance(entry.get("call"), dict) else {}
         if call.get("tool") != "plan_route":
@@ -2774,7 +2822,26 @@ def latest_plan_route_max_useful_power(tool_history: list[dict[str, Any]]) -> fl
         power = optional_float(preferences.get("max_useful_power_kw"))
         if power is not None:
             return power
+    if facts:
+        for preferences in reversed(facts.get("routePreferences") or []):
+            if not isinstance(preferences, dict):
+                continue
+            power = optional_float(preferences.get("max_useful_power_kw"))
+            if power is not None:
+                return power
+        vehicle = facts.get("vehicle") if isinstance(facts.get("vehicle"), dict) else {}
+        power = optional_float(vehicle.get("max_charge_kw"))
+        if power is not None:
+            return power
     return None
+
+
+def route_requires_unvalidated_arrival_warning(route: dict[str, Any]) -> bool:
+    return (
+        route.get("planningLevel") == "chargers_only"
+        or route.get("arrivalBattery") is None
+        or route.get("energyKwh") is None
+    )
 
 
 def integer_percent_label(value: float) -> str | None:
@@ -2965,12 +3032,13 @@ def destination_city_approximation_contract_issues(
     blocks: list[dict],
     tool_history: list[dict[str, Any]],
     message: str,
+    facts: dict[str, Any],
 ) -> list[str]:
     normalized_message = normalize(message)
     if not message_mentions_hotel_or_poi(normalized_message):
         return []
 
-    searches = city_approximation_destination_searches(tool_history, normalized_message)
+    searches = city_approximation_destination_searches(tool_history, normalized_message, facts)
     if not searches:
         return []
 
@@ -2994,6 +3062,7 @@ def destination_city_approximation_contract_issues(
 def city_approximation_destination_searches(
     tool_history: list[dict[str, Any]],
     normalized_message: str,
+    facts: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     known_city_labels = {normalize(value[0]) for value in KNOWN_LOCATIONS.values()}
     searches: list[dict[str, Any]] = []
@@ -3010,6 +3079,17 @@ def city_approximation_destination_searches(
         if normalized_label not in known_city_labels:
             continue
         searches.append({"label": label})
+    if facts:
+        for location in facts.get("locations") or []:
+            if not isinstance(location, dict):
+                continue
+            label = display_text(location.get("label"), "")
+            normalized_label = normalize(label)
+            if not label or normalized_label not in normalized_message:
+                continue
+            if normalized_label not in known_city_labels:
+                continue
+            searches.append({"label": label})
     return searches
 
 
