@@ -285,14 +285,14 @@ def test_conversation_message_keeps_reused_agent_block_ids_unique(client, settin
 
     first_response = client.post(
         "/api/conversation/message",
-        data={"text": "Necesito cargar ya"},
+        data={"text": "Hola"},
         content_type="application/json",
     )
     assert first_response.status_code == 200
 
     second_response = client.post(
         "/api/conversation/message",
-        data={"text": "Estoy en Córdoba"},
+        data={"text": "Otra consulta"},
         content_type="application/json",
     )
 
@@ -843,6 +843,8 @@ def test_conversation_agent_prompt_guides_followups_without_backend_intent_mappi
     prompt = conversation_agent_prompt("Me equivoqué, estoy en Valencia centro")
 
     assert "No pidas destino para una carga urgente" in prompt
+    assert "usa PositionRequestCard para ofrecer 'Usar mi ubicación' y 'Escribir ubicación'" in prompt
+    assert "no lo sustituyas por un AssistantMessage de texto" in prompt
     assert "No llames resolve_location con frases que no son ubicaciones concretas" in prompt
     assert "Si el usuario corrige la ubicación" in prompt
     assert "conserva batería, conector y preferencias" in prompt
@@ -1674,6 +1676,79 @@ def test_a2ui_contract_allows_empty_stops_after_station_tool_result():
     issues = a2ui_contract_issues(blocks, tool_history=tool_history, message="Voy una semana a Cádiz")
 
     assert not any("StationList.stations está vacío" in issue for issue in issues)
+
+
+def test_a2ui_contract_rejects_global_action_buttons_after_station_list():
+    tool_history = [
+        {
+            "call": {
+                "tool": "search_destination_chargers",
+                "args": {"location": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794}},
+            },
+            "result": {
+                "ok": True,
+                "tool": "search_destination_chargers",
+                "location": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794},
+                "stops": [
+                    {
+                        "name": "BALLENOIL-ES336090-COLON",
+                        "stationName": "BALLENOIL-ES336090-COLON",
+                        "powerKw": 150,
+                        "distanceKm": 0.3,
+                        "lat": 37.890608,
+                        "lon": -4.777821,
+                        "availableEvses": 2,
+                        "totalEvses": 2,
+                        "connectorTypes": ["CCS2"],
+                    }
+                ],
+            },
+        }
+    ]
+    blocks = validate_blocks(
+        [
+            {
+                "id": "stations",
+                "type": "StationList",
+                "version": 1,
+                "props": {
+                    "stations": [
+                        {
+                            "name": "BALLENOIL-ES336090-COLON",
+                            "stationName": "BALLENOIL-ES336090-COLON",
+                            "powerKw": 150,
+                            "distanceKm": 0.3,
+                            "lat": 37.890608,
+                            "lon": -4.777821,
+                            "availableEvses": 2,
+                            "totalEvses": 2,
+                            "connectorTypes": ["CCS2"],
+                        }
+                    ]
+                },
+            },
+            {
+                "id": "actions",
+                "type": "ActionButtons",
+                "version": 1,
+                "props": {
+                    "actions": [
+                        {
+                            "label": "Usar este punto",
+                            "event": {
+                                "name": "select_station",
+                                "context": {"stationName": "BALLENOIL-ES336090-COLON"},
+                            },
+                        }
+                    ]
+                },
+            },
+        ]
+    )
+
+    issues = a2ui_contract_issues(blocks, tool_history=tool_history, message="Buscar otra opción")
+
+    assert any("ActionButtons no debe ir inmediatamente después de StationList" in issue for issue in issues)
 
 
 def test_a2ui_contract_rejects_found_chargers_copy_without_station_tool_result():

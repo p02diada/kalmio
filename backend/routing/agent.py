@@ -1142,7 +1142,7 @@ def conversation_agent_prompt(
         "- Modelo de composición A2UI: una respuesta debe sentirse como una unidad de decisión accionable, no como una pila de tarjetas. Por defecto empieza con AssistantMessage de 1-3 frases: explica la decisión, ubicación usada, límite o problema relevante y el siguiente paso útil sin ocultar incertidumbre. Después muestra una sola card principal (StationPreviewCard o RouteCorridorCard) y acciones útiles. RouteCorridorCard es mapa de corredor y estaciones cercanas a la ruta; no la presentes como parada recomendada. Si usas ActionButtons para una recomendación, colócalos inmediatamente después de la card a la que pertenecen; el renderer los tratará como el pie de acción de esa decisión. Si hay cautela, riesgo o límite de datos, ponlo en el AssistantMessage previo a la card, nunca como bloque intermedio entre la card principal y ActionButtons. No uses ActionButtons para repetir texto ni como sustituto de herramientas necesarias.\n"
         "- No existe un componente separado de riesgo ni de aclaración. Explica riesgos, incertidumbres, límites de datos, datos faltantes y siguientes pasos en AssistantMessage antes de la card principal. Usa ErrorFallbackCard solo para fallos técnicos renderizables. Mantén StationList fuera de la primera respuesta salvo que cambie una decisión, haya empate real, baja confianza, o el usuario pida comparar/ver más opciones.\n"
         "- En copy visible, expresa duraciones largas en horas y minutos (por ejemplo, 8 h 37 min), no como cientos de minutos. Evita la palabra técnica 'trazado/trazados': para el conductor usa 'según los datos disponibles', 'registrado', 'indicado', 'verificado' o 'autorizado' según el dato.\n"
-        "- Carga urgente sin ubicación: pide solo ubicación actual, ciudad/zona o coordenadas. No pidas destino para una carga urgente. No llames resolve_location con frases que no son ubicaciones concretas, como 'ubicación actual', 'mi ubicación', 'estoy al 12%', 'no conozco la zona', 'estoy en carretera', 'tengo poca batería' o 'voy con niños'; pregunta el dato mínimo primero.\n"
+        "- Carga urgente sin ubicación: pide solo ubicación actual, ciudad/zona o coordenadas. Si necesitas que el conductor comparta ubicación actual o escriba una ubicación manual, usa PositionRequestCard para ofrecer 'Usar mi ubicación' y 'Escribir ubicación'; no lo sustituyas por un AssistantMessage de texto. No pidas destino para una carga urgente. No llames resolve_location con frases que no son ubicaciones concretas, como 'ubicación actual', 'mi ubicación', 'estoy al 12%', 'no conozco la zona', 'estoy en carretera', 'tengo poca batería' o 'voy con niños'; pregunta el dato mínimo primero.\n"
         "- Tras una urgencia, una ciudad/zona/coordenadas es continuación de la urgencia; usa herramientas si hay ubicación suficiente.\n"
         "- Si el usuario corrige la ubicación, descarta la anterior, conserva batería, conector y preferencias si siguen teniendo sentido y busca con la nueva.\n"
         "- Si pregunta por un fallo anterior, no contradigas bloques ya validados; explica validación, cobertura, aproximación o datos autorizados.\n"
@@ -1734,7 +1734,23 @@ def a2ui_contract_issues(
     issues.extend(price_preference_context_contract_issues(blocks, user_context, tool_history))
     issues.extend(minimum_charge_context_contract_issues(blocks, user_context))
     issues.extend(single_connector_preference_contract_issues(blocks, tool_history, user_context))
+    issues.extend(action_button_sequence_contract_issues(blocks))
     return dedupe_preserve_order(issues)
+
+
+def action_button_sequence_contract_issues(blocks: list[dict]) -> list[str]:
+    issues: list[str] = []
+    for index, block in enumerate(blocks[:-1]):
+        if not isinstance(block, dict) or block.get("type") != "StationList":
+            continue
+        next_block = blocks[index + 1]
+        if isinstance(next_block, dict) and next_block.get("type") == "ActionButtons":
+            issues.append(
+                "ActionButtons no debe ir inmediatamente después de StationList: en móvil queda ambiguo "
+                "si los botones pertenecen a toda la lista o a una estación concreta. Usa StationPreviewCard "
+                "con acciones para una estación primaria, o muestra StationList sin botones globales."
+            )
+    return issues
 
 
 def tool_fact_index(tool_history: list[dict[str, Any]], history_blocks: list[dict] | None = None) -> dict[str, Any]:
