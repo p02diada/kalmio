@@ -164,8 +164,8 @@ def main() -> None:
     component_types = {component.get("component") for component in components if isinstance(component, dict)}
     require("UserMessage" in component_types, "La respuesta no incluye eco de usuario", component_types)
     require(
-        "AssistantMessage" in component_types or "ClarifyingQuestionCard" in component_types,
-        "La respuesta no incluye explicación de ubicación ni aclaración",
+        "AssistantMessage" in component_types,
+        "La respuesta no incluye explicación de ubicación ni mensaje de asistente",
         component_types,
     )
 

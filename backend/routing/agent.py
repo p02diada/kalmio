@@ -42,7 +42,6 @@ A2UI_COMPONENT_TYPES = {
     "CostComparisonCard",
     "MapPreviewCard",
     "ActionButtons",
-    "ClarifyingQuestionCard",
     "PositionRequestCard",
     "PreferenceChips",
     "ErrorFallbackCard",
@@ -140,7 +139,7 @@ def run_local_agent(message: str, history_blocks: list[dict] | None = None) -> l
             missing.append("destino")
         if missing:
             blocks.append(
-                clarifying_block(
+                missing_data_message_block(
                     "Para decidir si hay que calcular ruta necesito ubicar estos datos.",
                     missing,
                 )
@@ -168,7 +167,7 @@ def run_local_agent(message: str, history_blocks: list[dict] | None = None) -> l
         return blocks
 
     blocks.append(
-        clarifying_block(
+        missing_data_message_block(
             "¿Quieres calcular una ruta EV o buscar una parada de carga cerca de un destino concreto?",
             ["tipo de búsqueda", "ubicación o ruta"],
         )
@@ -184,14 +183,11 @@ def conversation_failure_blocks(message: str) -> list[dict]:
             "AssistantMessage",
             {
                 "text": (
-                    "No he podido completar esta respuesta con fiabilidad. "
-                    "No voy a asumir estaciones, coordenadas, precios ni estado del vehículo."
+                    "No he podido completar esta respuesta con fiabilidad. No voy a asumir estaciones, coordenadas, "
+                    "precios ni estado del vehículo. Para continuar, envíame origen o ubicación, destino si hay ruta, "
+                    "batería actual y conector."
                 )
             },
-        ),
-        clarifying_block(
-            "Para continuar, envíame los datos críticos que tengas.",
-            ["origen o ubicación", "destino si hay ruta", "batería actual", "conector"],
         ),
     ]
 
@@ -1078,8 +1074,8 @@ def conversation_agent_prompt(
         "Comportamiento EV esperado:\n"
         "- Usa el historial útil, acepta correcciones naturales y no suenes como formulario.\n"
         "- Presenta las recomendaciones como paradas o lugares útiles para el viaje; usa name/stationName como punto de carga trazable y placeName solo si sale de herramienta o del usuario. No inventes lugares, servicios ni POIs.\n"
-        "- Modelo de composición A2UI: una respuesta debe sentirse como una unidad de decisión accionable, no como una pila de tarjetas. Por defecto empieza con AssistantMessage de 1-3 frases: explica la decisión, ubicación usada, límite o problema relevante y el siguiente paso útil sin ocultar incertidumbre. Después muestra una sola card principal (StationPreviewCard, RouteSummaryCard o ClarifyingQuestionCard) y acciones útiles. Si usas ActionButtons para una recomendación, colócalos inmediatamente después de la card a la que pertenecen; el renderer los tratará como el pie de acción de esa decisión. Si hay cautela, riesgo o límite de datos, ponlo en el AssistantMessage previo a la card, nunca como bloque intermedio entre StationPreviewCard y ActionButtons. No uses ActionButtons para repetir texto ni como sustituto de herramientas necesarias.\n"
-        "- No existe un componente separado de riesgo. Explica riesgos, incertidumbres, límites de datos y siguientes pasos en AssistantMessage antes de la card principal. Usa ClarifyingQuestionCard cuando falte un dato crítico y ErrorFallbackCard solo para fallos técnicos renderizables. Mantén StationList fuera de la primera respuesta salvo que cambie una decisión, haya empate real, baja confianza, o el usuario pida comparar/ver más opciones.\n"
+        "- Modelo de composición A2UI: una respuesta debe sentirse como una unidad de decisión accionable, no como una pila de tarjetas. Por defecto empieza con AssistantMessage de 1-3 frases: explica la decisión, ubicación usada, límite o problema relevante y el siguiente paso útil sin ocultar incertidumbre. Después muestra una sola card principal (StationPreviewCard o RouteSummaryCard) y acciones útiles. Si usas ActionButtons para una recomendación, colócalos inmediatamente después de la card a la que pertenecen; el renderer los tratará como el pie de acción de esa decisión. Si hay cautela, riesgo o límite de datos, ponlo en el AssistantMessage previo a la card, nunca como bloque intermedio entre StationPreviewCard y ActionButtons. No uses ActionButtons para repetir texto ni como sustituto de herramientas necesarias.\n"
+        "- No existe un componente separado de riesgo ni de aclaración. Explica riesgos, incertidumbres, límites de datos, datos faltantes y siguientes pasos en AssistantMessage antes de la card principal. Usa ErrorFallbackCard solo para fallos técnicos renderizables. Mantén StationList fuera de la primera respuesta salvo que cambie una decisión, haya empate real, baja confianza, o el usuario pida comparar/ver más opciones.\n"
         "- En copy visible, expresa duraciones largas en horas y minutos (por ejemplo, 8 h 37 min), no como cientos de minutos. Evita la palabra técnica 'trazado/trazados': para el conductor usa 'según los datos disponibles', 'registrado', 'indicado', 'verificado' o 'autorizado' según el dato.\n"
         "- Carga urgente sin ubicación: pide solo ubicación actual, ciudad/zona o coordenadas. No pidas destino para una carga urgente. No llames resolve_location con frases que no son ubicaciones concretas, como 'ubicación actual', 'mi ubicación', 'estoy al 12%', 'no conozco la zona', 'estoy en carretera', 'tengo poca batería' o 'voy con niños'; pregunta el dato mínimo primero.\n"
         "- Tras una urgencia, una ciudad/zona/coordenadas es continuación de la urgencia; usa herramientas si hay ubicación suficiente.\n"
@@ -1090,7 +1086,7 @@ def conversation_agent_prompt(
         "- Perfil de vehículo: un modelo comercial como Tesla Model Y y una batería de salida no son un perfil autorizado de consumo/autonomía. Para plan_route, usa vehicle:null u omite vehicle salvo que el usuario haya dado explícitamente batería, capacidad útil kWh, consumo kWh/100 km, conector y potencia máxima. No rellenes campos desconocidos con null, ceros o defaults. Puedes mencionar modelo y batería en el copy, pero no calcular energía, autonomía ni llegada con ellos.\n"
         "- Hotel/destino/estancia: si hay ciudad/POI suficiente y el usuario necesita cargar durante la estancia, llama search_destination_chargers directamente; no devuelvas solo un botón para buscar ni una respuesta final que diga 'buscaré'. Una ciudad conocida ya es ubicación suficiente para una búsqueda aproximada; no esperes hotel/zona exacta para la primera búsqueda, puedes pedir refinamiento después de mostrar resultados. Si tienes una ciudad conocida pero no tienes coordenadas exactas del hotel/POI, la primera decisión debe ser type=tool_call search_destination_chargers con la ciudad como location approximate, no type=final. Si el usuario da un POI/hotel dentro de una ciudad conocida, usa primero la ciudad/zona como aproximación verificable salvo que tengas coordenadas exactas autorizadas del POI; evita empezar por un punto muy estrecho que pueda ocultar cargadores urbanos útiles. No lo conviertas en ruta salvo que pidan origen-destino. Si muestras resultados de destino/estancia, explica en AssistantMessage la ubicación usada y si es aproximada; pide dirección, zona exacta o coordenadas para refinar cuando falte el punto exacto. Si el usuario dijo que el hotel no tiene cargador y la herramienta devuelve varias paradas, elige una parada primaria con StationPreviewCard usando solo distancia, potencia, conectores y puestos de carga registrados, y usa ActionButtons para navegar, refinar o pedir más opciones; no la presentes como disponibilidad en vivo ni como reserva. Reserva StationList para cuando el usuario pida ver/comparar opciones, haya empate real, baja confianza o alternativas materialmente útiles que cambien la decisión.\n"
         "- Si buscas por ciudad aproximada porque el hotel/POI exacto no está resuelto, la respuesta visible debe decirlo en AssistantMessage: usa la ciudad como aproximación, no como ubicación exacta del hotel/POI, y pide dirección, zona exacta o coordenadas para refinar.\n"
-        "- Si el usuario menciona ida y vuelta, volver, regreso o fechas de salida/vuelta, reconoce contexto de viaje redondo. Si falta origen para planificar ida/vuelta, pregunta por el origen antes de pedir hotel/zona y no llames plan_route ni search_destination_chargers todavia. Usa ClarifyingQuestionCard con field origen/salida cuando falte el origen. No uses la ciudad destino como origen.\n"
+        "- Si el usuario menciona ida y vuelta, volver, regreso o fechas de salida/vuelta, reconoce contexto de viaje redondo. Si falta origen para planificar ida/vuelta, pregunta por el origen en un AssistantMessage antes de pedir hotel/zona y no llames plan_route ni search_destination_chargers todavia. No uses la ciudad destino como origen.\n"
         "- Si resolve_location recibe un hotel, calle o POI pero solo devuelve una ciudad/zona, no afirmes que conoces el lugar exacto; no presentes el hotel exacto como ubicación validada; di que usas esa ciudad/zona como aproximación o pide coordenadas/dirección exacta.\n"
         "- Si search_destination_chargers devuelve stops, trátalos como estaciones: usa StationPreviewCard para una estación concreta o StationList para varias, con nombres y métricas exactas trazables. No uses placeholders cuando hay estaciones. Antes de llamar una herramienta, no crees StationPreviewCard genéricos como 'Cargador en Granada', potencia 0, distancia 0 o coordenadas iguales a la ciudad: pide herramienta o pregunta el dato mínimo.\n"
         "- En móvil, no satures la primera respuesta con todas las alternativas si hay una estación primaria clara. Por defecto, no muestres StationList en esa primera respuesta: prefiere StationPreviewCard para la recomendación y ActionButtons inmediatamente después para navegar, pedir más opciones o ajustar la búsqueda. Para pedir más opciones, usa ActionButtons con event.name='show_more_options' y un context trazable de la búsqueda o estación cuando exista; para navegación usa functionCall.openUrl si hay lat/lon trazables. Usa StationList cuando el usuario pida comparar/más opciones, cuando haya empate real, baja confianza o alternativas materialmente útiles que cambien la decisión. Si muestras StationPreviewCard y StationList juntos, no repitas la estación primaria dentro de StationList.\n"
@@ -1111,7 +1107,7 @@ def conversation_agent_prompt(
         "Si usas navegación para una alternativa previa, usa su lat/lon exactos. Si no hay alternativas previas suficientes, vuelve a buscar con la ubicación previa o pide el dato mínimo que falte. "
         "Recuerda que la disponibilidad en vivo puede cambiar.\n"
         "- En carretera y poco desvío: pide carretera, zona actual/coordenadas y destino si faltan; no lo reduzcas a búsqueda urbana arbitraria. "
-        "Cuando no haya ubicación suficiente, prefiere ClarifyingQuestionCard con una pregunta breve sobre carretera/zona actual/destino y campos carretera_o_zona_actual, destino y coordenadas. "
+        "Cuando no haya ubicación suficiente, usa AssistantMessage con una pregunta breve sobre carretera/zona actual, destino o coordenadas. "
         "Usa PositionRequestCard solo si basta con posición actual/manual del conductor; no muestres campos genéricos de ciudad si el usuario ya dijo que está en carretera y quiere poco desvío.\n"
         "- Si el coche carga máximo a X kW, pasa X como preferences.max_useful_power_kw; si recomiendas un cargador de más potencia, di antes de la primera parada una frase explícita como: 'Tu coche no aprovechará más de X kW; la potencia superior no se premia en esta elección'. No basta con decir que no necesita ultrarrápidos. No presentes la potencia superior como ventaja. No digas que has filtrado o excluido paradas por potencia si todavía muestras una estación por encima de ese máximo útil; di que esa potencia superior no se premia ni cambia lo que el coche puede aprovechar.\n"
         "- Restricción dura de llegada: sin perfil de vehículo no la presentes como cumplida; pide modelo/consumo/autonomía. Si la herramienta devuelve arrivalBattery:null o energyKwh:null, no los sustituyas por estimaciones ni por frases de certeza. Si el usuario pide llegar con al menos X%, pasa X como reserve_min_percent y di antes de cualquier StationPreviewCard/StationList que ese X% no se puede validar en chargers_only sin consumo/perfil.\n"
@@ -1131,7 +1127,7 @@ def conversation_agent_prompt(
         "'Me voy 3 días a Córdoba y me quedo en el hotel Meliá' -> llama search_destination_chargers con Córdoba como aproximación, no ActionButtons; "
         "'Voy una semana a Cádiz y necesito cargar durante la estancia' -> llama search_destination_chargers con Cádiz como aproximación; usa AssistantMessage para explicar la ubicación usada y la incertidumbre de estancia, no preguntes primero por hotel/zona; "
         "'Quiero la ruta más barata, pero sin bajar del 20%' sin origen/destino -> no llames plan_route, pregunta origen, destino y datos de vehículo/batería; "
-        "'Voy a Córdoba el viernes y vuelvo el domingo' -> ClarifyingQuestionCard preguntando origen/salida para planificar ida/vuelta antes de llamar herramientas; "
+        "'Voy a Córdoba el viernes y vuelvo el domingo' -> AssistantMessage preguntando origen/salida para planificar ida/vuelta antes de llamar herramientas; "
         "'Zaragoza a Barcelona con 25%' sin consumo/modelo -> no valides ese 25%; "
         "'Córdoba a Valencia con 58%, no quiero llegar justo' -> plan_route puede mostrar RouteSummaryCard y paradas autorizadas, pero debes decir que la llegada/reserva no se valida sin consumo o perfil; "
         "'Sevilla a Granada, me da para llegar sin cargar?' -> plan_route puede mostrar RouteSummaryCard de distancia/duración, pero no respondas sí/no sin batería actual/autonomía/modelo/consumo; pide esos datos; "
@@ -1153,7 +1149,7 @@ def conversation_agent_prompt(
         "MapPreviewCard solo para rutas de plan_route con routeGeometry GeoJSON LineString de proveedor, origin/destination con coordenadas de herramienta, primaryStation/stations de herramienta, corridorRadiusKm y geometryPrecision='provider'. "
         "Si no tienes geometría de proveedor, usa geometryPrecision='schematic' o no muestres mapa; no inventes coordenadas ni geometría. "
         "ActionButtons usa event para backend/agente, functionCall.openUrl para abrir mapas, o disabled con reason; cuando pertenezcan a una recomendación colócalos inmediatamente después de esa card para que se rendericen como acciones de la misma unidad; "
-        "ClarifyingQuestionCard faltan datos críticos; "
+        "AssistantMessage pide datos críticos en texto libre; "
         "PositionRequestCard pide posición actual/manual del conductor; "
         "PreferenceChips solo para correcciones o preferencias explícitas, siempre con props.title contextual; "
         "ErrorFallbackCard reservado.\n"
@@ -1168,12 +1164,11 @@ def conversation_agent_prompt(
         "intent, confidence, rationale y metadata son opcionales y no se muestran al usuario. "
         f"Tipos A2UI permitidos: {', '.join(sorted(A2UI_COMPONENT_TYPES))}. "
         "Dentro de blocks no uses type=tool_call, component=tool_call ni objetos con tool/args; eso solo es válido como objeto raíz. "
-        "Para ClarifyingQuestionCard usa props question y fields. "
         "Para ActionButtons usa actions con event {name, context} o functionCall {call:'openUrl', args:{url:'https://...'}}; "
         "no uses handlers arbitrarios. "
         "No inventes disponibilidad, precios, estaciones, coordenadas ni estado del vehículo. "
         "No uses ActionButtons para sustituir una herramienta de búsqueda cuando ya tienes ciudad/POI suficiente. "
-        "No llames plan_route con coordenadas vacías o 0,0; si faltan origen/destino reales, usa ClarifyingQuestionCard o AssistantMessage. "
+        "No llames plan_route con coordenadas vacías o 0,0; si faltan origen/destino reales, usa AssistantMessage. "
         "No devuelvas RouteSummaryCard ni distancia/duración de ruta si no tienes resultado de plan_route. "
         "No afirmes paradas/puntos de carga disponibles/encontrados ni incluyas listas vacías como resultado si no llamaste una herramienta de búsqueda/ruta. "
         "No afirmes paradas, puntos de carga o rutas si no vienen de herramientas, datos autorizados o texto explícito del usuario. "
@@ -3509,11 +3504,6 @@ def summarize_block_for_context(block_type: str, props: dict) -> str:
         title = str(props.get("title") or "Necesito ubicación").strip()
         body = str(props.get("body") or "").strip()
         return f"Asistente pidió ubicación: {title}. {body}".strip()
-    if block_type == "ClarifyingQuestionCard":
-        question = str(props.get("question") or "").strip()
-        fields = props.get("fields") if isinstance(props.get("fields"), list) else []
-        fields_text = ", ".join(str(field) for field in fields if field)
-        return f"Asistente pidió aclaración: {question} Campos: {fields_text}".strip()
     if block_type in STATION_CARD_TYPES:
         price = props.get("pricePerKwhEur")
         price_text = f", precio {price} {props.get('currency') or 'EUR'}/kWh" if price is not None else ""
@@ -3651,7 +3641,7 @@ def destination_charge_blocks(intent: ParsedIntent) -> list[dict]:
     location = intent.destination_search or intent.destination or intent.origin
     if location is None:
         return [
-            clarifying_block(
+            missing_data_message_block(
                 "Puedo buscar una parada de carga cerca de un hotel o destino, pero necesito una ciudad conocida o coordenadas.",
                 ["ciudad o coordenadas", "conector si lo sabes"],
             )
@@ -3993,8 +3983,11 @@ def round_optional(value: float | None) -> float | None:
     return round(value, 1) if isinstance(value, (int, float)) else None
 
 
-def clarifying_block(question: str, fields: list[str]) -> dict:
-    return block(f"clarify-{uuid4().hex[:10]}", "ClarifyingQuestionCard", {"question": question, "fields": fields})
+def missing_data_message_block(question: str, fields: list[str]) -> dict:
+    normalized_fields = [str(field).strip() for field in fields if str(field).strip()]
+    field_text = ", ".join(normalized_fields)
+    text = question if not field_text else f"{question} Envíame: {field_text}."
+    return block(f"assistant-{uuid4().hex[:10]}", "AssistantMessage", {"text": text})
 
 
 def position_request_block(reason: str, title: str, body: str) -> dict:
@@ -4114,19 +4107,6 @@ def normalize_block_props(block_type: str, props: dict) -> dict:
         if not text_value:
             text_value = props.get("title") or ""
         return {"text": str(text_value)}
-    if block_type == "ClarifyingQuestionCard":
-        question = props.get("question") or props.get("text") or props.get("message") or ""
-        fields = props.get("fields")
-        if not isinstance(fields, list):
-            fields = []
-            for item in props.get("questions") or props.get("options") or []:
-                if isinstance(item, dict):
-                    label = item.get("label") or item.get("text") or item.get("id")
-                    if label:
-                        fields.append(str(label))
-                elif item:
-                    fields.append(str(item))
-        return {"question": str(question), "fields": fields}
     if block_type in STATION_CARD_TYPES:
         recommended_stop = props.get("recommendedStop") if isinstance(props.get("recommendedStop"), dict) else {}
         station = props.get("station") if isinstance(props.get("station"), dict) else {}

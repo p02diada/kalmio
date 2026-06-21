@@ -1093,8 +1093,7 @@ def test_conversation_agent_prompt_asks_structured_road_context_before_low_detou
     assert "En carretera y poco desvío" in prompt
     assert "pide carretera, zona actual/coordenadas y destino" in prompt
     assert "no lo reduzcas a búsqueda urbana arbitraria" in prompt
-    assert "prefiere ClarifyingQuestionCard" in prompt
-    assert "carretera_o_zona_actual, destino y coordenadas" in prompt
+    assert "usa AssistantMessage con una pregunta breve" in prompt
     assert "no muestres campos genéricos de ciudad" in prompt
 
 
@@ -1181,12 +1180,12 @@ def test_conversation_agent_prompt_guides_granada_alhambra_weekend_destination_w
     assert "no crees StationPreviewCard genéricos" in prompt
 
 
-def test_conversation_agent_prompt_guides_round_trip_missing_origin_as_clarifying_card():
+def test_conversation_agent_prompt_guides_round_trip_missing_origin_as_assistant_message():
     prompt = conversation_agent_prompt("Voy a Córdoba el viernes y vuelvo el domingo, dónde cargo?")
 
     assert "ida y vuelta" in prompt
     assert "no llames plan_route ni search_destination_chargers" in prompt
-    assert "Usa ClarifyingQuestionCard" in prompt
+    assert "pregunta por el origen en un AssistantMessage" in prompt
     assert "origen/salida" in prompt
     assert "No uses la ciudad destino como origen" in prompt
 
@@ -2520,10 +2519,10 @@ def test_contextualized_prompt_adds_known_location_hint_for_hotel_followup():
         "Hotel Meliá cordoba",
         [
             {
-                "id": "clarify-hotel",
-                "type": "ClarifyingQuestionCard",
+                "id": "assistant-hotel",
+                "type": "AssistantMessage",
                 "version": 1,
-                "props": {"question": "¿Qué hotel o zona exacta?", "fields": ["hotel", "city_or_zone"]},
+                "props": {"text": "¿Qué hotel o zona exacta?"},
             }
         ],
     )
@@ -2634,7 +2633,6 @@ def test_conversation_message_preserves_urgent_charge_intent_for_location_follow
     new_blocks = blocks[latest_user_index + 1 :]
     new_block_types = [block["type"] for block in new_blocks]
     assert "StationPreviewCard" in new_block_types
-    assert "ClarifyingQuestionCard" not in new_block_types
     assert "PositionRequestCard" not in new_block_types
     urgent_block = next(block for block in new_blocks if block["type"] == "StationPreviewCard")
     assert urgent_block["props"]["name"] == station.name
@@ -2669,12 +2667,11 @@ def test_deepseek_hotel_followup_with_known_city_can_search_from_location_hint(c
                 "type": "final",
                 "blocks": [
                     {
-                        "id": "clarify-hotel",
-                        "type": "ClarifyingQuestionCard",
+                        "id": "assistant-hotel",
+                        "type": "AssistantMessage",
                         "version": 1,
                         "props": {
-                            "question": "¿Qué hotel o qué ciudad/zona quieres usar?",
-                            "fields": ["Nombre del hotel", "Ciudad o zona"],
+                            "text": "¿Qué hotel o qué ciudad/zona quieres usar?",
                         },
                     }
                 ],
@@ -2794,7 +2791,6 @@ def test_local_conversation_uses_history_for_followup_after_urgent_recommendatio
     new_blocks = blocks[latest_user_index + 1 :]
     new_block_types = [block["type"] for block in new_blocks]
     assert "StationPreviewCard" in new_block_types
-    assert "ClarifyingQuestionCard" not in new_block_types
 
     urgent_block = next(block for block in new_blocks if block["type"] == "StationPreviewCard")
     assert urgent_block["props"]["name"] == station.name
@@ -4743,7 +4739,6 @@ def test_deepseek_conversation_agent_failure_uses_minimal_safe_fallback(client, 
     block_types = [block["type"] for block in blocks]
     assert "UserMessage" in block_types
     assert "AssistantMessage" in block_types
-    assert "ClarifyingQuestionCard" in block_types
     assert "PositionRequestCard" not in block_types
     assert "StationDetailCard" not in block_types
 

@@ -129,20 +129,6 @@
       "required": ["actions"],
       "additionalProperties": false
     },
-    "ClarifyingQuestionCard": {
-      "type": "object",
-      "properties": {
-        "question": { "type": "string", "minLength": 1 },
-        "fields": {
-          "type": "array",
-          "items": { "type": "string", "minLength": 1 },
-          "maxItems": 6
-        },
-        "primaryAction": { "$ref": "#/$defs/action" }
-      },
-      "required": ["question"],
-      "additionalProperties": false
-    },
     "PositionRequestCard": {
       "type": "object",
       "properties": {

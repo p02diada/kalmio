@@ -43,7 +43,7 @@ CASE_SPECS: dict[int, CaseSpec] = {
     ),
     4: CaseSpec(
         turns=["Estoy en carretera con 18%, no quiero desviarme mucho"],
-        any_components=({"ClarifyingQuestionCard", "PositionRequestCard", "AssistantMessage"},),
+        any_components=({"PositionRequestCard", "AssistantMessage"},),
         forbidden_tools={"plan_route", "search_destination_chargers"},
         expected_text_any=("carretera", "zona", "destino", "coordenadas"),
     ),
@@ -69,7 +69,7 @@ CASE_SPECS: dict[int, CaseSpec] = {
     ),
     8: CaseSpec(
         turns=["Voy de Sevilla a Granada, me da para llegar sin cargar?"],
-        any_components=({"RouteSummaryCard", "ClarifyingQuestionCard", "AssistantMessage"},),
+        any_components=({"RouteSummaryCard", "AssistantMessage"},),
         expected_tools={"plan_route"},
         expected_text_any=("no puedo", "bateria", "modelo", "consumo"),
     ),
@@ -86,7 +86,7 @@ CASE_SPECS: dict[int, CaseSpec] = {
     ),
     11: CaseSpec(
         turns=["Quiero la ruta mas barata, pero sin bajar del 20%"],
-        any_components=({"ClarifyingQuestionCard", "AssistantMessage"},),
+        any_components=({"AssistantMessage"},),
         forbidden_tools={"plan_route", "search_destination_chargers"},
         expected_text_any=("origen", "destino", "vehiculo", "bateria", "consumo"),
     ),
@@ -97,19 +97,19 @@ CASE_SPECS: dict[int, CaseSpec] = {
     ),
     13: CaseSpec(
         turns=["Me conviene cargar antes de salir o al llegar?"],
-        any_components=({"ClarifyingQuestionCard", "AssistantMessage"},),
+        any_components=({"AssistantMessage"},),
         forbidden_tools={"plan_route", "search_destination_chargers"},
         expected_text_any=("origen", "destino", "bateria", "vehiculo", "consumo"),
     ),
     14: CaseSpec(
         turns=["Quiero cargar lo justo para llegar, sin pagar de mas"],
-        any_components=({"ClarifyingQuestionCard", "AssistantMessage"},),
+        any_components=({"AssistantMessage"},),
         forbidden_tools={"plan_route", "search_destination_chargers"},
         expected_text_any=("origen", "destino", "bateria", "vehiculo", "consumo"),
     ),
     15: CaseSpec(
         turns=["Compara ruta rapida contra ruta barata"],
-        any_components=({"ClarifyingQuestionCard", "AssistantMessage"},),
+        any_components=({"AssistantMessage"},),
         forbidden_tools={"plan_route", "search_destination_chargers"},
         expected_text_any=("origen", "destino"),
     ),
@@ -138,7 +138,7 @@ CASE_SPECS: dict[int, CaseSpec] = {
     ),
     20: CaseSpec(
         turns=["Voy a Cordoba el viernes y vuelvo el domingo, donde cargo?"],
-        expected_components={"ClarifyingQuestionCard"},
+        expected_components={"AssistantMessage"},
         forbidden_tools={"plan_route", "search_destination_chargers"},
         expected_text_any=("origen", "desde donde", "sales", "salida"),
     ),

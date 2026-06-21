@@ -13,7 +13,6 @@ export type KalmioA2UIType =
   | 'CostComparisonCard'
   | 'MapPreviewCard'
   | 'ActionButtons'
-  | 'ClarifyingQuestionCard'
   | 'PositionRequestCard'
   | 'PreferenceChips'
   | 'ErrorFallbackCard'

@@ -199,7 +199,7 @@ describe('App', () => {
 
   it('scrolls new agent results to the primary recommendation instead of the last alternative', async () => {
     document.cookie = 'csrftoken=test-token'
-    const scrollIntoView = vi.fn(function (this: HTMLElement) {})
+    const scrollIntoView = vi.fn(function (this: HTMLElement, _options?: ScrollIntoViewOptions) {})
     Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
       configurable: true,
       value: scrollIntoView,
