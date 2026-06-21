@@ -335,6 +335,7 @@ function PositionRequestCard({
   const [status, setStatus] = useState<'idle' | 'pending' | 'unsupported' | 'failed' | 'manual'>('idle')
   const manualFields = strings(block.props.manualFields)
   const manualHint = manualLocationHint(manualFields)
+  const manualFallbackHint = manualLocationHint(manualFields, { includeCoordinates: true })
 
   const requestLocation = () => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
@@ -364,29 +365,36 @@ function PositionRequestCard({
   const statusMessage = {
     idle: '',
     pending: 'Pidiendo permiso de ubicación...',
-    unsupported: 'Este navegador no permite compartir ubicación aquí. Escribe una ciudad, carretera o punto cercano.',
-    failed: 'No pude acceder a tu ubicación. Puedes escribir una ciudad, carretera o punto cercano.',
-    manual: 'Escribe una ciudad, carretera o punto cercano en el mensaje para continuar.',
+    unsupported: `Este navegador no permite compartir ubicación aquí. ${manualFallbackHint}`,
+    failed: `No pude acceder a tu ubicación. ${manualFallbackHint}`,
+    manual: `${manualFallbackHint} Envíalo en el mensaje para continuar.`,
   }[status]
 
   return (
     <A2UICard icon={MapPinned} tone="assistant" title={text(block.props.title)} subtitle="Tu posición se usa solo para resolver esta búsqueda.">
       <p className="text-sm leading-6 text-body">{text(block.props.body)}</p>
       {manualHint ? <p className="text-xs leading-5 text-muted-foreground">{manualHint}</p> : null}
-      <div className="flex min-w-0 max-w-full flex-col items-start gap-2">
-        <Button type="button" className="h-auto min-h-11 w-full whitespace-normal font-semibold leading-5" onClick={requestLocation} disabled={status === 'pending'}>
+      <div className="grid min-w-0 max-w-full grid-cols-1 gap-2 sm:grid-cols-2">
+        <Button
+          type="button"
+          variant="outline"
+          className="h-auto min-h-11 w-full whitespace-normal px-3 font-semibold leading-5"
+          onClick={requestLocation}
+          disabled={status === 'pending'}
+        >
           <Navigation className="size-4" aria-hidden="true" />
           {status === 'pending' ? 'Solicitando...' : 'Usar mi ubicación'}
         </Button>
         <Button
           type="button"
-          variant="ghost"
-          className="h-auto min-h-11 w-auto max-w-full whitespace-normal px-2.5 leading-5 text-body hover:text-foreground"
+          variant="outline"
+          className="h-auto min-h-11 w-full max-w-full whitespace-normal px-3 font-semibold leading-5"
           onClick={() => {
             setStatus('manual')
             onManualPositionRequest?.()
           }}
         >
+          <MessageCircle className="size-4" aria-hidden="true" />
           Escribir ubicación
         </Button>
       </div>
@@ -1639,17 +1647,14 @@ function connectorLabels(value: unknown) {
   return strings(value).map((item) => item.toUpperCase())
 }
 
-function manualLocationHint(fields: string[]) {
-  if (fields.length === 0) {
-    return ''
-  }
+function manualLocationHint(fields: string[], { includeCoordinates = false }: { includeCoordinates?: boolean } = {}) {
   const normalized = fields.map((field) => field.trim()).filter(Boolean)
   const coordinatePattern = /coord|lat|lon/i
   const primaryFields = normalized.filter((field) => !coordinatePattern.test(field))
   const coordinateFields = normalized.length > primaryFields.length
   const visibleFields = (primaryFields.length > 0 ? primaryFields : ['ciudad', 'carretera o punto cercano']).map(sentenceCaseInline)
   const hint = `También puedes escribir ${spanishList(visibleFields)}.`
-  return coordinateFields ? `${hint} Las coordenadas sirven si ya las tienes.` : hint
+  return includeCoordinates && coordinateFields ? `${hint} Si ya las tienes, también sirven coordenadas.` : hint
 }
 
 function sentenceCaseInline(value: string) {

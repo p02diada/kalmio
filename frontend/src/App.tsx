@@ -542,6 +542,16 @@ function ChatPage() {
       })
   }, [actionMutation, isSending, messagesQuery.data?.surfaceId])
 
+  const focusComposer = useCallback(() => {
+    const composer = composerRef.current
+    if (!composer) {
+      return
+    }
+    composer.focus({ preventScroll: true })
+    const cursorPosition = composer.value.length
+    composer.setSelectionRange(cursorPosition, cursorPosition)
+  }, [])
+
   useEffect(() => {
     if (sentInitialPrompt.current) {
       return
@@ -600,7 +610,12 @@ function ChatPage() {
         {messagesQuery.isPending ? <ConversationSkeleton /> : null}
         {!messagesQuery.isPending && renderedBlocks.length === 0 && !isSending && !error ? <ChatEmptyState /> : null}
         {renderedBlocks.length > 0 ? (
-          <A2UIRenderer blocks={renderedBlocks} onChipClick={sendText} onActionEvent={sendA2UIEvent} />
+          <A2UIRenderer
+            blocks={renderedBlocks}
+            onChipClick={sendText}
+            onActionEvent={sendA2UIEvent}
+            onManualPositionRequest={focusComposer}
+          />
         ) : null}
         {isSending ? <ConversationProgress phaseIndex={phaseIndex} /> : null}
         {error ? <InlineError message={error} onRetry={retryText ? () => sendText(retryText) : undefined} /> : null}

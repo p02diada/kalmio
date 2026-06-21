@@ -117,7 +117,7 @@ def run_local_agent(message: str, history_blocks: list[dict] | None = None) -> l
                     title="Necesito tu ubicación",
                     body=(
                         "Para buscar una parada de carga cercana sin inventar resultados, "
-                        "comparte tu ubicación o escribe una ciudad/coordenadas."
+                        "comparte tu ubicación o escribe una ciudad, carretera o punto cercano."
                     ),
                 )
             )
@@ -1149,7 +1149,7 @@ def conversation_agent_prompt(
         "Si no tienes geometría de proveedor, usa geometryPrecision='schematic' o no muestres mapa; no inventes coordenadas ni geometría. "
         "ActionButtons usa event para backend/agente, functionCall.openUrl para abrir mapas, o disabled con reason; cuando pertenezcan a una recomendación colócalos inmediatamente después de esa card para que se rendericen como acciones de la misma unidad; "
         "AssistantMessage pide datos críticos en texto libre; "
-        "PositionRequestCard pide posición actual/manual del conductor; "
+        "PositionRequestCard pide posición actual/manual del conductor; en la copia inicial evita mencionar coordenadas salvo que el usuario ya las haya ofrecido, porque la alternativa manual debe sentirse equivalente y no técnica; "
         "PreferenceChips solo para correcciones o preferencias explícitas, siempre con props.title contextual; "
         "ErrorFallbackCard reservado.\n"
         "tool_call no es un componente A2UI y nunca debe aparecer dentro de blocks; si necesitas una herramienta, devuelve type=tool_call como objeto raíz.\n"
@@ -4199,7 +4199,7 @@ def normalize_block_props(block_type: str, props: dict) -> dict:
             "title": str(props.get("title") or "Necesito tu ubicación"),
             "body": str(
                 props.get("body")
-                or "Comparte tu ubicación o escribe una ciudad/coordenadas para continuar sin inventar resultados."
+                or "Comparte tu ubicación o escribe una ciudad, carretera o punto cercano para continuar sin inventar resultados."
             ),
             "precision": precision,
             "manualFields": [str(item) for item in manual_fields if item],

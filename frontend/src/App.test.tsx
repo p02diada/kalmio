@@ -197,9 +197,50 @@ describe('App', () => {
     expect(screen.queryByText(/JSON válido/i)).not.toBeInTheDocument()
   })
 
+  it('focuses the chat composer when users choose manual location entry', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = input.toString()
+      if (url.includes('/api/conversation/messages')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify(conversationBody([
+                {
+                  id: 'position-request',
+                  type: 'PositionRequestCard',
+                  version: 1,
+                  props: {
+                    title: 'Necesito tu ubicación',
+                    body: 'Comparte tu ubicación o escribe una ciudad o punto cercano.',
+                    manualFields: ['ciudad', 'latitud', 'longitud'],
+                  },
+                },
+              ])),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        )
+      }
+      return Promise.reject(new Error(`Unexpected request: ${url}`))
+    })
+
+    render(<App />)
+    fireEvent.click((await screen.findAllByRole('link', { name: /Chat/i }))[0])
+
+    const composer = await screen.findByLabelText('Mensaje para Kalmio')
+    const manualButton = await screen.findByRole('button', { name: 'Escribir ubicación' })
+    manualButton.focus()
+    expect(document.activeElement).toBe(manualButton)
+
+    fireEvent.click(manualButton)
+
+    expect(document.activeElement).toBe(composer)
+    expect(screen.getByText(/también sirven coordenadas/i)).toBeInTheDocument()
+  })
+
   it('scrolls new agent results to the primary recommendation instead of the last alternative', async () => {
     document.cookie = 'csrftoken=test-token'
-    const scrollIntoView = vi.fn(function (this: HTMLElement, _options?: ScrollIntoViewOptions) {})
+    const scrollIntoView = vi.fn(function (this: HTMLElement, options?: ScrollIntoViewOptions) {
+      void options
+    })
     Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
       configurable: true,
       value: scrollIntoView,
