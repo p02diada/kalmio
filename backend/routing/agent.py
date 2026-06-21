@@ -75,6 +75,7 @@ class AgentResponseError(RuntimeError):
 
 
 DecisionRequester = Callable[..., dict[str, Any]]
+ProgressCallback = Callable[[dict[str, Any]], None]
 
 
 def initial_blocks() -> list[dict]:
@@ -92,10 +93,16 @@ def initial_blocks() -> list[dict]:
     ]
 
 
-def run_conversation_agent(message: str, history_blocks: list[dict] | None = None) -> list[dict]:
+def run_conversation_agent(
+    message: str,
+    history_blocks: list[dict] | None = None,
+    progress_callback: ProgressCallback | None = None,
+) -> list[dict]:
     mode = getattr(settings, "KALMIO_CONVERSATION_AGENT_MODE", "local")
     if mode == "deepseek":
-        blocks = validate_blocks(run_deepseek_agent(message, history_blocks=history_blocks))
+        blocks = validate_blocks(
+            run_deepseek_agent(message, history_blocks=history_blocks, progress_callback=progress_callback)
+        )
         if not any(item.get("type") == "UserMessage" for item in blocks):
             blocks.insert(0, block(f"user-{uuid4().hex[:10]}", "UserMessage", {"text": message.strip()}))
         return blocks
@@ -191,13 +198,18 @@ def conversation_failure_blocks(message: str) -> list[dict]:
     ]
 
 
-def run_deepseek_agent(message: str, history_blocks: list[dict] | None = None) -> list[dict]:
+def run_deepseek_agent(
+    message: str,
+    history_blocks: list[dict] | None = None,
+    progress_callback: ProgressCallback | None = None,
+) -> list[dict]:
     with agent_trace_turn("deepseek"):
         return run_provider_agent(
             message,
             history_blocks=history_blocks,
             request_decision=request_deepseek_decision,
             max_tool_calls=getattr(settings, "KALMIO_DEEPSEEK_MAX_TOOL_CALLS", 3),
+            progress_callback=progress_callback,
         )
 
 
@@ -207,6 +219,7 @@ def run_provider_agent(
     history_blocks: list[dict] | None,
     request_decision: DecisionRequester,
     max_tool_calls: int,
+    progress_callback: ProgressCallback | None = None,
 ) -> list[dict]:
     history_blocks = history_blocks or []
     decision_message = contextualized_prompt(message, history_blocks)
@@ -215,6 +228,11 @@ def run_provider_agent(
 
     for _ in range(max_tool_calls + 1):
         try:
+            emit_progress(
+                progress_callback,
+                "agent_reasoning",
+                "Entendiendo la petición y el contexto útil",
+            )
             decision = request_decision(decision_message, tool_history=tool_history)
         except AgentResponseError as exc:
             if tool_history:
@@ -227,6 +245,7 @@ def run_provider_agent(
                 tool_history,
                 history_blocks=history_blocks,
                 request_decision=request_decision,
+                progress_callback=progress_callback,
             )
 
         grounding_issues = tool_call_argument_grounding_issues(
@@ -274,12 +293,25 @@ def run_provider_agent(
         seen_calls.add(call_signature)
 
         tool_started = time.perf_counter()
+        emit_progress(
+            progress_callback,
+            "tool_started",
+            conversation_tool_progress_label(decision["tool"]),
+            tool=decision["tool"],
+        )
         try:
             result = execute_conversation_tool(ToolCall(name=decision["tool"], args=decision["args"]))
         except ConversationToolError as exc:
             result = {"ok": False, "tool": decision["tool"], "error": str(exc)}
         finally:
             tool_duration_ms = elapsed_ms(tool_started)
+        emit_progress(
+            progress_callback,
+            "tool_finished",
+            conversation_tool_finished_label(decision["tool"], bool(result.get("ok"))),
+            tool=decision["tool"],
+            ok=bool(result.get("ok")),
+        )
         record_trace_event(
             event="internal_tool_call",
             name=decision["tool"],
@@ -355,14 +387,17 @@ def validated_or_repaired_final_blocks(
     tool_history: list[dict[str, Any]],
     history_blocks: list[dict] | None = None,
     request_decision: DecisionRequester | None = None,
+    progress_callback: ProgressCallback | None = None,
 ) -> list[dict]:
     request_decision = request_decision or request_deepseek_decision
+    emit_progress(progress_callback, "validating_a2ui", "Comprobando que la respuesta es segura")
     blocks = validate_blocks(candidate_blocks)
     issues = a2ui_contract_issues(blocks, tool_history, message, history_blocks=history_blocks)
     if not issues:
         return blocks
 
     try:
+        emit_progress(progress_callback, "repairing_a2ui", "Ajustando la respuesta antes de mostrarla")
         repair_decision = request_decision(
             message,
             tool_history=tool_history,
@@ -387,6 +422,37 @@ def validated_or_repaired_final_blocks(
             message,
         )
     return repaired_blocks
+
+
+def emit_progress(
+    progress_callback: ProgressCallback | None,
+    stage: str,
+    label: str,
+    **metadata: Any,
+) -> None:
+    if progress_callback is None:
+        return
+    progress_callback({"stage": stage, "label": label, **metadata})
+
+
+def conversation_tool_progress_label(tool: str) -> str:
+    labels = {
+        "resolve_location": "Resolviendo la ubicación",
+        "search_destination_chargers": "Consultando puntos de carga autorizados",
+        "plan_route": "Calculando ruta y margen de batería",
+    }
+    return labels.get(tool, "Consultando datos autorizados")
+
+
+def conversation_tool_finished_label(tool: str, ok: bool) -> str:
+    if not ok:
+        return "La comprobación necesita una respuesta prudente"
+    labels = {
+        "resolve_location": "Ubicación resuelta",
+        "search_destination_chargers": "Puntos de carga consultados",
+        "plan_route": "Ruta calculada",
+    }
+    return labels.get(tool, "Datos consultados")
 
 
 def run_deepseek_decision(

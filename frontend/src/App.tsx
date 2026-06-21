@@ -60,10 +60,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { Toaster } from '@/components/ui/sonner'
 import {
   clearConversation,
+  ConversationApiError,
   conversationMessagesQueryKey,
   getConversationMessages,
-  sendConversationAction,
-  sendConversationMessage,
+  sendConversationActionStream,
+  sendConversationMessageStream,
+  type ConversationMessagesResponse,
+  type ConversationProgressUpdate,
 } from '@/lib/api/conversation'
 import type { A2UIBlock } from '@/lib/a2ui/types'
 import { cn } from '@/lib/utils'
@@ -304,8 +307,11 @@ function ChatPage() {
   const [error, setError] = useState<string | null>(null)
   const [isSending, setIsSending] = useState(false)
   const [waitMessageIndex, setWaitMessageIndex] = useState(0)
+  const [progressUpdate, setProgressUpdate] = useState<ConversationProgressUpdate | null>(null)
   const [retryText, setRetryText] = useState<string | null>(null)
+  const [inputDisabledReason, setInputDisabledReason] = useState<string | null>(null)
   const [pendingUserBlock, setPendingUserBlock] = useState<A2UIBlock | null>(null)
+  const [typewriter, setTypewriter] = useState<{ blockId: string; text: string; visibleChars: number } | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const latestRef = useRef<HTMLDivElement>(null)
   const composerRef = useRef<HTMLTextAreaElement>(null)
@@ -322,25 +328,55 @@ function ChatPage() {
     }
     return pendingUserBlock ? [pendingUserBlock] : []
   }, [messagesQuery.data, pendingUserBlock])
+  const displayedBlocks = useMemo(() => {
+    if (!typewriter) {
+      return renderedBlocks
+    }
+    return renderedBlocks.map((block) => {
+      if (block.id !== typewriter.blockId || block.type !== 'AssistantMessage') {
+        return block
+      }
+      return {
+        ...block,
+        props: {
+          ...block.props,
+          text: typewriter.text.slice(0, typewriter.visibleChars),
+        },
+      }
+    })
+  }, [renderedBlocks, typewriter])
   const blockCount = renderedBlocks.length
   const blockSignature = renderedBlocks.map((block) => `${block.id}:${block.type}`).join('|')
+  const handleConversationSuccess = useCallback((data: ConversationMessagesResponse) => {
+    const previousIds = new Set((messagesQuery.data?.blocks ?? []).map((block) => block.id))
+    const assistantBlock = data.blocks.find((block) => (
+      block.type === 'AssistantMessage' &&
+      !previousIds.has(block.id) &&
+      typeof block.props.text === 'string' &&
+      block.props.text.length > 0
+    ))
+    setTypewriter(assistantBlock
+      ? { blockId: assistantBlock.id, text: assistantBlock.props.text as string, visibleChars: 0 }
+      : null)
+    queryClient.setQueryData(conversationMessagesQueryKey, data)
+  }, [messagesQuery.data?.blocks])
   const sendMutation = useMutation({
-    mutationFn: sendConversationMessage,
-    onSuccess: (data) => {
-      queryClient.setQueryData(conversationMessagesQueryKey, data)
-      setPendingUserBlock(null)
-    },
+    mutationFn: ({ text, onProgress }: { text: string; onProgress: (progress: ConversationProgressUpdate) => void }) =>
+      sendConversationMessageStream(text, onProgress),
+    onSuccess: handleConversationSuccess,
   })
   const actionMutation = useMutation({
-    mutationFn: sendConversationAction,
-    onSuccess: (data) => {
-      queryClient.setQueryData(conversationMessagesQueryKey, data)
-    },
+    mutationFn: ({ action, onProgress }: { action: Parameters<typeof sendConversationActionStream>[0]; onProgress: (progress: ConversationProgressUpdate) => void }) =>
+      sendConversationActionStream(action, onProgress),
+    onSuccess: handleConversationSuccess,
   })
   const clearMutation = useMutation({
     mutationFn: clearConversation,
     onSuccess: () => {
       setPendingUserBlock(null)
+      setProgressUpdate(null)
+      setTypewriter(null)
+      setInputDisabledReason(null)
       queryClient.invalidateQueries({ queryKey: conversationMessagesQueryKey })
     },
     onError: (mutationError) => {
@@ -350,12 +386,14 @@ function ChatPage() {
 
   const sendText = useCallback((value: string) => {
     const text = value.trim()
-    if (!text || isSending) {
+    if (!text || isSending || inputDisabledReason) {
       return
     }
     setDraft('')
     setError(null)
     setRetryText(null)
+    setProgressUpdate({ stage: 'accepted', label: 'Preparando la consulta' })
+    setTypewriter(null)
     setPendingUserBlock({
       id: `pending-user-${Date.now()}`,
       type: 'UserMessage',
@@ -364,38 +402,48 @@ function ChatPage() {
     })
     setIsSending(true)
     setWaitMessageIndex(0)
-    sendMutation.mutateAsync(text)
+    sendMutation.mutateAsync({ text, onProgress: setProgressUpdate })
       .catch((mutationError) => {
-        setError(mutationError instanceof Error ? mutationError.message : 'No se pudo enviar el mensaje.')
+        setError(conversationMutationMessage(mutationError, 'No se pudo enviar el mensaje.'))
+        setInputDisabledReason(conversationInputDisabledReason(mutationError))
         setRetryText(text)
       })
       .finally(() => {
+        setPendingUserBlock(null)
+        setProgressUpdate(null)
         setIsSending(false)
       })
-  }, [isSending, sendMutation])
+  }, [inputDisabledReason, isSending, sendMutation])
 
   const sendA2UIEvent = useCallback((name: string, context: Record<string, unknown> = {}, sourceComponentId?: string) => {
     const actionName = name.trim()
-    if (!actionName || isSending) {
+    if (!actionName || isSending || inputDisabledReason) {
       return
     }
     setError(null)
     setRetryText(null)
+    setProgressUpdate({ stage: 'accepted', label: 'Preparando la acción' })
+    setTypewriter(null)
     setIsSending(true)
     setWaitMessageIndex(0)
     actionMutation.mutateAsync({
-      name: actionName,
-      context,
-      sourceComponentId,
-      surfaceId: messagesQuery.data?.surfaceId,
+      action: {
+        name: actionName,
+        context,
+        sourceComponentId,
+        surfaceId: messagesQuery.data?.surfaceId,
+      },
+      onProgress: setProgressUpdate,
     })
       .catch((mutationError) => {
-        setError(mutationError instanceof Error ? mutationError.message : 'No se pudo enviar la acción.')
+        setError(conversationMutationMessage(mutationError, 'No se pudo enviar la acción.'))
+        setInputDisabledReason(conversationInputDisabledReason(mutationError))
       })
       .finally(() => {
+        setProgressUpdate(null)
         setIsSending(false)
       })
-  }, [actionMutation, isSending, messagesQuery.data?.surfaceId])
+  }, [actionMutation, inputDisabledReason, isSending, messagesQuery.data?.surfaceId])
 
   const focusComposer = useCallback(() => {
     const composer = composerRef.current
@@ -421,6 +469,24 @@ function ChatPage() {
       timers.forEach((timer) => window.clearTimeout(timer))
     }
   }, [isSending])
+
+  useEffect(() => {
+    if (!typewriter || typewriter.visibleChars >= typewriter.text.length) {
+      return
+    }
+    const timer = window.setInterval(() => {
+      setTypewriter((current) => {
+        if (!current) {
+          return current
+        }
+        return {
+          ...current,
+          visibleChars: Math.min(current.visibleChars + 8, current.text.length),
+        }
+      })
+    }, 20)
+    return () => window.clearInterval(timer)
+  }, [typewriter])
 
   useEffect(() => {
     const previousBlockIds = previousBlockIdsRef.current
@@ -454,17 +520,17 @@ function ChatPage() {
         ) : null}
         {renderedBlocks.length > 0 ? (
           <A2UIRenderer
-            blocks={renderedBlocks}
+            blocks={displayedBlocks}
             onChipClick={sendText}
             onActionEvent={sendA2UIEvent}
             onManualPositionRequest={focusComposer}
           />
         ) : null}
-        {error ? <InlineError message={error} onRetry={retryText ? () => sendText(retryText) : undefined} /> : null}
+        {error ? <InlineError message={error} onRetry={retryText && !inputDisabledReason ? () => sendText(retryText) : undefined} /> : null}
         <div ref={latestRef} className="h-px" tabIndex={-1} aria-hidden="true" />
       </div>
 
-      {isSending ? <ChatPendingStatus messageIndex={waitMessageIndex} /> : null}
+      {isSending ? <ChatPendingStatus messageIndex={waitMessageIndex} message={chatPendingProgressMessage(progressUpdate)} /> : null}
 
       <form
         className="chat-composer"
@@ -489,11 +555,12 @@ function ChatPage() {
           aria-label="Mensaje para Kalmio"
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
-          placeholder="Ruta, batería o destino"
+          placeholder={inputDisabledReason ?? 'Ruta, batería o destino'}
           rows={1}
           className="chat-composer-input border-0 px-2 shadow-none focus-visible:outline-none"
+          disabled={Boolean(inputDisabledReason)}
         />
-        <Button type="submit" size="icon" className="size-9 shrink-0 rounded-full md:w-auto md:px-3" aria-label="Enviar" disabled={isSending || draft.trim().length === 0}>
+        <Button type="submit" size="icon" className="size-9 shrink-0 rounded-full md:w-auto md:px-3" aria-label="Enviar" disabled={isSending || Boolean(inputDisabledReason) || draft.trim().length === 0}>
           <ArrowUp className="size-4" aria-hidden="true" />
           <span className="hidden md:inline">Enviar</span>
         </Button>
@@ -959,6 +1026,24 @@ function ThemeDecisionPreview() {
       </Card>
     </div>
   )
+}
+
+function conversationMutationMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback
+}
+
+function conversationInputDisabledReason(error: unknown) {
+  if (error instanceof ConversationApiError && error.disableInput) {
+    return 'Agente no disponible'
+  }
+  return null
+}
+
+function chatPendingProgressMessage(update: ConversationProgressUpdate | null) {
+  if (!update || update.stage === 'accepted') {
+    return undefined
+  }
+  return update.label
 }
 
 function InlineError({ message, onRetry }: { message: string; onRetry?: () => void }) {

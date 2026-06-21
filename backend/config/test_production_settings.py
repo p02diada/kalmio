@@ -19,6 +19,7 @@ BASE_PRODUCTION_ENV = {
     "POSTGRES_PASSWORD": "ci-production-db-password-4f750d65",
     "POSTGRES_HOST": "db",
     "POSTGRES_PORT": "5432",
+    "KALMIO_DEEPSEEK_API_KEY": "ci-deepseek-key-for-production-settings-checks",
 }
 
 

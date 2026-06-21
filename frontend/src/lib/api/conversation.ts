@@ -26,6 +26,27 @@ export type SendConversationActionInput = {
   context?: Record<string, unknown>
 }
 
+export type ConversationProgressUpdate = {
+  stage: string
+  label: string
+  tool?: string
+  ok?: boolean
+}
+
+export class ConversationApiError extends Error {
+  code?: string
+  developerDetail?: string
+  disableInput: boolean
+
+  constructor(message: string, options: { code?: string; developerDetail?: string; disableInput?: boolean } = {}) {
+    super(message)
+    this.name = 'ConversationApiError'
+    this.code = options.code
+    this.developerDetail = options.developerDetail
+    this.disableInput = Boolean(options.disableInput)
+  }
+}
+
 export async function getConversationMessages(): Promise<ConversationMessagesResponse> {
   const response = await fetch(`${API_BASE_URL}/api/conversation/messages`, {
     credentials: 'include',
@@ -33,7 +54,7 @@ export async function getConversationMessages(): Promise<ConversationMessagesRes
   const body = await response.json().catch(() => null)
 
   if (!response.ok) {
-    throw new Error(conversationErrorMessage(body, response.status, 'load'))
+    throw conversationError(body, response.status, 'load')
   }
 
   return parseConversationMessagesResponse(body)
@@ -41,6 +62,13 @@ export async function getConversationMessages(): Promise<ConversationMessagesRes
 
 export async function sendConversationMessage(text: string): Promise<ConversationMessagesResponse> {
   return postConversationPayload({ text })
+}
+
+export async function sendConversationMessageStream(
+  text: string,
+  onProgress?: (progress: ConversationProgressUpdate) => void,
+): Promise<ConversationMessagesResponse> {
+  return postConversationPayloadStream({ text }, onProgress)
 }
 
 export async function sendConversationAction(action: SendConversationActionInput): Promise<ConversationMessagesResponse> {
@@ -54,6 +82,22 @@ export async function sendConversationAction(action: SendConversationActionInput
       context: action.context ?? {},
     } satisfies A2UIClientAction,
   })
+}
+
+export async function sendConversationActionStream(
+  action: SendConversationActionInput,
+  onProgress?: (progress: ConversationProgressUpdate) => void,
+): Promise<ConversationMessagesResponse> {
+  return postConversationPayloadStream({
+    version: A2UI_PROTOCOL_VERSION,
+    action: {
+      name: action.name,
+      surfaceId: action.surfaceId ?? KALMIO_A2UI_SURFACE_ID,
+      ...(action.sourceComponentId ? { sourceComponentId: action.sourceComponentId } : {}),
+      timestamp: new Date().toISOString(),
+      context: action.context ?? {},
+    } satisfies A2UIClientAction,
+  }, onProgress)
 }
 
 async function postConversationPayload(payload: unknown): Promise<ConversationMessagesResponse> {
@@ -70,10 +114,44 @@ async function postConversationPayload(payload: unknown): Promise<ConversationMe
   const body = await response.json().catch(() => null)
 
   if (!response.ok) {
-    throw new Error(conversationErrorMessage(body, response.status, 'send'))
+    throw conversationError(body, response.status, 'send')
   }
 
   return parseConversationMessagesResponse(body)
+}
+
+async function postConversationPayloadStream(
+  payload: unknown,
+  onProgress?: (progress: ConversationProgressUpdate) => void,
+): Promise<ConversationMessagesResponse> {
+  await ensureCsrfCookie()
+  const response = await fetch(`${API_BASE_URL}/api/conversation/message/stream`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      Accept: 'text/event-stream',
+      'Content-Type': 'application/json',
+      ...csrfHeaders(),
+    },
+    body: JSON.stringify(payload),
+  })
+
+  const contentType = response.headers.get('Content-Type') ?? ''
+  if (!response.ok) {
+    const body = contentType.includes('application/json') ? await response.json().catch(() => null) : null
+    throw conversationError(body, response.status, 'send')
+  }
+
+  if (!contentType.includes('text/event-stream')) {
+    const body = await response.json().catch(() => null)
+    return parseConversationMessagesResponse(body)
+  }
+
+  if (!response.body) {
+    throw new ConversationApiError('No he podido recibir el progreso de la conversación.')
+  }
+
+  return parseConversationEventStream(response.body, onProgress)
 }
 
 export async function clearConversation(): Promise<void> {
@@ -86,8 +164,90 @@ export async function clearConversation(): Promise<void> {
 
   if (!response.ok) {
     const body = await response.json().catch(() => null)
-    throw new Error(conversationErrorMessage(body, response.status, 'clear'))
+    throw conversationError(body, response.status, 'clear')
   }
+}
+
+async function parseConversationEventStream(
+  body: ReadableStream<Uint8Array>,
+  onProgress?: (progress: ConversationProgressUpdate) => void,
+): Promise<ConversationMessagesResponse> {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) {
+      break
+    }
+    buffer += decoder.decode(value, { stream: true })
+    const parts = buffer.split('\n\n')
+    buffer = parts.pop() ?? ''
+    for (const part of parts) {
+      const result = handleConversationStreamEvent(part, onProgress)
+      if (result) {
+        return result
+      }
+    }
+  }
+
+  buffer += decoder.decode()
+  if (buffer.trim()) {
+    const result = handleConversationStreamEvent(buffer, onProgress)
+    if (result) {
+      return result
+    }
+  }
+
+  throw new ConversationApiError('La conversación terminó sin una respuesta válida.')
+}
+
+function handleConversationStreamEvent(
+  rawEvent: string,
+  onProgress?: (progress: ConversationProgressUpdate) => void,
+): ConversationMessagesResponse | null {
+  const lines = rawEvent.split(/\r?\n/)
+  const event = lines.find((line) => line.startsWith('event:'))?.slice('event:'.length).trim() ?? 'message'
+  const data = lines
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => line.slice('data:'.length).trimStart())
+    .join('\n')
+
+  if (!data) {
+    return null
+  }
+  const payload = JSON.parse(data) as unknown
+  if (event === 'progress') {
+    const value = assertRecord(payload, 'Conversation progress')
+    onProgress?.({
+      stage: readString(value, 'stage', 'Conversation progress'),
+      label: readString(value, 'label', 'Conversation progress'),
+      ...(typeof value.tool === 'string' ? { tool: value.tool } : {}),
+      ...(typeof value.ok === 'boolean' ? { ok: value.ok } : {}),
+    })
+    return null
+  }
+  if (event === 'done') {
+    return parseConversationMessagesResponse(payload)
+  }
+  if (event === 'error') {
+    throw conversationError(payload, 502, 'send')
+  }
+  return null
+}
+
+function conversationError(body: unknown, status: number, action: 'load' | 'send' | 'clear') {
+  const value = isRecord(body) ? body : {}
+  const code = typeof value.code === 'string' ? value.code : undefined
+  const developerDetail = typeof value.developer_detail === 'string' ? value.developer_detail : undefined
+  const disableInput = value.disable_input === true
+  const message = conversationErrorMessage(body, status, action)
+  return new ConversationApiError(developerDetail ? `${message} Diagnóstico: ${code ?? 'chat_error'}.` : message, {
+    code,
+    developerDetail,
+    disableInput,
+  })
 }
 
 function conversationErrorMessage(body: unknown, status: number, action: 'load' | 'send' | 'clear') {
