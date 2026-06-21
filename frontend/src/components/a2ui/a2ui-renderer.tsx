@@ -2,12 +2,10 @@ import {
   ArrowLeft,
   AlertTriangle,
   BatteryCharging,
-  Euro,
   Maximize2,
   MapPinned,
   MessageCircle,
   Navigation,
-  Route,
   X,
   type LucideIcon,
 } from 'lucide-react'
@@ -118,8 +116,7 @@ function canHostActionFooter(block: A2UIBlock) {
   return (
     block.type === 'StationPreviewCard' ||
     block.type === 'StationDetailCard' ||
-    block.type === 'RouteCorridorCard' ||
-    block.type === 'MapPreviewCard'
+    block.type === 'RouteCorridorCard'
   )
 }
 
@@ -245,10 +242,6 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
       return <StationDetailCard block={block} />
     case 'StationList':
       return <StationListCard title={text(block.props.title, 'Estaciones cercanas')} stations={list(block.props.stations)} />
-    case 'CostComparisonCard':
-      return <CostComparisonCard block={block} />
-    case 'MapPreviewCard':
-      return <MapPreviewCard block={block} />
     case 'ActionButtons':
       return (
         <ActionButtons
@@ -320,9 +313,8 @@ function PositionRequestCard({
   onPositionSubmit?: (value: string) => void
   onManualPositionRequest?: () => void
 }) {
-  const [status, setStatus] = useState<'idle' | 'pending' | 'unsupported' | 'failed' | 'manual'>('idle')
+  const [status, setStatus] = useState<'idle' | 'pending' | 'unsupported' | 'failed'>('idle')
   const manualFields = strings(block.props.manualFields)
-  const manualHint = manualLocationHint(manualFields)
   const manualFallbackHint = manualLocationHint(manualFields, { includeCoordinates: true })
 
   const requestLocation = () => {
@@ -355,13 +347,11 @@ function PositionRequestCard({
     pending: 'Pidiendo permiso de ubicación...',
     unsupported: `Este navegador no permite compartir ubicación aquí. ${manualFallbackHint}`,
     failed: `No pude acceder a tu ubicación. ${manualFallbackHint}`,
-    manual: `${manualFallbackHint} Envíalo en el mensaje para continuar.`,
   }[status]
 
   return (
     <A2UICard icon={MapPinned} tone="assistant" title={text(block.props.title)} subtitle="Tu posición se usa solo para resolver esta búsqueda.">
       <p className="text-sm leading-6 text-body">{text(block.props.body)}</p>
-      {manualHint ? <p className="text-xs leading-5 text-muted-foreground">{manualHint}</p> : null}
       <div className="grid min-w-0 max-w-full grid-cols-1 gap-2 sm:grid-cols-2">
         <Button
           type="button"
@@ -378,7 +368,7 @@ function PositionRequestCard({
           variant="outline"
           className="h-auto min-h-11 w-full max-w-full whitespace-normal px-3 font-semibold leading-5"
           onClick={() => {
-            setStatus('manual')
+            setStatus('idle')
             onManualPositionRequest?.()
           }}
         >
@@ -417,40 +407,9 @@ function MessageCard({
         <KalmioBrandMark className="size-5" />
       </span>
       <div className="a2ui-message a2ui-message-assistant">
-        <span className="mb-1 flex items-center gap-2 text-caption font-medium text-muted-foreground">
-          Kalmio
-        </span>
         {value}
       </div>
     </div>
-  )
-}
-
-function MetricCard({
-  icon: Icon,
-  title,
-  rows,
-  tone,
-  note,
-  context,
-}: {
-  icon: typeof Route
-  title: string
-  rows: Array<[string, string]>
-  tone: 'primary' | 'warning' | 'route' | 'assistant'
-  note?: string
-  context?: Record<string, unknown>
-}) {
-  return (
-    <A2UICard icon={Icon} tone={tone} title={title}>
-      {context ? <DecisionNarrative props={context} /> : null}
-      <MetricGrid rows={rows} />
-      {note ? (
-        <p className="border-t border-border pt-3 text-sm leading-6 text-body">
-          {note}
-        </p>
-      ) : null}
-    </A2UICard>
   )
 }
 
@@ -707,30 +666,6 @@ function StationDetailSection({ title, children }: { title: string; children: Re
   )
 }
 
-function CostComparisonCard({ block }: { block: A2UIBlock }) {
-  const tariff = pricePerKwhValue(block.props.pricePerKwhEur, block.props.currency)
-  if (bool(block.props.priceIsEstimated) || !tariff) {
-    return <ErrorFallbackCard type={block.type} message="No hay tarifas verificadas para comparar." />
-  }
-
-  return (
-    <MetricCard
-      icon={Euro}
-      title={text(block.props.best)}
-      tone="primary"
-      rows={compactRows([
-        ['Tarifa', tariff],
-        pricePerKwhValue(block.props.comparedWithPricePerKwhEur, block.props.currency)
-          ? ['Comparada con', pricePerKwh(block.props.comparedWithPricePerKwhEur, block.props.currency)]
-          : null,
-        isKnownNumber(block.props.savingPerKwhEur) ? ['Ahorro/kWh', pricePerKwh(block.props.savingPerKwhEur, block.props.currency)] : null,
-      ])}
-      context={block.props}
-      note={priceNote(block.props)}
-    />
-  )
-}
-
 function RouteCorridorCard({ block }: { block: A2UIBlock }) {
   const mapData = useMemo(() => routeMapData(block.props), [block.props])
   const [isExpanded, setIsExpanded] = useState(false)
@@ -915,10 +850,6 @@ function DecisionNarrative({ props }: { props: Record<string, unknown> }) {
   )
 }
 
-function MetricGrid({ rows }: { rows: Array<[string, string]> }) {
-  return <MetricGridRows rows={rows} />
-}
-
 function MetricGridRows({ rows, inverted = false }: { rows: Array<[string, string]>; inverted?: boolean }) {
   return (
     <div className="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(7rem,100%),1fr))] gap-2 text-sm">
@@ -940,7 +871,7 @@ function StationListCard({ title, stations }: { title: string; stations: RecordL
       {stations.length === 0 ? (
         <p className="text-sm leading-6 text-body">No hay estaciones alternativas para mostrar.</p>
       ) : (
-        <ol className="flex flex-col gap-2">
+        <ol className="flex flex-col">
           {stations.map((station, index) => (
             <StationListItem key={`${stationTitle(station, 'Estación')}-${index}`} station={station} />
           ))}
@@ -963,7 +894,7 @@ function StationListItem({ station }: { station: Record<string, unknown> }) {
   ]).slice(0, 3)
 
   return (
-    <li className="rounded-md border border-border bg-muted px-2.5 py-2">
+    <li className="border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0">
       <div className="min-w-0">
         <div className="flex min-w-0 items-start justify-between gap-2">
           <div className="min-w-0">
@@ -979,12 +910,12 @@ function StationListItem({ station }: { station: Record<string, unknown> }) {
           {power || capacity ? (
             <div className="flex shrink-0 flex-col items-end gap-1">
               {power ? (
-                <span className="rounded-sm bg-surface px-1.5 py-0.5 text-caption font-semibold leading-4 text-foreground">
+                <span className="text-caption font-semibold leading-4 text-foreground">
                   {power}
                 </span>
               ) : null}
               {capacity ? (
-                <span className="rounded-sm bg-surface px-1.5 py-0.5 text-[0.6875rem] font-semibold leading-3 text-body">
+                <span className="text-[0.6875rem] font-semibold leading-3 text-body">
                   <span className="sr-only">Puestos </span>
                   {capacity}
                 </span>
@@ -993,7 +924,7 @@ function StationListItem({ station }: { station: Record<string, unknown> }) {
           ) : null}
         </div>
         {comparisonMetrics.length > 0 ? (
-          <div className={cn('mt-2 grid overflow-hidden rounded-md border border-border bg-border', comparisonMetrics.length === 2 ? 'grid-cols-2' : 'grid-cols-3')}>
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
             {comparisonMetrics.map(([label, value]) => (
               <StationListMetric key={label} label={label} value={value} />
             ))}
@@ -1013,10 +944,10 @@ function StationListItem({ station }: { station: Record<string, unknown> }) {
 
 function StationListMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 bg-surface px-1.5 py-1.5">
-      <span className="block text-[0.6875rem] font-medium leading-3 text-muted-foreground [overflow-wrap:anywhere]">{label}</span>
-      <span className="mt-0.5 block break-words text-[0.72rem] font-semibold leading-4 tracking-tight text-foreground [overflow-wrap:anywhere]">{value}</span>
-    </div>
+    <span className="min-w-0 text-caption leading-4 text-body [overflow-wrap:anywhere]">
+      <span className="font-medium text-muted-foreground">{label}</span>{' '}
+      <span className="font-semibold text-foreground">{value}</span>
+    </span>
   )
 }
 
@@ -1044,76 +975,6 @@ function StationListInlineValues({ label, values }: { label: string; values: str
         </span>
       ))}
     </div>
-  )
-}
-
-function MapPreviewCard({ block }: { block: A2UIBlock }) {
-  const mapData = useMemo(() => routeMapData(block.props), [block.props])
-  const [isExpanded, setIsExpanded] = useState(false)
-  const stationCount = routeCorridorStations(block.props).length
-  const geometryLabel = mapData.geometryPrecision === 'provider' ? 'Ruta calculada' : 'Mapa orientativo'
-  const expandedMap = isExpanded && typeof document !== 'undefined'
-    ? createPortal(
-      <section className="a2ui-map-fullscreen" aria-label="Mapa de ruta ampliado">
-        <div className="a2ui-map-fullscreen-header">
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold tracking-tight">Mapa de ruta</h2>
-            <p className="truncate text-sm text-muted-foreground">
-              {`${mapData.originLabel} → ${mapData.destinationLabel}`}
-            </p>
-          </div>
-          <Button type="button" variant="outline" size="sm" className="h-9 shrink-0" onClick={() => setIsExpanded(false)}>
-            <ArrowLeft className="size-4" aria-hidden="true" />
-            Volver
-          </Button>
-        </div>
-        <div className="a2ui-map-fullscreen-body">
-          <RouteMapCanvas data={mapData} variant="expanded" />
-        </div>
-      </section>,
-      document.body,
-    )
-    : null
-
-  useEffect(() => {
-    if (!isExpanded || typeof document === 'undefined') {
-      return
-    }
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = previousOverflow
-    }
-  }, [isExpanded])
-
-  return (
-    <>
-      <A2UICard
-        icon={MapPinned}
-        tone="route"
-        title="Mapa de ruta"
-        subtitle={`${mapData.originLabel} → ${mapData.destinationLabel}`}
-        headerAction={(
-          <Button type="button" variant="outline" size="sm" className="h-8 shrink-0 px-2" aria-label="Expandir mapa" onClick={() => setIsExpanded(true)}>
-            <Maximize2 className="size-4" aria-hidden="true" />
-          </Button>
-        )}
-      >
-        <button type="button" className="block w-full rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Abrir mapa de ruta" onClick={() => setIsExpanded(true)}>
-          <RouteMapCanvas data={mapData} variant="compact" />
-        </button>
-        <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
-          <span className="truncate">{mapData.originLabel}</span>
-          <span className="truncate text-center">Estaciones</span>
-          <span className="truncate text-right">{mapData.destinationLabel}</span>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <Badge variant="secondary">{routeCorridorStationCountLabel(stationCount)}</Badge>
-          <Badge variant="secondary">{geometryLabel}</Badge>
-        </div>
-      </A2UICard>
-      {expandedMap}
-    </>
   )
 }
 
@@ -1877,13 +1738,6 @@ function stationPriceListRow(item: Record<string, unknown>): [string, string] | 
   }
   const row = stationPriceRow(item)
   return row ? [row[0], row[1].replace(' €/kWh', '€/kWh')] : null
-}
-
-function priceNote(props: Record<string, unknown>) {
-  const comparedWith = text(props.comparedWith, '')
-  return compactParts([
-    comparedWith ? `Comparado con ${comparedWith}.` : '',
-  ]).join(' ')
 }
 
 function uncertaintyText(value: unknown) {

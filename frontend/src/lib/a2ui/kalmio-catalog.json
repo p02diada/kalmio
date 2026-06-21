@@ -90,45 +90,6 @@
       "required": ["stations"],
       "additionalProperties": false
     },
-    "CostComparisonCard": {
-      "allOf": [
-        { "$ref": "#/$defs/decisionProps" },
-        {
-          "type": "object",
-          "properties": {
-            "best": { "$ref": "#/$defs/displayValue" },
-            "pricePerKwhEur": { "type": ["number", "null"], "minimum": 0 },
-            "comparedWith": { "$ref": "#/$defs/displayValue" },
-            "comparedWithPricePerKwhEur": { "type": ["number", "null"], "minimum": 0 },
-            "savingPerKwhEur": { "type": ["number", "null"] },
-            "currency": { "type": "string" },
-            "priceIsEstimated": { "type": ["boolean", "null"] },
-            "estimatedCostEur": { "type": ["number", "null"], "minimum": 0 },
-            "savingEur": { "type": ["number", "null"] }
-          },
-          "additionalProperties": true
-        }
-      ]
-    },
-    "MapPreviewCard": {
-      "type": "object",
-      "properties": {
-        "routeId": { "type": "string" },
-        "origin": { "$ref": "#/$defs/mapPoint" },
-        "destination": { "$ref": "#/$defs/mapPoint" },
-        "primaryStation": { "$ref": "#/$defs/stationProps" },
-        "stations": {
-          "type": "array",
-          "maxItems": 8,
-          "items": { "$ref": "#/$defs/stationProps" }
-        },
-        "routeGeometry": { "$ref": "#/$defs/lineStringGeometry" },
-        "corridorRadiusKm": { "type": ["number", "null"], "minimum": 0 },
-        "geometryPrecision": { "enum": ["provider", "schematic", "unknown"] },
-        "source": { "type": "string" }
-      },
-      "additionalProperties": false
-    },
     "ActionButtons": {
       "type": "object",
       "properties": {

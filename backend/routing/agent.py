@@ -38,8 +38,6 @@ A2UI_COMPONENT_TYPES = {
     "StationPreviewCard",
     "StationDetailCard",
     "StationList",
-    "CostComparisonCard",
-    "MapPreviewCard",
     "ActionButtons",
     "PositionRequestCard",
     "PreferenceChips",
@@ -1050,7 +1048,7 @@ def compact_block_props_for_prompt(block_type: str, props: Any) -> Any:
             compact["stations"] = compact_station_list_for_prompt(stations, limit=6)
             compact["stationCount"] = len(stations)
         return compact
-    if block_type in {"MapPreviewCard", "RouteCorridorCard"}:
+    if block_type == "RouteCorridorCard":
         compact = {}
         for key, value in props.items():
             if key == "routeGeometry" and isinstance(value, dict):
@@ -1176,7 +1174,7 @@ def conversation_agent_prompt(
         "Usa PositionRequestCard solo si basta con posición actual/manual del conductor; no muestres campos genéricos de ciudad si el usuario ya dijo que está en carretera y quiere poco desvío.\n"
         "- Si el coche carga máximo a X kW, pasa X como preferences.max_useful_power_kw; si recomiendas un cargador de más potencia, di antes de la primera parada una frase explícita como: 'Tu coche no aprovechará más de X kW; la potencia superior no se premia en esta elección'. No basta con decir que no necesita ultrarrápidos. No presentes la potencia superior como ventaja. No digas que has filtrado o excluido paradas por potencia si todavía muestras una estación por encima de ese máximo útil; di que esa potencia superior no se premia ni cambia lo que el coche puede aprovechar.\n"
         "- Restricción dura de llegada: sin perfil de vehículo no la presentes como cumplida; pide modelo/consumo/autonomía. Si la herramienta devuelve arrivalBattery:null o energyKwh:null, no los sustituyas por estimaciones ni por frases de certeza. Si el usuario pide llegar con al menos X%, pasa X como reserve_min_percent y di antes de cualquier StationPreviewCard/StationList que ese X% no se puede validar en chargers_only sin consumo/perfil.\n"
-        "- Preferencias de precio, hubs grandes o tamaño de parada: trátalas como preferencia de decisión sobre paradas, no como comparación de hardware. Si falta ruta o ubicación, no llames herramientas con ubicaciones vacías; pide origen/destino o ubicación actual. Usa pricePerKwhEur/currency solo cuando venga de herramienta y priceIsEstimated no sea true. Puedes usar CostComparisonCard para comparar tarifas verificadas por kWh entre estaciones; no calcules coste total de una sesión si no hay energía/cantidad de carga. Si no hay tarifas de proveedor o solo hay tarifas estimadas, dilo en AssistantMessage sin mostrar precio. No conviertas una preferencia de precio en una ruta arriesgada.\n"
+        "- Preferencias de precio, hubs grandes o tamaño de parada: trátalas como preferencia de decisión sobre paradas, no como comparación de hardware. Si falta ruta o ubicación, no llames herramientas con ubicaciones vacías; pide origen/destino o ubicación actual. Usa pricePerKwhEur/currency solo cuando venga de herramienta y priceIsEstimated no sea true; muestra tarifas verificadas dentro de StationPreviewCard o StationList. No calcules coste total de una sesión si no hay energía/cantidad de carga. Si no hay tarifas de proveedor o solo hay tarifas estimadas, dilo en AssistantMessage sin mostrar precio. No conviertas una preferencia de precio en una ruta arriesgada.\n"
         "- Cargar antes de salir vs al llegar: si faltan datos, no calcules. Da una comparación conceptual breve: cargar antes reduce riesgo si sales bajo, la ruta es larga o no conoces carga en destino; cargar al llegar puede tener sentido si llegas con margen y hay punto autorizado en destino. Luego pide origen, destino, batería actual y modelo/consumo/autonomía.\n"
         "- Viajes futuros: di visiblemente antes de mostrar paradas que disponibilidad, acceso y tarifas pueden cambiar antes del viaje. En reparaciones A2UI, no elimines esa advertencia; debe conservar las tres palabras disponibilidad, acceso y tarifas antes de cualquier lista de paradas. Niños/comodidad: si la herramienta trae amenities en la parada primaria, debes mencionarlos brevemente por nombre en la respuesta visible como servicios indicados o comodidad potencial despues del riesgo principal; no digas que están cerca, disponibles, son seguros, ideales, perfectos o aptos para niños salvo que el dato venga explícitamente de la herramienta. Separa proximidad de servicios: puedes decir que la estación está cerca de la ubicación buscada y que trae servicios indicados, pero no digas que restaurantes/cafeterías/baños están cerca si la herramienta solo trae amenities.\n"
         "- Preferencias de servicios como baños, cafetería, restaurante o comer: si faltan ruta o ubicación, pregunta por ubicación/ruta. Si el siguiente turno aporta ciudad, zona o coordenadas, conserva esa preferencia y llama search_destination_chargers con esa ubicación; no vuelvas a preguntar qué necesita. Si la búsqueda devuelve amenities vacíos o no incluye esos servicios, muestra los cargadores encontrados y di visiblemente que baños/cafetería/restaurante no están verificados en esos resultados.\n"
@@ -1209,12 +1207,12 @@ def conversation_agent_prompt(
         "Catálogo A2UI permitido por propósito, no por reglas rígidas de intención:\n"
         "AssistantMessage texto breve para contexto conversacional como origen, destino, batería, margen, reserva e incertidumbre concreta; RouteCorridorCard solo plan_route y debe combinar mapa compacto, ruta y estaciones cercanas al corredor sin declarar una estación recomendada; "
         "StationPreviewCard/StationList solo estaciones de carga respaldadas por herramientas; en esos bloques name/stationName debe ser una estación verificable; address puede ser dirección/zona de herramienta. AssistantMessage explica incertidumbre concreta; "
-        "CostComparisonCard solo tarifas/costes de herramienta; para preferencias de precio usa pricePerKwhEur y savingPerKwhEur verificados y no estimados, no estimatedCostEur sin energía verificada. AssistantMessage muestra la ubicación/zona resuelta cuando aporte contexto; StationPreviewCard muestra estación concreta con distanceKm, powerKw, pricePerKwhEur, availableEvses, connectorTypes, lat/lon cuando vengan de herramienta; no muestres pricePerKwhEur si priceIsEstimated es true. "
+        "Para preferencias de precio, muestra pricePerKwhEur verificado y no estimado en StationPreviewCard o StationList; no inventes ahorro, coste total ni comparativas si la herramienta no trae datos suficientes. AssistantMessage muestra la ubicación/zona resuelta cuando aporte contexto; StationPreviewCard muestra estación concreta con distanceKm, powerKw, pricePerKwhEur, availableEvses, connectorTypes, lat/lon cuando vengan de herramienta; no muestres pricePerKwhEur si priceIsEstimated es true. "
         "si quieres mostrar alternativas, usa StationList solo cuando aporte una decisión distinta; si hay riesgo o límite crítico, explícalo en AssistantMessage antes de la card. "
-        "MapPreviewCard solo para inspección de mapa cuando no haya RouteCorridorCard; para una ruta completa prefiere RouteCorridorCard con routeGeometry GeoJSON LineString de proveedor, origin/destination con coordenadas de herramienta, stations de herramienta, corridorRadiusKm y geometryPrecision='provider'. "
+        "RouteCorridorCard es el único componente de ruta/mapa: úsalo con routeGeometry GeoJSON LineString de proveedor, origin/destination con coordenadas de herramienta, stations de herramienta, corridorRadiusKm y geometryPrecision='provider'. "
         "Si no tienes geometría de proveedor, usa geometryPrecision='schematic' o no muestres mapa; no inventes coordenadas ni geometría. "
         "ActionButtons usa event para backend/agente, functionCall.openUrl para abrir mapas, o disabled con reason; cuando pertenezcan a una recomendación colócalos inmediatamente después de esa card para que se rendericen como acciones de la misma unidad; "
-        "Usa labels de acción concretos: 'Usar este punto' para elegir una recomendación, 'Abrir ruta' para navegación openUrl y 'Buscar otra opción' para alternativas; evita labels vagos como 'Confirmar'. "
+        "Usa labels de acción concretos: 'Elegir esta parada' o 'Elegir este punto de carga' para seleccionar una recomendación, 'Abrir ruta' para navegación openUrl y 'Buscar otra opción' para alternativas; evita labels vagos como 'Confirmar' o acciones de selección genéricas. No ofrezcas reservar, pagar ni comprar desde ActionButtons.\n"
         "AssistantMessage pide datos críticos en texto libre; "
         "PositionRequestCard pide posición actual/manual del conductor; en la copia inicial evita mencionar coordenadas salvo que el usuario ya las haya ofrecido, porque la alternativa manual debe sentirse equivalente y no técnica; "
         "PreferenceChips solo para correcciones o preferencias explícitas, siempre con props.title contextual; "
@@ -1710,12 +1708,8 @@ def a2ui_contract_issues(
         elif block_type == "RouteCorridorCard":
             issues.extend(route_summary_contract_issues(props, facts, "RouteCorridorCard"))
             issues.extend(map_preview_contract_issues(props, facts, explicit_coordinates, "RouteCorridorCard"))
-        elif block_type == "MapPreviewCard":
-            issues.extend(map_preview_contract_issues(props, facts, explicit_coordinates, "MapPreviewCard"))
         elif block_type == "ActionButtons":
             issues.extend(action_buttons_contract_issues(props, facts, explicit_coordinates))
-        elif block_type == "CostComparisonCard":
-            issues.extend(cost_contract_issues(props, facts))
     issues.extend(factual_charger_copy_contract_issues(blocks, facts))
     issues.extend(destination_city_approximation_contract_issues(blocks, tool_history, user_context))
     issues.extend(approximate_location_contract_issues(blocks, facts))
@@ -2833,7 +2827,6 @@ def block_uses_factual_location(block: dict) -> bool:
     return block.get("type") in {
         "StationList",
         "RouteCorridorCard",
-        "MapPreviewCard",
         "StationPreviewCard",
         "StationDetailCard",
     }
@@ -3260,6 +3253,10 @@ def action_buttons_contract_issues(
         label = normalize(str(action.get("label") or ""))
         if any(term in label for term in ("reserv", "pagar", "pago", "booking", "payment", "comprar")):
             issues.append(f"ActionButtons.actions[{index}] pide una acción no soportada por Kalmio.")
+        if label == "usar este punto":
+            issues.append(
+                f"ActionButtons.actions[{index}] usa un label ambiguo; usa 'Elegir esta parada' o 'Elegir este punto de carga'."
+            )
         if action.get("action") or action.get("type"):
             issues.append(f"ActionButtons.actions[{index}] usa un handler que el frontend no soporta.")
 
@@ -3372,46 +3369,6 @@ def close_station_coordinates(lat: float, lon: float, expected_lat: Any, expecte
     if other_lat is None or other_lon is None:
         return False
     return abs(lat - other_lat) <= 0.0005 and abs(lon - other_lon) <= 0.0005
-
-
-def cost_contract_issues(props: dict, facts: dict[str, Any]) -> list[str]:
-    rendered_price = optional_float(props.get("pricePerKwhEur") or props.get("pricePerKwh"))
-    if rendered_price is None:
-        return ["CostComparisonCard necesita pricePerKwhEur verificado; no debe mostrar comparativas sin tarifa."]
-
-    best = display_text(props.get("best") or props.get("stationName") or props.get("name"), "")
-    source = facts["stations"].get(station_key(best)) if best else None
-    if not source:
-        return ["CostComparisonCard.best debe referenciar una estación trazable con tarifa."]
-    if props.get("priceIsEstimated") is True or source.get("priceIsEstimated") is True:
-        return [f"CostComparisonCard no debe comparar precio porque la tarifa para {best} está marcada como estimada."]
-    expected = optional_float(source.get("pricePerKwhEur"))
-    if expected is None:
-        return [f"CostComparisonCard no puede comparar precio porque {best} no tiene tarifa verificada."]
-    if not values_match(rendered_price, expected):
-        return [f"CostComparisonCard.pricePerKwhEur no coincide con la tarifa verificada para {best}."]
-
-    compared_price = optional_float(props.get("comparedWithPricePerKwhEur"))
-    compared_with = display_text(props.get("comparedWith"), "")
-    if compared_price is not None:
-        compared_source = facts["stations"].get(station_key(compared_with)) if compared_with else None
-        if not compared_source:
-            return ["CostComparisonCard.comparedWith debe referenciar una estación trazable si muestra otra tarifa."]
-        if compared_source.get("priceIsEstimated") is True:
-            return [
-                f"CostComparisonCard no debe comparar precio porque la tarifa para {compared_with} está marcada como estimada."
-            ]
-        compared_expected = optional_float(compared_source.get("pricePerKwhEur"))
-        if compared_expected is None:
-            return [f"CostComparisonCard no puede comparar precio porque {compared_with} no tiene tarifa verificada."]
-        if not values_match(compared_price, compared_expected):
-            return [f"CostComparisonCard.comparedWithPricePerKwhEur no coincide con la tarifa verificada para {compared_with}."]
-
-    if props.get("estimatedCostEur") is not None:
-        return ["CostComparisonCard.estimatedCostEur requiere energía/cantidad de carga verificada; usa tarifa por kWh si no existe."]
-    if props.get("savingEur") is not None:
-        return ["CostComparisonCard.savingEur es ambiguo sin energía verificada; usa savingPerKwhEur para comparar tarifas."]
-    return []
 
 
 def coordinates_from_text(value: str) -> list[tuple[float, float]]:

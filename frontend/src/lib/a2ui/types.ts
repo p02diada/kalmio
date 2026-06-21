@@ -9,8 +9,6 @@ export type KalmioA2UIType =
   | 'StationPreviewCard'
   | 'StationDetailCard'
   | 'StationList'
-  | 'CostComparisonCard'
-  | 'MapPreviewCard'
   | 'ActionButtons'
   | 'PositionRequestCard'
   | 'PreferenceChips'

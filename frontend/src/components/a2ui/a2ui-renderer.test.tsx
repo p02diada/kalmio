@@ -409,7 +409,7 @@ describe('A2UIRenderer', () => {
     expect(screen.getAllByText('CCS2').length).toBeGreaterThan(0)
   })
 
-  it('renders an expandable route map preview', () => {
+  it('renders an expandable route corridor map', () => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
 
     render(
@@ -417,7 +417,7 @@ describe('A2UIRenderer', () => {
         blocks={[
           {
             id: 'route-map',
-            type: 'MapPreviewCard',
+            type: 'RouteCorridorCard',
             version: 1,
             props: {
               origin: { label: 'Zaragoza', lat: 41.6488, lon: -0.8891 },
@@ -441,15 +441,15 @@ describe('A2UIRenderer', () => {
       />,
     )
 
-    expect(screen.getByText('Mapa de ruta')).toBeInTheDocument()
-    expect(screen.getByText('Ruta calculada')).toBeInTheDocument()
+    expect(screen.getByText('Ruta y carga')).toBeInTheDocument()
     expect(screen.getByText('2 estaciones cerca de la ruta')).toBeInTheDocument()
 
-    expect(screen.getByRole('button', { name: 'Expandir mapa' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Abrir detalle de ruta' }).length).toBeGreaterThan(0)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Abrir mapa de ruta' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Abrir detalle de ruta' })[0])
 
-    expect(screen.getByLabelText('Mapa de ruta ampliado')).toHaveClass('a2ui-map-fullscreen')
+    expect(screen.getByLabelText('Detalle de ruta')).toHaveClass('a2ui-map-fullscreen')
+    expect(screen.getByText('Ruta calculada')).toBeInTheDocument()
   })
 
   it('initializes route maps with a default vector base map', async () => {
@@ -460,7 +460,7 @@ describe('A2UIRenderer', () => {
         blocks={[
           {
             id: 'route-map',
-            type: 'MapPreviewCard',
+            type: 'RouteCorridorCard',
             version: 1,
             props: {
               origin: { label: 'Zaragoza', lat: 41.6488, lon: -0.8891 },
@@ -498,7 +498,7 @@ describe('A2UIRenderer', () => {
         blocks={[
           {
             id: 'route-map',
-            type: 'MapPreviewCard',
+            type: 'RouteCorridorCard',
             version: 1,
             props: {
               origin: { label: 'Zaragoza', lat: 41.6488, lon: -0.8891 },
@@ -531,11 +531,11 @@ describe('A2UIRenderer', () => {
 
     await waitFor(() => expect(maplibreMock.Map).toHaveBeenCalledTimes(1))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Expandir mapa' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Abrir detalle de ruta' })[0])
 
     await waitFor(() => expect(maplibreMock.Map).toHaveBeenCalledTimes(2))
 
-    expect(screen.getByLabelText('Mapa de ruta ampliado')).toHaveClass('a2ui-map-fullscreen')
+    expect(screen.getByLabelText('Detalle de ruta')).toHaveClass('a2ui-map-fullscreen')
 
     const compactOptions = maplibreMock.Map.mock.calls[0]?.[0] as { attributionControl?: unknown; interactive?: unknown }
     const expandedOptions = maplibreMock.Map.mock.calls[1]?.[0] as { attributionControl?: unknown; interactive?: unknown }
@@ -585,59 +585,6 @@ describe('A2UIRenderer', () => {
 
     expect(screen.queryByText('0.49 €/kWh')).not.toBeInTheDocument()
     expect(screen.queryByText('Precio')).not.toBeInTheDocument()
-  })
-
-  it('renders traced tariff comparisons per kWh', () => {
-    render(
-      <A2UIRenderer
-        blocks={[
-          {
-            id: 'cost',
-            type: 'CostComparisonCard',
-            version: 1,
-            props: {
-              best: 'Almansa HPC',
-              pricePerKwhEur: 0.49,
-              comparedWith: 'Almansa AC',
-              comparedWithPricePerKwhEur: 0.59,
-              savingPerKwhEur: 0.1,
-              currency: 'EUR',
-              priceIsEstimated: false,
-            },
-          },
-        ]}
-      />,
-    )
-
-    expect(screen.getByText('Almansa HPC')).toBeInTheDocument()
-    expect(screen.getByText('0.49 €/kWh')).toBeInTheDocument()
-    expect(screen.getByText('0.59 €/kWh')).toBeInTheDocument()
-    expect(screen.getByText('0.1 €/kWh')).toBeInTheDocument()
-    expect(screen.getByText('Comparado con Almansa AC.')).toBeInTheDocument()
-  })
-
-  it('does not render estimated tariffs as a cost comparison', () => {
-    render(
-      <A2UIRenderer
-        blocks={[
-          {
-            id: 'cost',
-            type: 'CostComparisonCard',
-            version: 1,
-            props: {
-              best: 'Almansa HPC',
-              pricePerKwhEur: 0.49,
-              currency: 'EUR',
-              priceIsEstimated: true,
-            },
-          },
-        ]}
-      />,
-    )
-
-    expect(screen.getByText('No puedo mostrar una parte de la respuesta')).toBeInTheDocument()
-    expect(screen.queryByText('0.49 €/kWh')).not.toBeInTheDocument()
-    expect(screen.queryByText('Tarifa')).not.toBeInTheDocument()
   })
 
   it('renders traced amenities without claiming unverified proximity or child suitability', () => {
@@ -850,7 +797,7 @@ describe('A2UIRenderer', () => {
             props: {
               actions: [
                 {
-                  label: 'Usar este punto',
+                  label: 'Elegir esta parada',
                   priority: 'primary',
                   event: { name: 'confirm_stop' },
                 },
@@ -865,7 +812,7 @@ describe('A2UIRenderer', () => {
       />,
     )
 
-    expect(screen.getByRole('button', { name: 'Usar este punto' })).toHaveClass('w-full', 'font-bold')
+    expect(screen.getByRole('button', { name: 'Elegir esta parada' })).toHaveClass('w-full', 'font-bold')
     expect(screen.getByRole('button', { name: 'Buscar otra opción' })).toHaveClass('w-auto', 'text-body')
     expect(screen.getByRole('button', { name: 'Buscar otra opción' })).not.toHaveClass('border')
     expect(screen.getByRole('button', { name: 'Buscar otra opción' })).not.toHaveClass('w-full')
@@ -893,6 +840,7 @@ describe('A2UIRenderer', () => {
       value: { getCurrentPosition },
     })
     const onPositionSubmit = vi.fn()
+    const onManualPositionRequest = vi.fn()
 
     render(
       <A2UIRenderer
@@ -909,10 +857,11 @@ describe('A2UIRenderer', () => {
           },
         ]}
         onPositionSubmit={onPositionSubmit}
+        onManualPositionRequest={onManualPositionRequest}
       />,
     )
 
-    expect(screen.getByText(/también puedes escribir ciudad/i)).toBeInTheDocument()
+    expect(screen.getByText(/escribe una ciudad o punto cercano/i)).toBeInTheDocument()
     expect(screen.queryByText(/coordenadas/i)).not.toBeInTheDocument()
     expect(screen.queryByText('latitud')).not.toBeInTheDocument()
     expect(screen.queryByText('longitud')).not.toBeInTheDocument()
@@ -921,7 +870,8 @@ describe('A2UIRenderer', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Escribir ubicación' }))
 
-    expect(screen.getByText(/también sirven coordenadas/i)).toBeInTheDocument()
+    expect(onManualPositionRequest).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText(/también sirven coordenadas/i)).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Usar mi ubicación' }))
 

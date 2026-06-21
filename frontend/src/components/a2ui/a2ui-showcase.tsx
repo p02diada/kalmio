@@ -54,7 +54,7 @@ const scenarios: ExperienceScenario[] = [
       block('urgent-actions', 'ActionButtons', {
         actions: [
           {
-            label: 'Usar este punto',
+            label: 'Elegir esta parada',
             priority: 'primary',
             event: { name: 'confirm_stop', context: { scenario: 'urgent' } },
           },
@@ -172,17 +172,6 @@ const scenarios: ExperienceScenario[] = [
           },
         ],
       }),
-      block('route-cost', 'CostComparisonCard', {
-        best: { label: 'Punto de muestra La Plana' },
-        takeaway: 'Tarifa más baja entre las opciones verificadas.',
-        why: 'La comparación solo se muestra cuando ambas tarifas están verificadas.',
-        pricePerKwhEur: 0.39,
-        comparedWith: { label: 'Punto de muestra Mudéjar' },
-        comparedWithPricePerKwhEur: 0.52,
-        savingPerKwhEur: 0.13,
-        currency: 'EUR',
-        priceIsEstimated: false,
-      }),
       block('route-preferences', 'PreferenceChips', {
         title: 'Preferencias',
         chips: ['Parada con restaurante', 'Menos desvío', 'Más margen de batería', 'Solo carga rápida'],
@@ -217,7 +206,7 @@ const scenarios: ExperienceScenario[] = [
       block('destination-actions', 'ActionButtons', {
         actions: [
           {
-            label: 'Usar este punto',
+            label: 'Elegir este punto de carga',
             priority: 'primary',
             event: { name: 'confirm_destination', context: { scenario: 'destination' } },
           },
@@ -227,11 +216,6 @@ const scenarios: ExperienceScenario[] = [
               call: 'openUrl',
               args: { url: 'https://www.google.com/maps/dir/?api=1&destination=39.4723,-0.3768' },
             },
-          },
-          {
-            label: 'Reservar plaza',
-            disabled: true,
-            reason: 'La reserva todavía no está disponible.',
           },
         ],
       }),
@@ -275,8 +259,6 @@ function componentFocus(type: string) {
     StationPreviewCard: 'Debe ser una recomendación escaneable que abre el detalle completo de la estación.',
     StationDetailCard: 'Debe estructurar toda la información disponible de una estación sin prometer disponibilidad ni precios no verificados.',
     StationList: 'Debe permitir comparar alternativas rápido sin obligar a leer párrafos largos.',
-    CostComparisonCard: 'Debe mostrar ahorro solo cuando el precio está verificado y dejar clara la comparación.',
-    MapPreviewCard: 'Debe apoyar la ruta, no convertirse en la tarea principal del conductor.',
     ActionButtons: 'Debe separar acción primaria, corrección y acciones bloqueadas sin ambigüedad.',
     PositionRequestCard: 'Debe obtener ubicación con permiso explícito y ofrecer alternativa manual equivalente.',
     PreferenceChips: 'Debe ofrecer correcciones rápidas con contexto visible, no aparecer como botones sueltos.',

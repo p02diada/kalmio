@@ -989,12 +989,12 @@ def test_conversation_agent_prompt_keeps_dynamic_tool_context_after_static_instr
     assert prompt.index("Usuario: Busca cargadores cerca") < prompt.index("Historial de herramientas compactado")
 
 
-def test_conversation_agent_prompt_compacts_rejected_map_blocks_for_repair():
+def test_conversation_agent_prompt_compacts_rejected_route_blocks_for_repair():
     coordinates = [[-3.7 + index * 0.001, 40.4 - index * 0.001] for index in range(5000)]
     candidate_blocks = [
         {
             "id": "map",
-            "type": "MapPreviewCard",
+            "type": "RouteCorridorCard",
             "version": 1,
             "props": {
                 "origin": {"label": "Madrid", "lat": 40.4168, "lon": -3.7038},
@@ -1014,7 +1014,7 @@ def test_conversation_agent_prompt_compacts_rejected_map_blocks_for_repair():
     prompt = conversation_agent_prompt(
         "Tengo un Tesla Model Y y salgo con 45%. Madrid a Valencia",
         tool_history=[],
-        repair_issues=["MapPreviewCard necesita geometría trazable."],
+        repair_issues=["RouteCorridorCard necesita geometría trazable."],
         candidate_blocks=candidate_blocks,
     )
 
@@ -1734,7 +1734,7 @@ def test_a2ui_contract_rejects_global_action_buttons_after_station_list():
                 "props": {
                     "actions": [
                         {
-                            "label": "Usar este punto",
+                            "label": "Elegir esta parada",
                             "event": {
                                 "name": "select_station",
                                 "context": {"stationName": "BALLENOIL-ES336090-COLON"},
@@ -2096,7 +2096,7 @@ def test_a2ui_contract_allows_available_evses_copy_for_single_connector_preferen
     assert issues == []
 
 
-def test_a2ui_contract_allows_traced_station_price_and_cost_comparison():
+def test_a2ui_contract_allows_traced_station_price_without_cost_comparison_card():
     tool_history = [
         {
             "call": {"tool": "search_destination_chargers", "args": {"location": {"label": "Almansa"}}},
@@ -2118,20 +2118,6 @@ def test_a2ui_contract_allows_traced_station_price_and_cost_comparison():
                 "version": 1,
                 "props": {"name": "Almansa HPC", "pricePerKwhEur": 0.49, "currency": "EUR", "priceIsEstimated": False},
             },
-            {
-                "id": "cost",
-                "type": "CostComparisonCard",
-                "version": 1,
-                "props": {
-                    "best": "Almansa HPC",
-                    "pricePerKwhEur": 0.49,
-                    "comparedWith": "Almansa AC",
-                    "comparedWithPricePerKwhEur": 0.59,
-                    "savingPerKwhEur": 0.10,
-                    "currency": "EUR",
-                    "priceIsEstimated": False,
-                },
-            },
         ]
     )
 
@@ -2140,28 +2126,9 @@ def test_a2ui_contract_allows_traced_station_price_and_cost_comparison():
     assert issues == []
 
 
-def test_a2ui_contract_rejects_estimated_or_mismatched_prices():
-    tool_history = [
-        {
-            "call": {"tool": "search_destination_chargers", "args": {"location": {"label": "Almansa"}}},
-            "result": {
-                "ok": True,
-                "tool": "search_destination_chargers",
-                "stops": [
-                    {"name": "Almansa HPC", "pricePerKwhEur": 0.49, "currency": "EUR", "priceIsEstimated": True},
-                    {"name": "Almansa AC", "pricePerKwhEur": 0.59, "currency": "EUR", "priceIsEstimated": False},
-                ],
-            },
-        }
-    ]
+def test_validate_blocks_replaces_removed_cost_comparison_card():
     blocks = validate_blocks(
         [
-            {
-                "id": "station",
-                "type": "StationDetailCard",
-                "version": 1,
-                "props": {"name": "Almansa HPC", "pricePerKwhEur": 0.49, "currency": "EUR", "priceIsEstimated": True},
-            },
             {
                 "id": "cost",
                 "type": "CostComparisonCard",
@@ -2176,10 +2143,8 @@ def test_a2ui_contract_rejects_estimated_or_mismatched_prices():
         ]
     )
 
-    issues = a2ui_contract_issues(blocks, tool_history)
-
-    assert any("tarifa para Almansa HPC está marcada como estimada" in issue for issue in issues)
-    assert any("pricePerKwhEur no coincide" in issue for issue in issues)
+    assert blocks[0]["type"] == "ErrorFallbackCard"
+    assert blocks[0]["props"]["originalType"] == "CostComparisonCard"
 
 
 def test_a2ui_contract_rejects_untraced_default_reserve_attribution():
@@ -5140,7 +5105,7 @@ def test_a2ui_contract_rejects_map_preview_with_untraced_route_geometry():
     blocks = [
         {
             "id": "map",
-            "type": "MapPreviewCard",
+            "type": "RouteCorridorCard",
             "version": 1,
             "props": {
                 "origin": {"label": "Madrid", "lat": 40.4168, "lon": -3.7038},
@@ -5165,7 +5130,7 @@ def test_a2ui_contract_rejects_map_preview_with_untraced_route_geometry():
 
     issues = a2ui_contract_issues(blocks, tool_history)
 
-    assert any("MapPreviewCard.routeGeometry no coincide con plan_route" in issue for issue in issues)
+    assert any("RouteCorridorCard.routeGeometry no coincide con plan_route" in issue for issue in issues)
 
 
 @pytest.mark.django_db
