@@ -416,6 +416,69 @@ textarea:focus-visible {
     padding: 0 0.25rem 1rem;
   }
 
+  .chat-pending-status {
+    display: flex;
+    min-height: 1.5rem;
+    width: 100%;
+    align-items: center;
+    gap: 0.375rem;
+    flex-shrink: 0;
+    padding: 0 0.375rem;
+    color: var(--color-muted-foreground);
+    animation: chat-pending-status-enter 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .chat-pending-status-mark {
+    display: grid;
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    place-items: center;
+    opacity: 0.72;
+  }
+
+  .chat-pending-status-copy {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    align-items: center;
+    overflow: hidden;
+  }
+
+  .chat-pending-status-message {
+    overflow: hidden;
+    color: var(--color-muted-foreground);
+    font-size: var(--text-caption);
+    font-weight: 500;
+    line-height: var(--text-caption--line-height);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    animation: chat-pending-status-copy 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .chat-pending-status-dots {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.1875rem;
+  }
+
+  .chat-pending-status-dots span {
+    width: 0.1875rem;
+    height: 0.1875rem;
+    border-radius: var(--radius-full);
+    background: var(--color-muted-foreground);
+    animation: chat-pending-status-dot 1100ms cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  }
+
+  .chat-pending-status-dots span:nth-child(2) {
+    animation-delay: 120ms;
+  }
+
+  .chat-pending-status-dots span:nth-child(3) {
+    animation-delay: 240ms;
+  }
+
   .a2ui-message {
     max-width: 82%;
     border-radius: var(--radius-md);
@@ -434,6 +497,60 @@ textarea:focus-visible {
   .a2ui-message-assistant {
     border: 1px solid var(--color-border);
     background: var(--color-surface);
+  }
+
+  @keyframes chat-pending-status-enter {
+    from {
+      opacity: 0;
+      transform: translateY(0.25rem);
+      filter: blur(0.125rem);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+      filter: blur(0);
+    }
+  }
+
+  @keyframes chat-pending-status-copy {
+    from {
+      opacity: 0;
+      transform: translateY(0.1875rem);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes chat-pending-status-dot {
+    0%,
+    100% {
+      opacity: 0.28;
+      transform: translateY(0);
+    }
+
+    45% {
+      opacity: 0.82;
+      transform: translateY(-0.125rem);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .chat-pending-status,
+    .chat-pending-status-message {
+      animation: none;
+      transform: none;
+      filter: none;
+    }
+
+    .chat-pending-status-dots span {
+      animation: none;
+      opacity: 0.72;
+      transform: none;
+    }
   }
 
   .a2ui-map-shell {

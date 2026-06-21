@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 
 import { A2UIRenderer } from '@/components/a2ui/a2ui-renderer'
+import { ChatPendingStatus } from '@/components/chat/chat-pending-status'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -409,7 +410,40 @@ export function A2UIShowcasePage() {
         </p>
       </div>
 
+      <article id="chat-waiting" className="scroll-mt-28 rounded-md border border-border bg-surface">
+        <div className="border-b border-border px-3 py-2">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-mono text-xs leading-4 text-muted-foreground">Estado operativo</p>
+              <h2 className="text-sm font-semibold leading-5 tracking-normal">Espera del chat</h2>
+            </div>
+            <Badge variant="secondary" className="shrink-0">
+              Nuevo
+            </Badge>
+          </div>
+          <p className="mt-1 text-xs leading-5 text-body">
+            Esto es lo que ve el conductor después de enviar un mensaje mientras Kalmio resuelve la respuesta.
+          </p>
+        </div>
+        <div className="mx-auto flex w-full max-w-[23.4375rem] flex-col gap-3 bg-background px-3 py-4">
+          <A2UIRenderer
+            blocks={[
+              block('waiting-preview-user', 'UserMessage', {
+                text: 'Estoy en Córdoba con un 18% y CCS2.',
+              }),
+            ]}
+          />
+          <ChatPendingStatus messageIndex={2} />
+        </div>
+      </article>
+
       <div className="flex flex-wrap gap-2">
+        <a
+          href="#chat-waiting"
+          className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+        >
+          Espera del chat
+        </a>
         {(viewMode === 'components' ? componentCases : scenarios).map((item) => (
           <a
             key={item.id}

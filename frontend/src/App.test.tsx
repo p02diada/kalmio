@@ -387,6 +387,7 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
 
     expect(await screen.findByText('Estoy en Córdoba con un 18%')).toBeInTheDocument()
+    expect(screen.getByText('Contactando con Kalmio')).toBeInTheDocument()
 
     resolveMessage(
       new Response(
