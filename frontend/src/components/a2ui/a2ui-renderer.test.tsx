@@ -895,7 +895,7 @@ describe('A2UIRenderer', () => {
             version: 1,
             props: {
               title: 'Necesito tu ubicación',
-              body: 'Comparte tu ubicación o escribe una ciudad/coordenadas.',
+              body: 'Comparte tu ubicación o escribe una ciudad o punto cercano.',
               manualFields: ['ciudad', 'latitud', 'longitud'],
             },
           },
@@ -905,12 +905,15 @@ describe('A2UIRenderer', () => {
     )
 
     expect(screen.getByText(/también puedes escribir ciudad/i)).toBeInTheDocument()
-    expect(screen.getByText(/las coordenadas sirven si ya las tienes/i)).toBeInTheDocument()
+    expect(screen.queryByText(/coordenadas/i)).not.toBeInTheDocument()
     expect(screen.queryByText('latitud')).not.toBeInTheDocument()
     expect(screen.queryByText('longitud')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Usar mi ubicación' })).toHaveClass('w-full', 'font-semibold')
-    expect(screen.getByRole('button', { name: 'Escribir ubicación' })).toHaveClass('w-auto', 'text-body')
-    expect(screen.getByRole('button', { name: 'Escribir ubicación' })).not.toHaveClass('border')
+    expect(screen.getByRole('button', { name: 'Usar mi ubicación' })).toHaveClass('w-full', 'font-semibold', 'border')
+    expect(screen.getByRole('button', { name: 'Escribir ubicación' })).toHaveClass('w-full', 'font-semibold', 'border')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Escribir ubicación' }))
+
+    expect(screen.getByText(/también sirven coordenadas/i)).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Usar mi ubicación' }))
 
