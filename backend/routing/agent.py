@@ -39,7 +39,6 @@ A2UI_COMPONENT_TYPES = {
     "StationPreviewCard",
     "StationDetailCard",
     "StationList",
-    "RiskExplanationCard",
     "CostComparisonCard",
     "MapPreviewCard",
     "ActionButtons",
@@ -166,17 +165,17 @@ def run_local_agent(message: str, history_blocks: list[dict] | None = None) -> l
         except RoutingProviderError as exc:
             blocks.append(
                 block(
-                    f"risk-{uuid4().hex[:10]}",
-                    "RiskExplanationCard",
-                    {"level": "alto", "text": f"No puedo calcular la ruta ahora: {exc}"},
+                    f"assistant-{uuid4().hex[:10]}",
+                    "AssistantMessage",
+                    {"text": f"No puedo calcular la ruta ahora: {exc}"},
                 )
             )
         except PlanningDataError as exc:
             blocks.append(
                 block(
-                    f"risk-{uuid4().hex[:10]}",
-                    "RiskExplanationCard",
-                    {"level": "alto", "text": str(exc)},
+                    f"assistant-{uuid4().hex[:10]}",
+                    "AssistantMessage",
+                    {"text": str(exc)},
                 )
             )
         return blocks
@@ -1094,29 +1093,31 @@ def conversation_agent_prompt(
         "Comportamiento EV esperado:\n"
         "- Usa el historial útil, acepta correcciones naturales y no suenes como formulario.\n"
         "- Presenta las recomendaciones como paradas o lugares útiles para el viaje; usa name/stationName como punto de carga trazable y placeName solo si sale de herramienta o del usuario. No inventes lugares, servicios ni POIs.\n"
+        "- Modelo de composición A2UI: una respuesta debe sentirse como una unidad de decisión accionable, no como una pila de tarjetas. Por defecto empieza con AssistantMessage de 1-3 frases: explica la decisión, el límite o problema relevante y el siguiente paso útil sin ocultar incertidumbre. Después muestra una sola card principal (StationPreviewCard, RouteSummaryCard, PlaceDetailCard o ClarifyingQuestionCard) y acciones útiles. Si usas ActionButtons para una recomendación, colócalos inmediatamente después de la card a la que pertenecen; el renderer los tratará como el pie de acción de esa decisión. No uses ActionButtons para repetir texto ni como sustituto de herramientas necesarias.\n"
+        "- No existe un componente separado de riesgo. Explica riesgos, incertidumbres, límites de datos y siguientes pasos en AssistantMessage antes de la card principal. Usa ClarifyingQuestionCard cuando falte un dato crítico y ErrorFallbackCard solo para fallos técnicos renderizables. Mantén StationList fuera de la primera respuesta salvo que cambie una decisión, haya empate real, baja confianza, o el usuario pida comparar/ver más opciones.\n"
         "- En copy visible, expresa duraciones largas en horas y minutos (por ejemplo, 8 h 37 min), no como cientos de minutos. Evita la palabra técnica 'trazado/trazados': para el conductor usa 'según los datos disponibles', 'registrado', 'indicado', 'verificado' o 'autorizado' según el dato.\n"
         "- Carga urgente sin ubicación: pide solo ubicación actual, ciudad/zona o coordenadas. No pidas destino para una carga urgente. No llames resolve_location con frases que no son ubicaciones concretas, como 'ubicación actual', 'mi ubicación', 'estoy al 12%', 'no conozco la zona', 'estoy en carretera', 'tengo poca batería' o 'voy con niños'; pregunta el dato mínimo primero.\n"
         "- Tras una urgencia, una ciudad/zona/coordenadas es continuación de la urgencia; usa herramientas si hay ubicación suficiente.\n"
         "- Si el usuario corrige la ubicación, descarta la anterior, conserva batería, conector y preferencias si siguen teniendo sentido y busca con la nueva.\n"
         "- Si pregunta por un fallo anterior, no contradigas bloques ya validados; explica validación, cobertura, aproximación o datos autorizados.\n"
         "- Calle/POI/zona: intenta resolver la parte conocida con resolve_location. Si no puedes ubicar esa calle exacta, dilo y ofrece ciudad aproximada o coordenadas; no inventes coordenadas.\n"
-        "- Ruta sin consumo/modelo: puedes usar plan_route para explorar contexto de ruta y paradas de carga, pero no inventes autonomía, energía ni llegada. Si plan_route devuelve planningLevel=chargers_only, dilo. Usa RouteSummaryCard para distancia/duración de la herramienta y solo después de plan_route; no calcules ni inventes distancia/duración sin herramienta. StationPreviewCard y StationList sirven para estaciones autorizadas cuando sean útiles, y RiskExplanationCard para explicar que no puedes validar batería de llegada ni reserva sin consumo/perfil. No repitas la duración en prosa si ya está en RouteSummaryCard; evita frases como '4 horas' y deja el dato en la tarjeta o usa formato '4 h'. Mantén el AssistantMessage inicial en una frase corta y muestra la parada principal antes del aviso largo para que aparezca pronto en móvil; orden recomendado: RouteSummaryCard, StationPreviewCard, RiskExplanationCard y después StationList. Si el usuario pregunta si 'le da', 'llega sin cargar' o 'puede llegar sin cargar' y hay origen/destino pero faltan batería actual, autonomía, modelo o consumo, debes llamar plan_route para mostrar distancia/duración de proveedor; no respondas sí/no, no afirmes que llega, pide esos datos críticos, y no muestres StationPreviewCard/StationList como recomendación principal salvo que el usuario pida paradas de respaldo o plan B. Si el usuario prefiere parar pocas veces y ya hay origen/destino, debes llamar plan_route; si faltan autonomía/consumo/modelo, di antes de las paradas que no puedes garantizar ni optimizar pocas paradas sin esos datos; presenta cualquier estación solo como punto de carga autorizado en el corredor, no como plan optimizado. Si el usuario dice que sale con X%, ese X% es batería de salida, no de llegada ni reserva; no escribas 'llegas con X%'. Si el usuario pide no llegar justo sin dar un porcentaje de reserva, no digas que indicó 20%; si usas reserve_min_percent por defecto, llámalo margen conservador por defecto. No digas asegurar/garantizar margen en chargers_only ni 'te ayudará a recuperar margen'; di que cargar ahí puede ayudar a recuperar margen operativo no validado. Si el viaje es futuro (mañana, fecha concreta, finde, viernes/domingo), añade en el AssistantMessage inicial o en el primer RiskExplanationCard, antes de cualquier StationPreviewCard o StationList, una advertencia visible: disponibilidad, acceso y tarifas pueden cambiar antes del viaje.\n"
+        "- Ruta sin consumo/modelo: puedes usar plan_route para explorar contexto de ruta y paradas de carga, pero no inventes autonomía, energía ni llegada. Si plan_route devuelve planningLevel=chargers_only, dilo. Usa RouteSummaryCard para distancia/duración de la herramienta y solo después de plan_route; no calcules ni inventes distancia/duración sin herramienta. StationPreviewCard sirve para una estación autorizada útil; StationList queda para comparar/ver más opciones, empate real o baja confianza. Di visiblemente que no puedes validar batería de llegada ni reserva sin consumo/perfil. No repitas la duración en prosa si ya está en RouteSummaryCard; evita frases como '4 horas' y deja el dato en la tarjeta o usa formato '4 h'. El AssistantMessage inicial debe explicar antes de la card qué puedes decidir, qué no puedes validar y cuál es el siguiente paso; muestra después la decisión principal pronto en móvil. Patrón recomendado: AssistantMessage explicativo, una card principal de contexto o recomendación, ActionButtons para navegar/ver alternativas/refinar, y solo después StationList cuando esté justificada. Si el usuario pregunta si 'le da', 'llega sin cargar' o 'puede llegar sin cargar' y hay origen/destino pero faltan batería actual, autonomía, modelo o consumo, debes llamar plan_route para mostrar distancia/duración de proveedor; no respondas sí/no, no afirmes que llega, pide esos datos críticos, y no muestres StationPreviewCard/StationList como recomendación principal salvo que el usuario pida paradas de respaldo o plan B. Si el usuario prefiere parar pocas veces y ya hay origen/destino, debes llamar plan_route; si faltan autonomía/consumo/modelo, di antes de las paradas que no puedes garantizar ni optimizar pocas paradas sin esos datos; presenta cualquier estación solo como punto de carga autorizado en el corredor, no como plan optimizado. Si el usuario dice que sale con X%, ese X% es batería de salida, no de llegada ni reserva; no escribas 'llegas con X%'. Si el usuario pide no llegar justo sin dar un porcentaje de reserva, no digas que indicó 20%; si usas reserve_min_percent por defecto, llámalo margen conservador por defecto. No digas asegurar/garantizar margen en chargers_only ni 'te ayudará a recuperar margen'; di que cargar ahí puede ayudar a recuperar margen operativo no validado. Si el viaje es futuro (mañana, fecha concreta, finde, viernes/domingo), añade en el AssistantMessage inicial, antes de cualquier StationPreviewCard o StationList, una advertencia visible: disponibilidad, acceso y tarifas pueden cambiar antes del viaje.\n"
         "- Perfil de vehículo: un modelo comercial como Tesla Model Y y una batería de salida no son un perfil autorizado de consumo/autonomía. Para plan_route, usa vehicle:null u omite vehicle salvo que el usuario haya dado explícitamente batería, capacidad útil kWh, consumo kWh/100 km, conector y potencia máxima. No rellenes campos desconocidos con null, ceros o defaults. Puedes mencionar modelo y batería en el copy, pero no calcular energía, autonomía ni llegada con ellos.\n"
         "- Hotel/destino/estancia: si hay ciudad/POI suficiente y el usuario necesita cargar durante la estancia, llama search_destination_chargers directamente; no devuelvas solo un botón para buscar ni una respuesta final que diga 'buscaré'. Una ciudad conocida ya es ubicación suficiente para una búsqueda aproximada; no esperes hotel/zona exacta para la primera búsqueda, puedes pedir refinamiento después de mostrar resultados. Si tienes una ciudad conocida pero no tienes coordenadas exactas del hotel/POI, la primera decisión debe ser type=tool_call search_destination_chargers con la ciudad como location approximate, no type=final. Si el usuario da un POI/hotel dentro de una ciudad conocida, usa primero la ciudad/zona como aproximación verificable salvo que tengas coordenadas exactas autorizadas del POI; evita empezar por un punto muy estrecho que pueda ocultar cargadores urbanos útiles. No lo conviertas en ruta salvo que pidan origen-destino. Si muestras resultados de destino/estancia, incluye un PlaceDetailCard como ancla de la ubicación usada, con precision='approximate' y needsConfirmation=true cuando sea aproximación. Si el usuario dijo que el hotel no tiene cargador y la herramienta devuelve varias paradas, elige una parada primaria con StationPreviewCard usando solo distancia, potencia, conectores y puestos de carga registrados, y usa ActionButtons para navegar, refinar o pedir más opciones; no la presentes como disponibilidad en vivo ni como reserva. Reserva StationList para cuando el usuario pida ver/comparar opciones, haya empate real, baja confianza o alternativas materialmente útiles que cambien la decisión.\n"
-        "- Si buscas por ciudad aproximada porque el hotel/POI exacto no está resuelto, la respuesta visible debe decirlo en AssistantMessage o RiskExplanationCard: usa la ciudad como aproximación, no como ubicación exacta del hotel/POI, y pide dirección, zona exacta o coordenadas para refinar.\n"
+        "- Si buscas por ciudad aproximada porque el hotel/POI exacto no está resuelto, la respuesta visible debe decirlo en AssistantMessage: usa la ciudad como aproximación, no como ubicación exacta del hotel/POI, y pide dirección, zona exacta o coordenadas para refinar.\n"
         "- Si el usuario menciona ida y vuelta, volver, regreso o fechas de salida/vuelta, reconoce contexto de viaje redondo. Si falta origen para planificar ida/vuelta, pregunta por el origen antes de pedir hotel/zona y no llames plan_route ni search_destination_chargers todavia. Usa ClarifyingQuestionCard con field origen/salida cuando falte el origen. No uses la ciudad destino como origen.\n"
         "- Si resolve_location recibe un hotel, calle o POI pero solo devuelve una ciudad/zona, no afirmes que conoces el lugar exacto; no presentes el hotel exacto como ubicación validada; di que usas esa ciudad/zona como aproximación o pide coordenadas/dirección exacta.\n"
         "- Si search_destination_chargers devuelve stops, trátalos como estaciones: usa StationPreviewCard para una estación concreta o StationList para varias, con nombres y métricas exactas trazables. No uses placeholders cuando hay estaciones. Antes de llamar una herramienta, no crees StationPreviewCard genéricos como 'Cargador en Granada', potencia 0, distancia 0 o coordenadas iguales a la ciudad: pide herramienta o pregunta el dato mínimo.\n"
-        "- En móvil, no satures la primera respuesta con todas las alternativas si hay una estación primaria clara. Por defecto, no muestres StationList en esa primera respuesta: prefiere StationPreviewCard para la recomendación, RiskExplanationCard si aporta seguridad, y ActionButtons para navegar, pedir más opciones o ajustar la búsqueda. Para pedir más opciones, usa ActionButtons con event.name='show_more_options' y un context trazable de la búsqueda o estación cuando exista; para navegación usa functionCall.openUrl si hay lat/lon trazables. Usa StationList cuando el usuario pida comparar/más opciones, cuando haya empate real, baja confianza o alternativas materialmente útiles que cambien la decisión. Si muestras StationPreviewCard y StationList juntos, no repitas la estación primaria dentro de StationList.\n"
+        "- En móvil, no satures la primera respuesta con todas las alternativas si hay una estación primaria clara. Por defecto, no muestres StationList en esa primera respuesta: prefiere StationPreviewCard para la recomendación y ActionButtons inmediatamente después para navegar, pedir más opciones o ajustar la búsqueda. Para pedir más opciones, usa ActionButtons con event.name='show_more_options' y un context trazable de la búsqueda o estación cuando exista; para navegación usa functionCall.openUrl si hay lat/lon trazables. Usa StationList cuando el usuario pida comparar/más opciones, cuando haya empate real, baja confianza o alternativas materialmente útiles que cambien la decisión. Si muestras StationPreviewCard y StationList juntos, no repitas la estación primaria dentro de StationList.\n"
         "- No uses superlativos globales como 'el más rápido en la ciudad' o 'el mejor de Córdoba' salvo que la herramienta lo demuestre. Acota a 'entre estas opciones' o 'según los datos disponibles' cuando compares potencia/distancia.\n"
         "- Si ya hay stops con potencia/distancia/disponibilidad y el usuario pide comparar potencia, alternativas o más opciones, responde con esos resultados previos; no repitas la misma búsqueda sin cambiar ubicación, radio, conector o criterio material.\n"
         "- Si una herramienta permitida falla, explica el fallo en contexto y pide una acción mínima; no fabriques datos.\n"
         "- Batería baja: pocas opciones, riesgo explícito, y ActionButtons de navegación con functionCall.openUrl cuando la estación recomendada tiene lat/lon trazables. Puedes mencionar la batería en texto de riesgo si aporta contexto, pero no la uses como métrica principal de StationPreviewCard. "
-        "Si el usuario dice poca batería sin porcentaje explícito, no inventes un número; explica la batería baja en RiskExplanationCard o AssistantMessage. "
-        "Trata esa situación como urgente. Orden exacto recomendado si hay coordenadas de herramienta: StationPreviewCard, RiskExplanationCard si hace falta, ActionButtons, y solo después StationList; nunca pongas StationList antes de ActionButtons en este caso. "
-        "Con batería <=10%, prioriza una sola estación primaria, muestra el riesgo de margen muy bajo inmediatamente junto a esa estación como frase visible para el conductor, y deja solo 1-2 alternativas adicionales después. "
+        "Si el usuario dice poca batería sin porcentaje explícito, no inventes un número; explica la batería baja en AssistantMessage. "
+        "Trata esa situación como urgente. Orden exacto recomendado si hay coordenadas de herramienta: AssistantMessage con el riesgo y la decisión, StationPreviewCard, ActionButtons, y solo después StationList si hace falta; nunca pongas StationList antes de ActionButtons en este caso. "
+        "Con batería <=10%, prioriza una sola estación primaria, muestra el riesgo de margen muy bajo primero en AssistantMessage y junto a esa estación como frase visible para el conductor, y deja solo 1-2 alternativas adicionales después. "
         "Si la estación primaria tiene lat/lon trazables, ActionButtons con functionCall.openUrl es obligatorio y debe ir antes de cualquier StationList; no lo sustituyas por texto. "
-        "Pon RiskExplanationCard antes de las alternativas.\n"
+        "Pon el aviso de riesgo en AssistantMessage antes de las alternativas.\n"
         "- No describas availableEvses, totalEvses o puestos importados como 'libres', 'disponibles en vivo' u ocupación actual. En copy visible para conductores di 'puestos de carga registrados' o 'puestos'; evita la sigla técnica EVSE salvo en nombres de campos internos. Si tienes availableEvses y totalEvses, puedes mostrarlo como ratio de puestos disponibles/total, por ejemplo '4/10 puestos', sin llamarlo disponibilidad en vivo. Usa 'conectores' solo para connectorTypes como CCS2 o Type2. Si el usuario pide evitar cargadores con un solo conector/EVSE, prioriza estaciones con más de 1 puesto registrado cuando la herramienta lo soporte y explica el dato sin afirmar ocupación en vivo.\n"
         "- Punto de carga ocupado: si el historial deja claro cuál era la parada primaria anterior, no la repitas como plan B. "
         "En la respuesta visible, nombra la parada descartada y deja claro que no debe seguir siendo el plan principal. "
@@ -1129,21 +1130,21 @@ def conversation_agent_prompt(
         "Usa PositionRequestCard solo si basta con posición actual/manual del conductor; no muestres campos genéricos de ciudad si el usuario ya dijo que está en carretera y quiere poco desvío.\n"
         "- Si el coche carga máximo a X kW, pasa X como preferences.max_useful_power_kw; si recomiendas un cargador de más potencia, di antes de la primera parada una frase explícita como: 'Tu coche no aprovechará más de X kW; la potencia superior no se premia en esta elección'. No basta con decir que no necesita ultrarrápidos. No presentes la potencia superior como ventaja. No digas que has filtrado o excluido paradas por potencia si todavía muestras una estación por encima de ese máximo útil; di que esa potencia superior no se premia ni cambia lo que el coche puede aprovechar.\n"
         "- Restricción dura de llegada: sin perfil de vehículo no la presentes como cumplida; pide modelo/consumo/autonomía. Si la herramienta devuelve arrivalBattery:null o energyKwh:null, no los sustituyas por estimaciones ni por frases de certeza. Si el usuario pide llegar con al menos X%, pasa X como reserve_min_percent y di antes de cualquier StationPreviewCard/StationList que ese X% no se puede validar en chargers_only sin consumo/perfil.\n"
-        "- Preferencias de precio, hubs grandes o tamaño de parada: trátalas como preferencia de decisión sobre paradas, no como comparación de hardware. Si falta ruta o ubicación, no llames herramientas con ubicaciones vacías; pide origen/destino o ubicación actual. Usa pricePerKwhEur/currency solo cuando venga de herramienta y priceIsEstimated no sea true. Puedes usar CostComparisonCard para comparar tarifas verificadas por kWh entre estaciones; no calcules coste total de una sesión si no hay energía/cantidad de carga. Si no hay tarifas de proveedor o solo hay tarifas estimadas, dilo sin mostrar precio. Si los datos pueden estar desactualizados, usa RiskExplanationCard; no lo conviertas en una tarifa estimada visible. No conviertas una preferencia de precio en una ruta arriesgada.\n"
+        "- Preferencias de precio, hubs grandes o tamaño de parada: trátalas como preferencia de decisión sobre paradas, no como comparación de hardware. Si falta ruta o ubicación, no llames herramientas con ubicaciones vacías; pide origen/destino o ubicación actual. Usa pricePerKwhEur/currency solo cuando venga de herramienta y priceIsEstimated no sea true. Puedes usar CostComparisonCard para comparar tarifas verificadas por kWh entre estaciones; no calcules coste total de una sesión si no hay energía/cantidad de carga. Si no hay tarifas de proveedor o solo hay tarifas estimadas, dilo en AssistantMessage sin mostrar precio. No conviertas una preferencia de precio en una ruta arriesgada.\n"
         "- Cargar antes de salir vs al llegar: si faltan datos, no calcules. Da una comparación conceptual breve: cargar antes reduce riesgo si sales bajo, la ruta es larga o no conoces carga en destino; cargar al llegar puede tener sentido si llegas con margen y hay punto autorizado en destino. Luego pide origen, destino, batería actual y modelo/consumo/autonomía.\n"
         "- Viajes futuros: di visiblemente antes de mostrar paradas que disponibilidad, acceso y tarifas pueden cambiar antes del viaje. En reparaciones A2UI, no elimines esa advertencia; debe conservar las tres palabras disponibilidad, acceso y tarifas antes de cualquier lista de paradas. Niños/comodidad: si la herramienta trae amenities en la parada primaria, debes mencionarlos brevemente por nombre en la respuesta visible como servicios indicados o comodidad potencial despues del riesgo principal; no digas que están cerca, disponibles, son seguros, ideales, perfectos o aptos para niños salvo que el dato venga explícitamente de la herramienta. Separa proximidad de servicios: puedes decir que la estación está cerca de la ubicación buscada y que trae servicios indicados, pero no digas que restaurantes/cafeterías/baños están cerca si la herramienta solo trae amenities.\n"
         "- Preferencias de servicios como baños, cafetería, restaurante o comer: si faltan ruta o ubicación, pregunta por ubicación/ruta. Si el siguiente turno aporta ciudad, zona o coordenadas, conserva esa preferencia y llama search_destination_chargers con esa ubicación; no vuelvas a preguntar qué necesita. Si la búsqueda devuelve amenities vacíos o no incluye esos servicios, muestra los cargadores encontrados y di visiblemente que baños/cafetería/restaurante no están verificados en esos resultados.\n"
         "- Preferencias de desvío controlado por comodidad: usa route tooling si hay ruta. Si la herramienta trae detourMin y amenities, presenta la parada primaria como punto autorizado dentro o cerca del margen pedido y menciona servicios indicados como comodidad potencial; no digas 'buenos servicios', 'más cómodo' ni que el sitio es cómodo si la herramienta solo trae amenities. No introduzcas preferencias de pocas paradas salvo que el usuario las pida. Si muestras alternativas, conserva el desvío de la herramienta para que el usuario pueda comparar.\n"
-        "- Preferencias de seguridad nocturna o evitar sitios solitarios: si falta ubicación/ruta, pregunta por el dato mínimo sin prometer que buscarás sitios con afluencia, actividad, vigilancia o iluminación. Si el siguiente turno aporta ciudad, zona o coordenadas, conserva esa preferencia y llama search_destination_chargers con esa ubicación; no respondas solo con PlaceDetailCard. Puedes priorizar señales disponibles como dirección céntrica, potencia, puestos de carga/conectores o hub si la herramienta lo trae; no afirmes seguridad, vigilancia, iluminación, afluencia, actividad ni que sea menos probable que un lugar sea solitario. Di de forma visible que Kalmio no valida seguridad ni entorno en vivo y que el conductor debe verificar el entorno al llegar de noche. Si muestras alternativas, coloca RiskExplanationCard antes de StationList para que el límite no quede escondido en móvil.\n"
-        "- Estancias de varios días: piensa en carga durante estancia y vuelta; si hay viaje redondo y falta origen, pídelo; si solo pide carga en destino y hay ubicación suficiente, busca en destino. Si la estancia añade riesgo o una decisión útil, explícalo con AssistantMessage o RiskExplanationCard; no repitas destino/noches en un componente dedicado.\n"
+        "- Preferencias de seguridad nocturna o evitar sitios solitarios: si falta ubicación/ruta, pregunta por el dato mínimo sin prometer que buscarás sitios con afluencia, actividad, vigilancia o iluminación. Si el siguiente turno aporta ciudad, zona o coordenadas, conserva esa preferencia y llama search_destination_chargers con esa ubicación; no respondas solo con PlaceDetailCard. Puedes priorizar señales disponibles como dirección céntrica, potencia, puestos de carga/conectores o hub si la herramienta lo trae; no afirmes seguridad, vigilancia, iluminación, afluencia, actividad ni que sea menos probable que un lugar sea solitario. Di en AssistantMessage que Kalmio no valida seguridad ni entorno en vivo y que el conductor debe verificar el entorno al llegar de noche. Si muestras alternativas, ese límite debe aparecer antes de StationList para que no quede escondido en móvil.\n"
+        "- Estancias de varios días: piensa en carga durante estancia y vuelta; si hay viaje redondo y falta origen, pídelo; si solo pide carga en destino y hay ubicación suficiente, busca en destino. Si la estancia añade riesgo o una decisión útil, explícalo con AssistantMessage; no repitas destino/noches en un componente dedicado.\n"
         "- Rutas baratas, reservas duras, carga justa o comparativas rápida/barata necesitan origen, destino y datos de vehículo/batería para calcular energía, llegada o coste total; si faltan, pregunta en el mismo turno por origen, destino, batería actual y modelo/consumo/autonomía. Si la herramienta sí trae pricePerKwhEur y priceIsEstimated no es true, puedes comparar tarifa por kWh entre estaciones. No inventes tarifas, kWh, llegada ni comparativas de precio; si no hay datos de tarifas de proveedor, dilo.\n"
         "Ejemplos críticos por analogía, no reglas rígidas: 'Necesito cargar ya' -> pide ubicación, no destino; 'En Córdoba' tras urgencia -> busca Córdoba; "
         "'Paseo de la Victoria de Córdoba' -> si solo resuelves Córdoba, explica la aproximación; "
         "'Voy a dormir en Valencia, busca cargadores cerca del hotel' -> llama search_destination_chargers con Valencia como aproximación y explica que el hotel exacto refina; "
-        "'Valencia centro' tras hotel sin cargador -> PlaceDetailCard + StationPreviewCard + ActionButtons + RiskExplanationCard si falta hotel exacto, usando una parada primaria y dejando que el usuario pida alternativas; "
+        "'Valencia centro' tras hotel sin cargador -> AssistantMessage explicando que falta hotel exacto si el límite cambia la decisión + PlaceDetailCard + StationPreviewCard + ActionButtons pegados a la recomendación; deja que el usuario pida alternativas; "
         "'Voy a Granada y duermo cerca de la Alhambra' -> devuelve type=tool_call search_destination_chargers; usa Granada como primera búsqueda aproximada para no esconder cargadores urbanos si no tienes coordenadas exactas autorizadas del alojamiento; en la respuesta final posterior a la herramienta, si es finde, antes de paradas di que disponibilidad, acceso y tarifas pueden cambiar, di que usas Granada como aproximación y no como ubicación exacta del alojamiento, muestra PlaceDetailCard de Granada/Alhambra como aproximación y pide hotel/zona/direccion exacta para refinar; "
         "'Me voy 3 días a Córdoba y me quedo en el hotel Meliá' -> llama search_destination_chargers con Córdoba como aproximación, no ActionButtons; "
-        "'Voy una semana a Cádiz y necesito cargar durante la estancia' -> llama search_destination_chargers con Cádiz como aproximación; usa PlaceDetailCard para la ubicación y RiskExplanationCard/AssistantMessage para explicar la incertidumbre de estancia, no preguntes primero por hotel/zona; "
+        "'Voy una semana a Cádiz y necesito cargar durante la estancia' -> llama search_destination_chargers con Cádiz como aproximación; usa AssistantMessage para explicar la incertidumbre de estancia y PlaceDetailCard para la ubicación, no preguntes primero por hotel/zona; "
         "'Quiero la ruta más barata, pero sin bajar del 20%' sin origen/destino -> no llames plan_route, pregunta origen, destino y datos de vehículo/batería; "
         "'Voy a Córdoba el viernes y vuelvo el domingo' -> ClarifyingQuestionCard preguntando origen/salida para planificar ida/vuelta antes de llamar herramientas; "
         "'Zaragoza a Barcelona con 25%' sin consumo/modelo -> no valides ese 25%; "
@@ -1161,12 +1162,12 @@ def conversation_agent_prompt(
     catalog_instructions = (
         "Catálogo A2UI permitido por propósito, no por reglas rígidas de intención:\n"
         "AssistantMessage texto breve; TripSummaryCard ruta clara con origin, destination, battery y arrivalReservePercent; RouteSummaryCard solo plan_route; "
-        "StationPreviewCard/StationList solo estaciones de carga respaldadas por herramientas; en esos bloques name/stationName debe ser una estación verificable; address puede ser dirección/zona de herramienta. RiskExplanationCard incertidumbre concreta; "
+        "StationPreviewCard/StationList solo estaciones de carga respaldadas por herramientas; en esos bloques name/stationName debe ser una estación verificable; address puede ser dirección/zona de herramienta. AssistantMessage explica incertidumbre concreta; "
         "CostComparisonCard solo tarifas/costes de herramienta; para preferencias de precio usa pricePerKwhEur y savingPerKwhEur verificados y no estimados, no estimatedCostEur sin energía verificada. PlaceDetailCard muestra lugares o zonas resueltas; StationPreviewCard muestra estación concreta con distanceKm, powerKw, pricePerKwhEur, availableEvses, connectorTypes, lat/lon cuando vengan de herramienta; no muestres pricePerKwhEur si priceIsEstimated es true. "
-        "si quieres mostrar alternativas o riesgo, usa bloques separados StationList y RiskExplanationCard elegidos por el agente. "
+        "si quieres mostrar alternativas, usa StationList solo cuando aporte una decisión distinta; si hay riesgo o límite crítico, explícalo en AssistantMessage antes de la card. "
         "MapPreviewCard solo para rutas de plan_route con routeGeometry GeoJSON LineString de proveedor, origin/destination con coordenadas de herramienta, primaryStation/stations de herramienta, corridorRadiusKm y geometryPrecision='provider'. "
         "Si no tienes geometría de proveedor, usa geometryPrecision='schematic' o no muestres mapa; no inventes coordenadas ni geometría. "
-        "ActionButtons usa event para backend/agente, functionCall.openUrl para abrir mapas, o disabled con reason; "
+        "ActionButtons usa event para backend/agente, functionCall.openUrl para abrir mapas, o disabled con reason; cuando pertenezcan a una recomendación colócalos inmediatamente después de esa card para que se rendericen como acciones de la misma unidad; "
         "ClarifyingQuestionCard faltan datos críticos; "
         "PositionRequestCard pide posición actual/manual del conductor; PlaceDetailCard muestra lugares o zonas resueltas; PreferenceChips preferencias; ErrorFallbackCard reservado.\n"
         "tool_call no es un componente A2UI y nunca debe aparecer dentro de blocks; si necesitas una herramienta, devuelve type=tool_call como objeto raíz.\n"
@@ -1262,7 +1263,7 @@ def station_search_result_prompt(message: str, tool_history: list[dict[str, Any]
     return (
         f"Ya tienes resultados de {tool_name} en el historial. No repitas la misma búsqueda ni pidas "
         "otra herramienta salvo que cambie materialmente ubicación, ruta, conector o preferencia. Devuelve type=final "
-        "con StationPreviewCard/StationList/RiskExplanationCard usando solo esos resultados.\n"
+        "con AssistantMessage y StationPreviewCard/StationList usando solo esos resultados.\n"
         f"{destination_context}"
     )
 
@@ -1473,14 +1474,9 @@ def blocks_from_tool_result(tool_result: dict[str, Any], message: str = "") -> l
     if not tool_result.get("ok"):
         return [
             block(
-                f"risk-{uuid4().hex[:10]}",
-                "RiskExplanationCard",
-                {
-                    "level": "alto",
-                    "text": user_facing_failure_text(
-                        str(tool_result.get("error") or "La herramienta no pudo devolver datos reales.")
-                    ),
-                },
+                f"assistant-{uuid4().hex[:10]}",
+                "AssistantMessage",
+                {"text": user_facing_failure_text(str(tool_result.get("error") or "La herramienta no pudo devolver datos reales."))},
             )
         ]
     if tool == "search_destination_chargers":
@@ -1489,6 +1485,16 @@ def blocks_from_tool_result(tool_result: dict[str, Any], message: str = "") -> l
         if parse_intent(message).is_urgent_request:
             nearest = stations[0] if stations and isinstance(stations[0], dict) else {}
             return [
+                block(
+                    f"assistant-{uuid4().hex[:10]}",
+                    "AssistantMessage",
+                    {
+                        "text": (
+                            "Muestro paradas con puntos de carga autorizados cerca de la ubicación indicada. "
+                            "Confirma acceso final, tarifa y disponibilidad antes de depender de ellas."
+                        ),
+                    },
+                ),
                 place_detail_block(
                     location,
                     context="Lugar usado para buscar una estación de carga urgente",
@@ -1507,19 +1513,18 @@ def blocks_from_tool_result(tool_result: dict[str, Any], message: str = "") -> l
                         "stations": [station_props_from_result(station) for station in stations],
                     },
                 ),
-                block(
-                    f"risk-{uuid4().hex[:10]}",
-                    "RiskExplanationCard",
-                    {
-                        "level": "medio",
-                        "text": (
-                            "Muestro paradas con puntos de carga autorizados cerca de la ubicación indicada. "
-                            "Confirma acceso final, tarifa y disponibilidad antes de depender de ellos."
-                        ),
-                    },
-                ),
             ]
         return [
+            block(
+                f"assistant-{uuid4().hex[:10]}",
+                "AssistantMessage",
+                {
+                    "text": (
+                        "Muestro solo paradas respaldadas por puntos de carga autorizados devueltos por la herramienta interna. "
+                        "Confirma acceso final, tarifa y disponibilidad antes de depender de ellas."
+                    ),
+                },
+            ),
             place_detail_block(
                 location,
                 context="Lugar usado para buscar estaciones de carga",
@@ -1532,11 +1537,6 @@ def blocks_from_tool_result(tool_result: dict[str, Any], message: str = "") -> l
                     "title": "Estaciones cerca del destino",
                     "stations": [station_props_from_result(station) for station in stations],
                 },
-            ),
-            block(
-                f"risk-{uuid4().hex[:10]}",
-                "RiskExplanationCard",
-                {"level": "medio", "text": "Muestro solo paradas respaldadas por puntos de carga autorizados devueltos por la herramienta interna."},
             ),
         ]
     if tool == "plan_route":
@@ -1585,18 +1585,13 @@ def fallback_from_tool_history(tool_history: list[dict[str, Any]], reason: str, 
                 "AssistantMessage",
                 {
                     "text": (
-                        "Muestro solo datos validados por las herramientas disponibles y marco lo que no puedo confirmar."
+                        "Muestro solo datos validados por las herramientas disponibles y marco lo que no puedo confirmar. "
+                        f"{user_facing_failure_text(reason)}"
                     )
                 },
             ),
             *blocks_from_tool_result(latest_result, message),
-            block(
-                f"risk-{uuid4().hex[:10]}",
-                "RiskExplanationCard",
-                {"level": "medio", "text": user_facing_failure_text(reason)},
-            ),
         ]
-    level = "alto" if latest_result and not latest_result.get("ok") else "medio"
     return [
         block(
             f"assistant-{uuid4().hex[:10]}",
@@ -1604,14 +1599,10 @@ def fallback_from_tool_history(tool_history: list[dict[str, Any]], reason: str, 
             {
                 "text": (
                     "No he podido cerrar una respuesta fiable con los datos validados. "
-                    "No voy a completar estaciones, coordenadas, precios ni disponibilidad por mi cuenta."
+                    "No voy a completar estaciones, coordenadas, precios ni disponibilidad por mi cuenta. "
+                    f"{user_facing_failure_text(reason)}"
                 )
             },
-        ),
-        block(
-            f"risk-{uuid4().hex[:10]}",
-            "RiskExplanationCard",
-            {"level": level, "text": user_facing_failure_text(reason)},
         ),
     ]
 
@@ -1686,20 +1677,17 @@ def a2ui_contract_issues(
             issues.extend(action_buttons_contract_issues(props, facts, explicit_coordinates))
         elif block_type == "CostComparisonCard":
             issues.extend(cost_contract_issues(props, facts))
-        elif block_type == "RiskExplanationCard":
-            issues.extend(risk_explanation_contract_issues(props))
-
     issues.extend(factual_charger_copy_contract_issues(blocks, facts))
     issues.extend(destination_city_approximation_contract_issues(blocks, tool_history, user_context))
     issues.extend(approximate_location_contract_issues(blocks, facts))
     issues.extend(comfort_copy_contract_issues(blocks))
     issues.extend(night_safety_copy_contract_issues(blocks, user_context))
-    issues.extend(night_safety_risk_order_contract_issues(blocks, user_context))
+    issues.extend(night_safety_warning_order_contract_issues(blocks, user_context))
     issues.extend(requested_service_data_contract_issues(blocks, tool_history, user_context))
     issues.extend(default_reserve_copy_contract_issues(blocks, tool_history, user_context))
     issues.extend(unvalidated_route_margin_copy_contract_issues(blocks, tool_history))
+    issues.extend(chargers_only_warning_order_contract_issues(blocks, tool_history))
     issues.extend(max_useful_power_copy_contract_issues(blocks, tool_history))
-    issues.extend(chargers_only_risk_order_contract_issues(blocks, tool_history))
     issues.extend(few_stops_copy_context_contract_issues(blocks, user_context))
     issues.extend(departure_battery_copy_contract_issues(blocks, user_context))
     issues.extend(future_trip_volatility_copy_contract_issues(blocks, user_context))
@@ -1985,32 +1973,6 @@ def night_safety_copy_contract_issues(blocks: list[dict], message: str) -> list[
     return []
 
 
-def night_safety_risk_order_contract_issues(blocks: list[dict], message: str) -> list[str]:
-    if not user_message_mentions_night_safety(message):
-        return []
-    if not any(block.get("type") in STATION_CARD_TYPES or block.get("type") == "StationList" for block in blocks):
-        return [
-            "El usuario pidió servicios como baños/cafetería/restaurante y la herramienta encontró cargadores, "
-            "pero esos servicios no están trazados. La respuesta debe mostrar StationPreviewCard o StationList "
-            "con los cargadores encontrados y decir que esos servicios no están verificados."
-        ]
-    first_alternatives = first_block_index(blocks, "StationList")
-    if first_alternatives is None:
-        return []
-    first_risk = first_block_index(blocks, "RiskExplanationCard")
-    if first_risk is None:
-        return [
-            "Si el usuario quiere evitar sitios solitarios de noche y se muestran alternativas, "
-            "la respuesta debe incluir RiskExplanationCard con el límite de seguridad/entorno."
-        ]
-    if first_risk > first_alternatives:
-        return [
-            "Si el usuario quiere evitar sitios solitarios de noche, RiskExplanationCard debe aparecer antes de "
-            "StationList para no esconder en móvil que Kalmio no valida seguridad, iluminación ni afluencia."
-        ]
-    return []
-
-
 def user_message_mentions_night_safety(message: str) -> bool:
     normalized = normalize(message)
     if not normalized:
@@ -2029,6 +1991,25 @@ def user_message_mentions_night_safety(message: str) -> bool:
         "segura",
     )
     return any(visible_text_has_term(normalized, term) for term in safety_terms)
+
+
+def night_safety_warning_order_contract_issues(blocks: list[dict], message: str) -> list[str]:
+    if not user_message_mentions_night_safety(message):
+        return []
+    if first_block_index(blocks, "StationList") is None:
+        return []
+    early_text = normalize(" ".join(block_visible_text(block) for block in blocks_before_first_charge_option(blocks)))
+    if (
+        "no valida seguridad" in early_text
+        or "no valido seguridad" in early_text
+        or "no puedo validar seguridad" in early_text
+        or "no valida seguridad ni entorno" in early_text
+    ):
+        return []
+    return [
+        "Si el usuario quiere evitar sitios solitarios de noche, el AssistantMessage inicial debe explicar "
+        "antes de StationList que Kalmio no valida seguridad, iluminación ni afluencia en vivo."
+    ]
 
 
 def is_service_location_clarifying_copy(blocks: list[dict], visible_text: str) -> bool:
@@ -2347,6 +2328,28 @@ def unvalidated_route_margin_copy_contract_issues(
     return []
 
 
+def chargers_only_warning_order_contract_issues(
+    blocks: list[dict],
+    tool_history: list[dict[str, Any]],
+) -> list[str]:
+    route = latest_plan_route_result(tool_history)
+    if not route or route.get("planningLevel") != "chargers_only":
+        return []
+    if first_block_index(blocks, "StationList") is None:
+        return []
+    early_text = normalize(" ".join(block_visible_text(block) for block in blocks_before_first_charge_option(blocks)))
+    if (
+        ("no puedo validar" in early_text or "no valido" in early_text)
+        and ("bateria de llegada" in early_text or "batería de llegada" in early_text)
+        and "reserva" in early_text
+    ):
+        return []
+    return [
+        "En una ruta chargers_only, el AssistantMessage inicial debe explicar antes de StationList "
+        "que batería de llegada y reserva no están validadas."
+    ]
+
+
 def max_useful_power_copy_contract_issues(
     blocks: list[dict],
     tool_history: list[dict[str, Any]],
@@ -2452,27 +2455,6 @@ def explains_max_useful_power_limit(visible_text: str, cap: float) -> bool:
             "por encima del máximo",
         )
     )
-
-
-def chargers_only_risk_order_contract_issues(
-    blocks: list[dict],
-    tool_history: list[dict[str, Any]],
-) -> list[str]:
-    route = latest_plan_route_result(tool_history)
-    if not route or route.get("planningLevel") != "chargers_only":
-        return []
-    first_alternatives = first_block_index(blocks, "StationList")
-    if first_alternatives is None:
-        return []
-    first_risk = first_block_index(blocks, "RiskExplanationCard")
-    if first_risk is None:
-        return []
-    if first_risk > first_alternatives:
-        return [
-            "En una ruta chargers_only, RiskExplanationCard debe aparecer antes de StationList "
-            "para no esconder que batería de llegada y reserva no están validadas."
-        ]
-    return []
 
 
 def first_block_index(blocks: list[dict], block_type: str) -> int | None:
@@ -3412,21 +3394,6 @@ def cost_contract_issues(props: dict, facts: dict[str, Any]) -> list[str]:
     return []
 
 
-def risk_explanation_contract_issues(props: dict) -> list[str]:
-    text = display_text(props.get("text"), "")
-    normalized = normalize(text).strip(" .:")
-    if len(normalized) < 20 or normalized in {
-        "antes de salir",
-        "antes de confiar en ellas",
-        "datos",
-        "riesgo",
-        "aviso",
-        "precaucion",
-    }:
-        return ["RiskExplanationCard.text debe explicar la incertidumbre o el riesgo de forma concreta."]
-    return []
-
-
 def coordinates_from_text(value: str) -> list[tuple[float, float]]:
     coordinates = []
     for match in re.finditer(r"(-?\d{1,2}(?:[.,]\d+)?)\s*,\s*(-?\d{1,3}(?:[.,]\d+)?)", value):
@@ -3643,9 +3610,6 @@ def summarize_block_for_context(block_type: str, props: dict) -> str:
         stop_summaries = [summary for summary in stop_summaries if summary]
         if stop_summaries:
             return "Estaciones mostradas con datos trazables: " + "; ".join(stop_summaries)
-    if block_type == "RiskExplanationCard":
-        text = str(props.get("text") or "").strip()
-        return f"Aviso mostrado: {text}" if text else ""
     return ""
 
 
@@ -3703,10 +3667,9 @@ def urgent_charge_blocks(intent: ParsedIntent, location: ParsedLocation) -> list
     if not stations:
         return [
             block(
-                f"risk-{uuid4().hex[:10]}",
-                "RiskExplanationCard",
+                f"assistant-{uuid4().hex[:10]}",
+                "AssistantMessage",
                 {
-                    "level": "alto",
                     "text": (
                         f"No hay paradas con puntos de carga autorizados importados cerca de {location.label}. "
                         "No voy a inventar estaciones; comparte otra ubicación o coordenadas más precisas."
@@ -3726,6 +3689,16 @@ def urgent_charge_blocks(intent: ParsedIntent, location: ParsedLocation) -> list
     nearest = stations[0]
     top = stations[:3]
     return [
+        block(
+            f"assistant-{uuid4().hex[:10]}",
+            "AssistantMessage",
+            {
+                "text": (
+                    "Muestro estaciones con puntos de carga autorizados cerca de la ubicación indicada. "
+                    "Confirma acceso final, tarifa y disponibilidad antes de depender de ellas."
+                ),
+            },
+        ),
         place_detail_block(
             location,
             context="Ubicación usada para buscar una estación de carga urgente",
@@ -3742,17 +3715,6 @@ def urgent_charge_blocks(intent: ParsedIntent, location: ParsedLocation) -> list
             {
                 "title": "Otras estaciones cercanas",
                 "stations": [station_props_from_nearby(item) for item in top],
-            },
-        ),
-        block(
-            f"risk-{uuid4().hex[:10]}",
-            "RiskExplanationCard",
-            {
-                "level": "medio",
-                "text": (
-                    "Muestro estaciones con puntos de carga autorizados cerca de la ubicación indicada. "
-                    "Confirma acceso final, tarifa y disponibilidad antes de depender de ellos."
-                ),
             },
         ),
     ]
@@ -3777,23 +3739,30 @@ def destination_charge_blocks(intent: ParsedIntent) -> list[dict]:
     )
     if not stations:
         return [
+            block(
+                f"assistant-{uuid4().hex[:10]}",
+                "AssistantMessage",
+                {"text": "No hay paradas con puntos de carga autorizados cerca de ese destino. No voy a inventar estaciones."},
+            ),
             place_detail_block(
                 location,
                 context="Lugar usado para buscar estaciones de carga",
                 needs_confirmation=True,
             ),
-            block(
-                f"risk-{uuid4().hex[:10]}",
-                "RiskExplanationCard",
-                {
-                    "level": "alto",
-                    "text": "No hay paradas con puntos de carga autorizados cerca de ese destino. No voy a inventar estaciones.",
-                },
-            ),
         ]
 
     top = stations[:3]
     return [
+        block(
+            f"assistant-{uuid4().hex[:10]}",
+            "AssistantMessage",
+            {
+                "text": (
+                    "Muestro estaciones con puntos de carga autorizados cerca del destino. "
+                    "Confirma acceso final, tarifa y disponibilidad antes de depender de ellas."
+                ),
+            },
+        ),
         place_detail_block(
             location,
             context="Lugar usado para buscar estaciones de carga",
@@ -3805,14 +3774,6 @@ def destination_charge_blocks(intent: ParsedIntent) -> list[dict]:
             {
                 "title": "Estaciones cerca del destino",
                 "stations": [station_props_from_nearby(item) for item in top],
-            },
-        ),
-        block(
-            f"risk-{uuid4().hex[:10]}",
-            "RiskExplanationCard",
-            {
-                "level": "medio",
-                "text": "Muestro estaciones con puntos de carga autorizados cerca del destino. Confirma acceso final, tarifa y disponibilidad antes de depender de ellas.",
             },
         ),
     ]
@@ -3837,17 +3798,19 @@ def route_planning_blocks(intent: ParsedIntent) -> list[dict]:
     station = plan.recommendation.station
     primary_station_props = route_station_props(station, title="Estación recomendada")
     alternative_station_props = [route_station_props(alternative.station) for alternative in plan.alternatives]
+    warning_text = " ".join(str(warning).strip() for warning in plan.warnings if str(warning).strip())
+    assistant_text = (
+        "He decidido calcular ruta porque hay origen y destino. "
+        if intent.vehicle
+        else "He decidido explorar paradas de carga en ruta. Sin datos completos del coche no calculo autonomía."
+    )
+    if warning_text:
+        assistant_text = f"{assistant_text} {warning_text}"
     blocks = [
         block(
             f"assistant-{uuid4().hex[:10]}",
             "AssistantMessage",
-            {
-                "text": (
-                    "He decidido calcular ruta porque hay origen y destino. "
-                    if intent.vehicle
-                    else "He decidido explorar paradas de carga en ruta. Sin datos completos del coche no calculo autonomía."
-                )
-            },
+            {"text": assistant_text},
         ),
         block(
             f"trip-{uuid4().hex[:10]}",
@@ -3886,8 +3849,6 @@ def route_planning_blocks(intent: ParsedIntent) -> list[dict]:
                 },
             )
         )
-    for warning in plan.warnings:
-        blocks.append(block(f"risk-{uuid4().hex[:10]}", "RiskExplanationCard", {"level": "medio", "text": warning}))
     blocks.extend(
         [
             block(
@@ -4241,6 +4202,17 @@ def station_identities(station: Any) -> set[str]:
 
 
 def normalize_block_props(block_type: str, props: dict) -> dict:
+    if block_type in {"AssistantMessage", "UserMessage"}:
+        text_value = props.get("text") or props.get("message") or props.get("description") or props.get("risk")
+        if not text_value and isinstance(props.get("risks"), list):
+            text_value = " ".join(str(item) for item in props["risks"] if item)
+        if not text_value and isinstance(props.get("items"), list):
+            text_value = " ".join(str(item) for item in props["items"] if item)
+        if not text_value and isinstance(props.get("warnings"), list):
+            text_value = " ".join(str(item) for item in props["warnings"] if item)
+        if not text_value:
+            text_value = props.get("title") or ""
+        return {"text": str(text_value)}
     if block_type == "ClarifyingQuestionCard":
         question = props.get("question") or props.get("text") or props.get("message") or ""
         fields = props.get("fields")
@@ -4348,17 +4320,6 @@ def normalize_block_props(block_type: str, props: dict) -> dict:
                 normalized_action["label"] = display_text(label, "Continuar")
             normalized_actions.append(normalized_action)
         return {**props, "actions": normalized_actions}
-    if block_type == "RiskExplanationCard":
-        text_value = props.get("text") or props.get("message") or props.get("description") or props.get("risk")
-        if not text_value and isinstance(props.get("risks"), list):
-            text_value = " ".join(str(item) for item in props["risks"] if item)
-        if not text_value and isinstance(props.get("items"), list):
-            text_value = " ".join(str(item) for item in props["items"] if item)
-        if not text_value and isinstance(props.get("warnings"), list):
-            text_value = " ".join(str(item) for item in props["warnings"] if item)
-        if not text_value:
-            text_value = props.get("title") or "Hay incertidumbre que debes confirmar antes de depender de este resultado."
-        return {"level": str(props.get("level") or "medio"), "text": str(text_value)}
     if block_type == "PositionRequestCard":
         reason = props.get("reason")
         if reason not in {"urgent_charge", "nearby_chargers", "route_origin"}:

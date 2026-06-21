@@ -38,7 +38,7 @@ CASE_SPECS: dict[int, CaseSpec] = {
     ),
     3: CaseSpec(
         turns=["Necesito cargar ya. Estoy en Cordoba", "El cargador al que iba esta ocupado, dame un plan B"],
-        any_components=({"StationPreviewCard", "StationList", "RiskExplanationCard"},),
+        any_components=({"StationPreviewCard", "StationList", "AssistantMessage"},),
         expected_text_any=("ocup", "alternativa", "plan b", "disponibilidad"),
     ),
     4: CaseSpec(
@@ -250,6 +250,38 @@ def components_from_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return components
 
 
+NON_DECISION_COMPONENTS = {"AssistantMessage", "UserMessage", "PreferenceChips"}
+ACTION_COMPONENTS = {"ActionButtons"}
+ALTERNATIVE_LIST_COMPONENTS = {"StationList", "AlternativeStopsList"}
+
+
+def latest_turn_components(components: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    last_user_index = -1
+    for index, component in enumerate(components):
+        if component.get("component") == "UserMessage":
+            last_user_index = index
+    return components[last_user_index + 1 :]
+
+
+def density_metrics(components: list[dict[str, Any]]) -> dict[str, Any]:
+    latest_components = latest_turn_components(components)
+    latest_types = [str(component.get("component")) for component in latest_components]
+    card_types = [
+        component_type
+        for component_type in latest_types
+        if component_type not in NON_DECISION_COMPONENTS
+    ]
+    return {
+        "latestTurnComponents": latest_types,
+        "latestTurnCardCount": len(card_types),
+        "latestTurnActionCount": sum(1 for component_type in card_types if component_type in ACTION_COMPONENTS),
+        "latestTurnAlternativeListCount": sum(
+            1 for component_type in card_types if component_type in ALTERNATIVE_LIST_COMPONENTS
+        ),
+        "latestTurnOverOneCard": len(card_types) > 1,
+    }
+
+
 def visible_text(value: Any) -> str:
     if isinstance(value, str):
         return value
@@ -352,6 +384,7 @@ def evaluate_case(case_id: int, spec: CaseSpec, payload: dict[str, Any], events:
         "failures": failures,
         "components": sorted(component_types),
         "tools": sorted(tool_names),
+        "density": density_metrics(components),
     }
 
 
@@ -415,7 +448,14 @@ def main() -> int:
         results.append(result)
         if not args.json:
             status = "PASS" if result["ok"] else "FAIL"
-            print(f"{status} case {case_id}: components={result.get('components', [])} tools={result.get('tools', [])}")
+            density = result.get("density") or {}
+            print(
+                f"{status} case {case_id}: components={result.get('components', [])} "
+                f"tools={result.get('tools', [])} "
+                f"latest_cards={density.get('latestTurnCardCount')} "
+                f"latest_actions={density.get('latestTurnActionCount')} "
+                f"latest_lists={density.get('latestTurnAlternativeListCount')}"
+            )
             for failure in result.get("failures", []):
                 print(f"  - {failure}")
 

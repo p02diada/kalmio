@@ -75,15 +75,54 @@ export function A2UIRenderer({
   blocks: A2UIBlock[]
 } & A2UIRendererActions) {
   const actions = { onChipClick, onActionEvent, onPositionSubmit, onManualPositionRequest }
+  const renderedBlocks: ReactNode[] = []
+
+  for (let index = 0; index < blocks.length; index += 1) {
+    const block = blocks[index]
+    const nextBlock = blocks[index + 1]
+
+    if (nextBlock?.type === 'ActionButtons' && canHostActionFooter(block)) {
+      renderedBlocks.push(
+        <div
+          key={`${block.id}-${nextBlock.id}`}
+          className="flex min-w-0 max-w-full flex-col gap-2"
+          data-a2ui-decision-unit="true"
+          data-a2ui-action-footer-for={block.id}
+        >
+          <div data-a2ui-block-id={block.id} data-a2ui-block-type={block.type}>
+            <A2UIBoundary block={block} actions={actions} />
+          </div>
+          <div className="-mt-1 px-1" data-a2ui-block-id={nextBlock.id} data-a2ui-block-type={nextBlock.type}>
+            <A2UIBoundary block={nextBlock} actions={actions} />
+          </div>
+        </div>,
+      )
+      index += 1
+      continue
+    }
+
+    renderedBlocks.push(
+      <div key={block.id} data-a2ui-block-id={block.id} data-a2ui-block-type={block.type}>
+        <A2UIBoundary block={block} actions={actions} />
+      </div>,
+    )
+  }
 
   return (
     <div className="flex min-w-0 max-w-full flex-col gap-3">
-      {blocks.map((block) => (
-        <div key={block.id} data-a2ui-block-id={block.id} data-a2ui-block-type={block.type}>
-          <A2UIBoundary block={block} actions={actions} />
-        </div>
-      ))}
+      {renderedBlocks}
     </div>
+  )
+}
+
+function canHostActionFooter(block: A2UIBlock) {
+  return (
+    block.type === 'StationPreviewCard' ||
+    block.type === 'StationDetailCard' ||
+    block.type === 'RouteSummaryCard' ||
+    block.type === 'TripSummaryCard' ||
+    block.type === 'PlaceDetailCard' ||
+    block.type === 'MapPreviewCard'
   )
 }
 
@@ -223,8 +262,6 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
       return <StationDetailCard block={block} />
     case 'StationList':
       return <StationListCard title={text(block.props.title, 'Estaciones cercanas')} stations={list(block.props.stations)} />
-    case 'RiskExplanationCard':
-      return <RiskBand level={text(block.props.level, 'medio')} body={text(block.props.text)} />
     case 'CostComparisonCard':
       return <CostComparisonCard block={block} />
     case 'MapPreviewCard':
@@ -897,22 +934,6 @@ function StationListInlineValues({ label, values }: { label: string; values: str
         </span>
       ))}
     </div>
-  )
-}
-
-function RiskBand({ level, body }: { level: string; body: string }) {
-  const severity = level.toLowerCase()
-  const high = severity.includes('alto') || severity.includes('alta')
-  const low = severity.includes('bajo') || severity.includes('baja') || severity.includes('info')
-  const title = high ? 'Riesgo alto' : low ? 'Aviso de datos' : 'Datos a confirmar'
-  const tone: A2UICardTone = high ? 'error' : low ? 'route' : 'warning'
-
-  return (
-    <A2UICard icon={AlertTriangle} tone={tone} title={title}>
-      <p className="text-sm leading-6 text-body">
-        {body || 'Hay incertidumbre que debes confirmar antes de depender de este resultado.'}
-      </p>
-    </A2UICard>
   )
 }
 

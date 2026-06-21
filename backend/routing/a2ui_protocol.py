@@ -67,7 +67,6 @@ def facts_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
         "locations": [],
         "routes": [],
         "stations": [],
-        "risks": [],
     }
     for block in blocks:
         block_type = block.get("type")
@@ -86,8 +85,6 @@ def facts_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
                 for station in props["stations"]
                 if isinstance(station, dict)
             )
-        elif block_type == "RiskExplanationCard":
-            facts["risks"].append(with_source(props, source_component_id))
     return facts
 
 

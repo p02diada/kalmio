@@ -10,7 +10,6 @@ export type KalmioA2UIType =
   | 'StationPreviewCard'
   | 'StationDetailCard'
   | 'StationList'
-  | 'RiskExplanationCard'
   | 'CostComparisonCard'
   | 'MapPreviewCard'
   | 'ActionButtons'

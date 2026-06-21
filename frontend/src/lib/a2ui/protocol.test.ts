@@ -58,7 +58,7 @@ describe('A2UI protocol adapter', () => {
   it('does not let local props override structural component fields', () => {
     const component = localBlockToComponentDefinition({
       id: 'safe-id',
-      type: 'RiskExplanationCard',
+      type: 'AssistantMessage',
       version: 1,
       props: {
         id: 'bad-id',
@@ -69,7 +69,7 @@ describe('A2UI protocol adapter', () => {
 
     expect(component).toMatchObject({
       id: 'safe-id',
-      component: 'RiskExplanationCard',
+      component: 'AssistantMessage',
       version: 1,
       text: 'Disponibilidad no confirmada.',
     })

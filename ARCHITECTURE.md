@@ -42,6 +42,8 @@ The backend still stores validated UI internally as a local adapter shape:
 
 This adapter is not the official A2UI wire protocol and must not be extended as a public frontend contract. Conversation endpoints return `messages`, a self-contained A2UI v0.9.1 REST snapshot with `createSurface`, `updateComponents`, and `updateDataModel`. New work must update the Kalmio catalog, use renderer-owned styling, use `event` or registered `functionCall` actions, and keep factual EV data traceable to tool results or `updateDataModel` state.
 
+Kalmio treats each assistant turn as a decision unit, not as an arbitrary stack of cards. The agent may choose the useful A2UI components, but the default composition is an explanatory `AssistantMessage` that states the decision, relevant limit or problem, and next useful step, followed by one primary decision component and safe actions. `ActionButtons` remains an A2UI component for protocol and validation purposes; when it follows a decision component directly, the renderer presents it as that component's action footer. Risks, uncertainty, data limits, and provider failures are explained in `AssistantMessage` or represented by `ClarifyingQuestionCard`/`ErrorFallbackCard` when those blocks are specifically needed; there is no standalone risk component in the active catalog. Alternative lists are reserved for explicit comparison, materially different options, low confidence, or user-requested exploration.
+
 Official transports can be JSONL/SSE, WebSocket, A2A, AG-UI, or REST for simple local slices, but any production protocol implementation must preserve ordered envelope delivery, catalog negotiation/capabilities, and a return channel for actions.
 
 ## `/api/conversation/message` Flow

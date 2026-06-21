@@ -596,7 +596,7 @@ def test_removed_destination_and_stay_cards_render_fallbacks():
     assert blocks[1]["props"]["originalType"] == "StayPlanningCard"
 
 
-def test_risk_explanation_card_normalizes_singular_risk_text():
+def test_removed_risk_explanation_card_renders_as_unknown_fallback():
     blocks = validate_blocks(
         [
             {
@@ -608,7 +608,8 @@ def test_risk_explanation_card_normalizes_singular_risk_text():
         ]
     )
 
-    assert blocks[0]["props"]["text"] == "Disponibilidad, acceso y tarifas pueden cambiar antes del viaje."
+    assert blocks[0]["type"] == "ErrorFallbackCard"
+    assert blocks[0]["props"]["originalType"] == "RiskExplanationCard"
 
 
 def test_urgent_tool_fallback_renders_station_without_repeating_user_battery():
@@ -749,8 +750,14 @@ def test_conversation_agent_prompt_guides_followups_without_backend_intent_mappi
     assert "usa primero la ciudad/zona como aproximación verificable" in prompt
     assert "incluye un PlaceDetailCard como ancla" in prompt
     assert "no presentes el hotel exacto como ubicación validada" in prompt
+    assert "unidad de decisión accionable" in prompt
+    assert "no como una pila de tarjetas" in prompt
+    assert "una card principal" in prompt
+    assert "colócalos inmediatamente después de la card" in prompt
+    assert "pie de acción de esa decisión" in prompt
     assert "no satures la primera respuesta" in prompt
     assert "no muestres StationList en esa primera respuesta" in prompt
+    assert "ActionButtons inmediatamente después" in prompt
     assert "event.name='show_more_options'" in prompt
     assert "pedir más opciones" in prompt
     assert "no repitas la estación primaria dentro de StationList" in prompt
@@ -758,7 +765,7 @@ def test_conversation_agent_prompt_guides_followups_without_backend_intent_mappi
     assert "tool_call no es un componente A2UI" in prompt
     assert "nunca debe aparecer dentro de blocks" in prompt
     assert "No llames plan_route con coordenadas vacías o 0,0" in prompt
-    assert "usa PlaceDetailCard para la ubicación" in prompt
+    assert "AssistantMessage para explicar la incertidumbre de estancia y PlaceDetailCard para la ubicación" in prompt
 
 
 def test_conversation_agent_prompt_exposes_max_useful_power_tool_argument():
@@ -923,7 +930,7 @@ def test_a2ui_contract_rejects_hard_power_filter_copy_when_rendering_over_cap_st
             },
             {
                 "id": "risk",
-                "type": "RiskExplanationCard",
+                "type": "AssistantMessage",
                 "version": 1,
                 "props": {
                     "text": "Tu coche no aprovechará los 240 kW; la potencia por encima de 100 kW no se premia."
@@ -978,7 +985,7 @@ def test_a2ui_contract_allows_max_useful_power_copy_without_hard_filter_claim():
             },
             {
                 "id": "risk",
-                "type": "RiskExplanationCard",
+                "type": "AssistantMessage",
                 "version": 1,
                 "props": {
                     "text": "Tu coche no aprovechará los 240 kW; faltan autonomía y consumo para validar llegada."
@@ -1000,9 +1007,10 @@ def test_conversation_agent_prompt_prioritizes_low_margin_urgent_order():
     assert "ActionButtons con functionCall.openUrl es obligatorio" in prompt
     assert "antes de cualquier StationList" in prompt
     assert "no lo sustituyas por texto" in prompt
-    assert "explica la batería baja en RiskExplanationCard" in prompt
+    assert "explica la batería baja en AssistantMessage" in prompt
     assert "metadata son opcionales y no se muestran al usuario" in prompt
-    assert "StationPreviewCard, RiskExplanationCard si hace falta, ActionButtons, y solo después StationList" in prompt
+    assert "AssistantMessage con el riesgo y la decisión, StationPreviewCard, ActionButtons" in prompt
+    assert "solo después StationList si hace falta" in prompt
 
 
 def test_conversation_agent_prompt_handles_qualitative_low_battery_and_children_amenities():
@@ -1037,7 +1045,7 @@ def test_conversation_agent_prompt_limits_night_safety_claims():
     assert "no respondas solo con PlaceDetailCard" in prompt
     assert "no afirmes seguridad, vigilancia, iluminación, afluencia" in prompt
     assert "Kalmio no valida seguridad ni entorno en vivo" in prompt
-    assert "RiskExplanationCard antes de StationList" in prompt
+    assert "ese límite debe aparecer antes de StationList" in prompt
 
 
 def test_conversation_agent_prompt_warns_after_tool_when_requested_services_are_unverified():
@@ -1094,9 +1102,13 @@ def test_conversation_agent_prompt_guides_chargers_only_route_without_claiming_d
     assert "planningLevel=chargers_only" in prompt
     assert "Usa RouteSummaryCard para distancia/duración de la herramienta" in prompt
     assert "no puedes validar batería de llegada ni reserva sin consumo/perfil" in prompt
-    assert "AssistantMessage inicial en una frase corta" in prompt
-    assert "muestra la parada principal antes del aviso largo" in prompt
-    assert "RouteSummaryCard, StationPreviewCard, RiskExplanationCard y después StationList" in prompt
+    assert "El AssistantMessage inicial debe explicar antes de la card" in prompt
+    assert "qué puedes decidir, qué no puedes validar y cuál es el siguiente paso" in prompt
+    assert "muestra después la decisión principal pronto en móvil" in prompt
+    assert "Patrón recomendado: AssistantMessage explicativo" in prompt
+    assert "una card principal de contexto o recomendación" in prompt
+    assert "ActionButtons para navegar/ver alternativas/refinar" in prompt
+    assert "solo después StationList cuando esté justificada" in prompt
     assert "no digas que indicó 20%" in prompt
     assert "margen conservador por defecto" in prompt
     assert "No digas asegurar/garantizar margen en chargers_only" in prompt
@@ -1161,7 +1173,7 @@ def test_conversation_agent_prompt_guides_granada_alhambra_weekend_destination_w
     assert "disponibilidad, acceso y tarifas pueden cambiar" in prompt
     assert "no como ubicación exacta del alojamiento" in prompt
     assert "pide hotel/zona/direccion exacta" in prompt
-    assert "AssistantMessage o RiskExplanationCard" in prompt
+    assert "AssistantMessage para explicar la incertidumbre" in prompt
     assert "no devuelvas solo un botón para buscar ni una respuesta final que diga 'buscaré'" in prompt
     assert "No respondas con 'buscaré', 'voy a buscar' o 'puedo buscar'" in prompt
     assert "no crees StationPreviewCard genéricos" in prompt
@@ -1603,6 +1615,12 @@ def test_a2ui_contract_accepts_chargers_only_route_blocks_with_structured_metada
     blocks = validate_blocks(
         [
             {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {"text": "Sin consumo ni perfil del vehículo, no puedo validar batería de llegada ni reserva."},
+            },
+            {
                 "id": "route",
                 "type": "RouteSummaryCard",
                 "version": 1,
@@ -1624,15 +1642,6 @@ def test_a2ui_contract_accepts_chargers_only_route_blocks_with_structured_metada
                     "scoreReasons": ["Servicios cercanos"],
                     "lat": 39.48123,
                     "lon": -0.389118,
-                },
-            },
-            {
-                "id": "risk",
-                "type": "RiskExplanationCard",
-                "version": 1,
-                "props": {
-                    "level": "medio",
-                    "text": "Sin consumo ni perfil del vehículo, no puedo validar batería de llegada ni reserva.",
                 },
             },
             {
@@ -1677,7 +1686,7 @@ def test_a2ui_contract_accepts_chargers_only_route_blocks_with_structured_metada
     assert issues == []
 
 
-def test_a2ui_contract_rejects_chargers_only_risk_after_alternatives():
+def test_a2ui_contract_rejects_chargers_only_warning_after_alternatives():
     tool_history = [
         {
             "call": {
@@ -1723,7 +1732,7 @@ def test_a2ui_contract_rejects_chargers_only_risk_after_alternatives():
             },
             {
                 "id": "risk",
-                "type": "RiskExplanationCard",
+                "type": "AssistantMessage",
                 "version": 1,
                 "props": {
                     "level": "medio",
@@ -1735,7 +1744,7 @@ def test_a2ui_contract_rejects_chargers_only_risk_after_alternatives():
 
     issues = a2ui_contract_issues(blocks, tool_history, message="Voy de Madrid a Valencia")
 
-    assert any("RiskExplanationCard debe aparecer antes de StationList" in issue for issue in issues)
+    assert any("AssistantMessage inicial debe explicar antes de StationList" in issue for issue in issues)
 
 
 def test_a2ui_contract_rejects_available_evses_as_connector_count_copy():
@@ -1993,7 +2002,7 @@ def test_a2ui_contract_rejects_untraced_default_reserve_attribution():
         [
             {
                 "id": "risk",
-                "type": "RiskExplanationCard",
+                "type": "AssistantMessage",
                 "version": 1,
                 "props": {
                     "level": "medio",
@@ -2039,7 +2048,7 @@ def test_a2ui_contract_rejects_unvalidated_margin_guarantee_in_chargers_only_rou
         [
             {
                 "id": "risk",
-                "type": "RiskExplanationCard",
+                "type": "AssistantMessage",
                 "version": 1,
                 "props": {
                     "level": "medio",
@@ -2084,7 +2093,7 @@ def test_a2ui_contract_rejects_certain_margin_recovery_in_chargers_only():
         [
             {
                 "id": "risk",
-                "type": "RiskExplanationCard",
+                "type": "AssistantMessage",
                 "version": 1,
                 "props": {
                     "level": "medio",
@@ -2108,7 +2117,7 @@ def test_a2ui_contract_rejects_unasked_few_stops_copy():
         [
             {
                 "id": "risk",
-                "type": "RiskExplanationCard",
+                "type": "AssistantMessage",
                 "version": 1,
                 "props": {
                     "text": (
@@ -2142,7 +2151,7 @@ def test_a2ui_contract_rejects_future_route_without_volatility_warning():
             },
             {
                 "id": "risk",
-                "type": "RiskExplanationCard",
+                "type": "AssistantMessage",
                 "version": 1,
                 "props": {
                     "level": "medio",
@@ -2201,7 +2210,7 @@ def test_a2ui_contract_rejects_future_warning_after_alternatives():
             },
             {
                 "id": "risk",
-                "type": "RiskExplanationCard",
+                "type": "AssistantMessage",
                 "version": 1,
                 "props": {
                     "level": "medio",
@@ -2323,7 +2332,7 @@ def test_a2ui_contract_rejects_visible_amenity_proximity_copy():
         [
             {
                 "id": "risk",
-                "type": "RiskExplanationCard",
+                "type": "AssistantMessage",
                 "version": 1,
                 "props": {
                     "level": "medio",
@@ -2709,7 +2718,7 @@ def test_deepseek_hotel_followup_with_known_city_can_search_from_location_hint(c
                 },
                 {
                     "id": "risk-cordoba",
-                    "type": "RiskExplanationCard",
+                    "type": "AssistantMessage",
                     "version": 1,
                     "props": {
                         "level": "medio",
@@ -2852,7 +2861,7 @@ def test_deepseek_conversation_agent_interprets_vehicle_followup_from_available_
             blocks.append(
                 {
                     "id": "urgent-risk",
-                    "type": "RiskExplanationCard",
+                    "type": "AssistantMessage",
                     "version": 1,
                     "props": {
                         "level": "medio",
@@ -2984,7 +2993,7 @@ def test_deepseek_conversation_agent_executes_allowlisted_tool(client, settings,
                 },
                 {
                     "id": "risk-from-tool",
-                    "type": "RiskExplanationCard",
+                    "type": "AssistantMessage",
                     "version": 1,
                     "props": {
                         "level": "medio",
@@ -3091,7 +3100,7 @@ def test_deepseek_conversation_agent_uses_same_tool_and_a2ui_validation_loop(
 
 
 @pytest.mark.django_db
-def test_deepseek_conversation_agent_rejects_unknown_tool_with_a2ui_risk(client, settings, monkeypatch):
+def test_deepseek_conversation_agent_rejects_unknown_tool_with_assistant_message(client, settings, monkeypatch):
     settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
 
     def fake_deepseek_decision(message, tool_history=None):
@@ -3106,8 +3115,11 @@ def test_deepseek_conversation_agent_rejects_unknown_tool_with_a2ui_risk(client,
     )
 
     assert response.status_code == 200
-    risk_block = next(block for block in blocks_from_a2ui_response(response) if block["type"] == "RiskExplanationCard")
-    assert "No puedo hacer esa acción desde el chat" in risk_block["props"]["text"]
+    assert any(
+        "No puedo hacer esa acción desde el chat" in block["props"]["text"]
+        for block in blocks_from_a2ui_response(response)
+        if block["type"] == "AssistantMessage"
+    )
 
 
 @pytest.mark.django_db
@@ -3267,7 +3279,7 @@ def test_deepseek_conversation_agent_allows_bounded_tool_chain(client, settings,
                 },
                 {
                     "id": "risk-from-chain",
-                    "type": "RiskExplanationCard",
+                    "type": "AssistantMessage",
                     "version": 1,
                     "props": {"level": "medio", "text": "Confirma disponibilidad antes de depender de estos cargadores."},
                 },
@@ -3546,35 +3558,17 @@ def test_deepseek_conversation_agent_does_not_force_user_battery_into_station_de
 
 
 @pytest.mark.django_db
-def test_deepseek_conversation_agent_repairs_vague_risk_copy(client, settings, monkeypatch):
+def test_deepseek_conversation_agent_allows_risk_copy_in_assistant_message(client, settings, monkeypatch):
     settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
-    repair_requests = []
-
     def fake_deepseek_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
-        if repair_issues:
-            repair_requests.append(repair_issues)
-            return {
-                "type": "final",
-                "blocks": [
-                    {
-                        "id": "risk-specific",
-                        "type": "RiskExplanationCard",
-                        "version": 1,
-                        "props": {
-                            "level": "medio",
-                            "text": "Confirma acceso final, tarifa y disponibilidad porque los datos pueden cambiar.",
-                        },
-                    }
-                ],
-            }
         return {
             "type": "final",
             "blocks": [
                 {
-                    "id": "risk-vague",
-                    "type": "RiskExplanationCard",
+                    "id": "risk-copy",
+                    "type": "AssistantMessage",
                     "version": 1,
-                    "props": {"level": "medio", "text": "Antes de salir"},
+                    "props": {"text": "Confirma acceso final, tarifa y disponibilidad porque los datos pueden cambiar."},
                 }
             ],
         }
@@ -3588,10 +3582,11 @@ def test_deepseek_conversation_agent_repairs_vague_risk_copy(client, settings, m
     )
 
     assert response.status_code == 200
-    assert repair_requests
-    assert "RiskExplanationCard.text debe explicar" in repair_requests[0][0]
-    risk_block = next(block for block in blocks_from_a2ui_response(response) if block["type"] == "RiskExplanationCard")
-    assert "Confirma acceso final" in risk_block["props"]["text"]
+    assert any(
+        "Confirma acceso final" in block["props"]["text"]
+        for block in blocks_from_a2ui_response(response)
+        if block["type"] == "AssistantMessage"
+    )
 
 
 @pytest.mark.django_db
@@ -3986,7 +3981,7 @@ def test_comfort_copy_allows_traced_amenities_as_potential_convenience():
         [
             {
                 "id": "risk",
-                "type": "RiskExplanationCard",
+                "type": "AssistantMessage",
                 "version": 1,
                 "props": {
                     "text": "Servicios indicados en el punto: CAFE y SUPERMARKET. Pueden ayudar como comodidad potencial; confirma antes de depender de ellos."
@@ -4036,7 +4031,7 @@ def test_comfort_copy_allows_perfecto_as_conversational_acknowledgement():
             },
             {
                 "id": "risk",
-                "type": "RiskExplanationCard",
+                "type": "AssistantMessage",
                 "version": 1,
                 "props": {
                     "text": "La parada tiene servicios indicados; confirma disponibilidad y acceso antes de depender de ellos."
@@ -4218,7 +4213,7 @@ def test_night_safety_contract_rejects_untraced_affluence_claims():
             },
             {
                 "id": "risk",
-                "type": "RiskExplanationCard",
+                "type": "AssistantMessage",
                 "version": 1,
                 "props": {
                     "text": "Al estar en zona céntrica, es menos probable que sean solitarios; verifica el entorno."
@@ -4251,7 +4246,7 @@ def test_night_safety_contract_rejects_untraced_affluence_claims():
     assert any("inferencia de seguridad nocturna no respaldada por datos" in issue for issue in issues)
 
 
-def test_night_safety_contract_rejects_risk_after_alternatives():
+def test_night_safety_contract_rejects_warning_after_alternatives():
     blocks = validate_blocks(
         [
             {
@@ -4276,7 +4271,7 @@ def test_night_safety_contract_rejects_risk_after_alternatives():
             },
             {
                 "id": "risk",
-                "type": "RiskExplanationCard",
+                "type": "AssistantMessage",
                 "version": 1,
                 "props": {
                     "text": (
@@ -4306,7 +4301,7 @@ def test_night_safety_contract_rejects_risk_after_alternatives():
         message="No quiero cargar en sitios solitarios de noche Estoy en Valencia centro",
     )
 
-    assert any("RiskExplanationCard debe aparecer antes" in issue for issue in issues)
+    assert any("AssistantMessage inicial debe explicar" in issue for issue in issues)
 
 
 def test_night_safety_contract_allows_traced_central_copy_with_early_risk():
@@ -4318,7 +4313,9 @@ def test_night_safety_contract_allows_traced_central_copy_with_early_risk():
                 "version": 1,
                 "props": {
                     "text": (
-                        "He priorizado puntos autorizados cerca de Valencia centro usando dirección, potencia y puestos de carga registrados."
+                        "He priorizado puntos autorizados cerca de Valencia centro usando dirección, potencia y puestos de carga registrados. "
+                        "No puedo validar seguridad, iluminación, afluencia ni vigilancia en vivo. "
+                        "Confirma acceso, disponibilidad y verifica el entorno si llegas de noche."
                     )
                 },
             },
@@ -4327,17 +4324,6 @@ def test_night_safety_contract_allows_traced_central_copy_with_early_risk():
                 "type": "StationDetailCard",
                 "version": 1,
                 "props": {"name": "E-V-Valencia-091", "powerKw": 100, "distanceKm": 0.17},
-            },
-            {
-                "id": "risk",
-                "type": "RiskExplanationCard",
-                "version": 1,
-                "props": {
-                    "text": (
-                        "No puedo validar seguridad, iluminación, afluencia ni vigilancia en vivo. "
-                        "Confirma acceso, disponibilidad y verifica el entorno si llegas de noche."
-                    )
-                },
             },
             {
                 "id": "alternatives",
@@ -4508,7 +4494,7 @@ def test_a2ui_contract_allows_hotel_city_approximation_with_refinement_request()
             },
             {
                 "id": "risk",
-                "type": "RiskExplanationCard",
+                "type": "AssistantMessage",
                 "version": 1,
                 "props": {"text": "Confirma acceso final, tarifa y disponibilidad antes de depender de estos puntos."},
             },
@@ -4567,7 +4553,7 @@ def test_a2ui_contract_allows_weekend_alhambra_destination_with_early_warning():
             },
             {
                 "id": "risk",
-                "type": "RiskExplanationCard",
+                "type": "AssistantMessage",
                 "version": 1,
                 "props": {"text": "Datos procedentes solo de puntos de carga autorizados importados."},
             },
@@ -4627,8 +4613,11 @@ def test_deepseek_conversation_agent_stops_repeated_tool_call(client, settings, 
     )
 
     assert response.status_code == 200
-    risk_block = next(block for block in blocks_from_a2ui_response(response) if block["type"] == "RiskExplanationCard")
-    assert "No he podido completar esta respuesta con fiabilidad" in risk_block["props"]["text"]
+    assert any(
+        "No he podido completar esta respuesta con fiabilidad" in block["props"]["text"]
+        for block in blocks_from_a2ui_response(response)
+        if block["type"] == "AssistantMessage"
+    )
 
 
 @pytest.mark.django_db
@@ -4735,8 +4724,11 @@ def test_deepseek_conversation_agent_stops_at_tool_budget(client, settings, monk
     )
 
     assert response.status_code == 200
-    risk_block = next(block for block in blocks_from_a2ui_response(response) if block["type"] == "RiskExplanationCard")
-    assert "No he podido completar esta respuesta con fiabilidad" in risk_block["props"]["text"]
+    assert any(
+        "No he podido completar esta respuesta con fiabilidad" in block["props"]["text"]
+        for block in blocks_from_a2ui_response(response)
+        if block["type"] == "AssistantMessage"
+    )
 
 
 @pytest.mark.django_db

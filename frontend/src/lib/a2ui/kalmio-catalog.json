@@ -77,17 +77,6 @@
       "required": ["stations"],
       "additionalProperties": false
     },
-    "RiskExplanationCard": {
-      "type": "object",
-      "properties": {
-        "level": { "enum": ["info", "bajo", "baja", "medio", "media", "alto", "alta", "high", "medium"] },
-        "text": { "type": "string", "minLength": 1 },
-        "uncertainty": { "$ref": "#/$defs/uncertainty" },
-        "primaryAction": { "$ref": "#/$defs/action" }
-      },
-      "required": ["text"],
-      "additionalProperties": false
-    },
     "CostComparisonCard": {
       "allOf": [
         { "$ref": "#/$defs/decisionProps" },

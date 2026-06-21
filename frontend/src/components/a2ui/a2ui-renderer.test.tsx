@@ -282,6 +282,14 @@ describe('A2UIRenderer', () => {
       <A2UIRenderer
         blocks={[
           {
+            id: 'explanation',
+            type: 'AssistantMessage',
+            version: 1,
+            props: {
+              text: 'Margen bajo: confirma acceso y disponibilidad antes de depender de esta estación.',
+            },
+          },
+          {
             id: 'urgent',
             type: 'StationPreviewCard',
             version: 1,
@@ -292,15 +300,6 @@ describe('A2UIRenderer', () => {
               powerKw: 150,
               availableEvses: 2,
               connectorTypes: ['CCS2'],
-            },
-          },
-          {
-            id: 'risk',
-            type: 'RiskExplanationCard',
-            version: 1,
-            props: {
-              level: 'alto',
-              text: 'Margen bajo: confirma acceso y disponibilidad antes de depender de esta estación.',
             },
           },
         ]}
@@ -683,28 +682,6 @@ describe('A2UIRenderer', () => {
     expect(screen.queryByText(/apto para niños|ideal|seguro/i)).not.toBeInTheDocument()
   })
 
-  it('labels medium uncertainty as data to confirm', () => {
-    render(
-      <A2UIRenderer
-        blocks={[
-          {
-            id: 'risk',
-            type: 'RiskExplanationCard',
-            version: 1,
-            props: {
-              level: 'medio',
-              text: 'Confirma acceso final, tarifa y disponibilidad antes de depender de ellos.',
-            },
-          },
-        ]}
-      />,
-    )
-
-    expect(screen.getByText('Datos a confirmar')).toBeInTheDocument()
-    expect(screen.queryByText('Nivel: medio')).not.toBeInTheDocument()
-    expect(screen.queryByText('Riesgo a confirmar')).not.toBeInTheDocument()
-  })
-
   it('explains disabled actions', () => {
     render(
       <A2UIRenderer
@@ -813,6 +790,45 @@ describe('A2UIRenderer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ajustar búsqueda' }))
 
     expect(onActionEvent).toHaveBeenCalledWith('refine_search', { radiusKm: 80 }, 'actions')
+  })
+
+  it('renders adjacent action buttons as the footer of a decision card', () => {
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'station',
+            type: 'StationPreviewCard',
+            version: 1,
+            props: {
+              name: 'Moya Hub Honrubia',
+              stationName: 'Moya Hub Honrubia',
+              powerKw: 240,
+              distanceKm: 1.2,
+            },
+          },
+          {
+            id: 'actions',
+            type: 'ActionButtons',
+            version: 1,
+            props: {
+              actions: [
+                {
+                  label: 'Ver alternativas',
+                  event: { name: 'show_more_options', context: { stationName: 'Moya Hub Honrubia' } },
+                },
+              ],
+            },
+          },
+        ]}
+      />,
+    )
+
+    const unit = document.querySelector('[data-a2ui-decision-unit="true"]')
+    expect(unit).toHaveAttribute('data-a2ui-action-footer-for', 'station')
+    expect(unit?.querySelector('[data-a2ui-block-id="station"]')).not.toBeNull()
+    expect(unit?.querySelector('[data-a2ui-block-id="actions"]')).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Ver alternativas' })).toBeInTheDocument()
   })
 
   it('keeps secondary action buttons compact under a primary decision', () => {

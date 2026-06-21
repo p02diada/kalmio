@@ -50,8 +50,7 @@ const scenarios: ExperienceScenario[] = [
         availableEvses: 2,
         connectorTypes: ['CCS2', 'TYPE2'],
       }),
-      block('urgent-risk', 'RiskExplanationCard', {
-        level: 'alto',
+      block('urgent-explanation', 'AssistantMessage', {
         text: 'La batería actual deja poco margen. Esta revisión usa datos de muestra; no confirma disponibilidad ni precio.',
       }),
       block('urgent-actions', 'ActionButtons', {
@@ -225,9 +224,8 @@ const scenarios: ExperienceScenario[] = [
         context: 'Zona usada para buscar estaciones cerca del alojamiento',
         needsConfirmation: true,
       }),
-      block('destination-risk', 'RiskExplanationCard', {
-        level: 'medio',
-        text: 'El hotel exacto no está confirmado. Usa estos resultados como aproximación y confirma acceso, tarifa y disponibilidad antes de depender de ellos.',
+      block('destination-explanation', 'AssistantMessage', {
+        text: 'El hotel exacto no está confirmado. Uso esta zona como aproximación y conviene confirmar acceso, tarifa y disponibilidad antes de depender de estos resultados.',
       }),
       block('destination-station', 'StationPreviewCard', {
         title: 'Estación cerca del destino',
@@ -297,7 +295,6 @@ function componentFocus(type: string) {
     StationPreviewCard: 'Debe ser una recomendación escaneable que abre el detalle completo de la estación.',
     StationDetailCard: 'Debe estructurar toda la información disponible de una estación sin prometer disponibilidad ni precios no verificados.',
     StationList: 'Debe permitir comparar alternativas rápido sin obligar a leer párrafos largos.',
-    RiskExplanationCard: 'Debe bajar ansiedad explicando incertidumbre concreta y el siguiente comportamiento seguro.',
     CostComparisonCard: 'Debe mostrar ahorro solo cuando el precio está verificado y dejar clara la comparación.',
     MapPreviewCard: 'Debe apoyar la ruta, no convertirse en la tarea principal del conductor.',
     ActionButtons: 'Debe separar acción primaria, corrección y acciones bloqueadas sin ambigüedad.',
