@@ -24,7 +24,7 @@ from routing.agent import (
     tool_call_argument_grounding_issues,
     validate_blocks,
 )
-from routing.instrumentation import estimate_deepseek_cost, record_trace_event
+from routing.instrumentation import estimate_deepseek_cost, normalize_usage, record_trace_event
 from routing.models import RoutePlan
 from routing.production_planner import score_exploration_station, station_to_score_payload
 from routing.providers import Coordinate, ProviderRoute, RoutingProviderError
@@ -853,6 +853,29 @@ def test_conversation_agent_prompt_compacts_route_geometry_tool_history():
     assert '"coordinates"' not in prompt
     assert "Moya Hub Honrubia" in prompt
     assert len(prompt) < len(json.dumps(tool_history, ensure_ascii=False))
+
+
+def test_conversation_agent_prompt_keeps_dynamic_tool_context_after_static_instructions():
+    tool_history = [
+        {
+            "call": {
+                "tool": "resolve_location",
+                "args": {"query": "Valencia"},
+            },
+            "result": {
+                "ok": True,
+                "tool": "resolve_location",
+                "location": {"label": "Valencia", "lat": 39.4699, "lon": -0.3763},
+            },
+        }
+    ]
+
+    prompt = conversation_agent_prompt("Busca cargadores cerca", tool_history)
+
+    assert prompt.index("Herramientas permitidas") < prompt.index("Comportamiento EV esperado")
+    assert prompt.index("Comportamiento EV esperado") < prompt.index("Contexto dinámico del turno")
+    assert prompt.index("Contexto dinámico del turno") < prompt.index("Usuario: Busca cargadores cerca")
+    assert prompt.index("Usuario: Busca cargadores cerca") < prompt.index("Historial de herramientas compactado")
 
 
 def test_conversation_agent_prompt_compacts_rejected_map_blocks_for_repair():
@@ -2472,6 +2495,25 @@ def test_deepseek_cost_estimate_uses_provider_cache_breakdown(settings):
 
     assert cost["basis"] == "provider_cache_breakdown"
     assert cost["totalCostUsd"] == 0.0014112
+
+
+def test_normalize_usage_derives_cache_breakdown_from_openai_cached_tokens():
+    usage = normalize_usage(
+        {
+            "prompt_tokens": 10_000,
+            "completion_tokens": 2_000,
+            "total_tokens": 12_000,
+            "prompt_tokens_details": {"cached_tokens": 7_500},
+        }
+    )
+
+    assert usage == {
+        "inputTokens": 10_000,
+        "outputTokens": 2_000,
+        "totalTokens": 12_000,
+        "cacheHitInputTokens": 7_500,
+        "cacheMissInputTokens": 2_500,
+    }
 
 
 def test_agent_trace_writes_jsonl_without_payloads_by_default(settings, tmp_path):
