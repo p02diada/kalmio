@@ -400,6 +400,9 @@ function ChatPage() {
       version: 1,
       props: { text },
     })
+    if (isCoarsePointerViewport()) {
+      composerRef.current?.blur()
+    }
     setIsSending(true)
     setWaitMessageIndex(0)
     sendMutation.mutateAsync({ text, onProgress: setProgressUpdate })
@@ -502,7 +505,7 @@ function ChatPage() {
       if (typeof target?.scrollIntoView === 'function') {
         target.scrollIntoView({ block: scrollTargetBlockId ? 'start' : 'end', behavior: 'smooth' })
       }
-      if (!isSending) {
+      if (!isSending && shouldRestoreComposerFocus()) {
         composerRef.current?.focus({ preventScroll: true })
       }
     })
@@ -592,6 +595,17 @@ function findA2UIBlockElement(container: HTMLElement | null, blockId: string) {
   return Array.from(container.querySelectorAll<HTMLElement>('[data-a2ui-block-id]')).find(
     (element) => element.dataset.a2uiBlockId === blockId,
   ) ?? null
+}
+
+function shouldRestoreComposerFocus() {
+  return !isCoarsePointerViewport()
+}
+
+function isCoarsePointerViewport() {
+  return (
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches
+  ) || window.navigator.maxTouchPoints > 0
 }
 
 function ChatEmptyState({ onPromptSelect }: { onPromptSelect: (value: string) => void }) {

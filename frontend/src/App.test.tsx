@@ -197,6 +197,82 @@ describe('App', () => {
     expect(screen.queryByText(/JSON válido/i)).not.toBeInTheDocument()
   })
 
+  it('does not force the mobile keyboard open after a conversation error', async () => {
+    document.cookie = 'csrftoken=test-token'
+    const originalMatchMedia = window.matchMedia
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      writable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: query === '(pointer: coarse)',
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    })
+    const blurSpy = vi.spyOn(window.HTMLTextAreaElement.prototype, 'blur')
+
+    try {
+      vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+        const url = input.toString()
+        if (url.includes('/api/conversation/messages')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify(conversationBody([
+                  {
+                    id: 'assistant-initial',
+                    type: 'AssistantMessage',
+                    version: 1,
+                    props: { text: 'Cuéntame qué necesitas.' },
+                  },
+                ])),
+              { status: 200, headers: { 'Content-Type': 'application/json' } },
+            ),
+          )
+        }
+        if (url.includes('/api/auth/csrf')) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ detail: 'csrf cookie set', csrf_token: 'test-token' }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+          )
+        }
+        if (url.includes('/api/conversation/message')) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ detail: 'El agente no devolvió JSON válido.' }), {
+              status: 502,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+          )
+        }
+        return Promise.reject(new Error(`Unexpected request: ${url}`))
+      })
+
+      render(<App />)
+      const textarea = await screen.findByLabelText('Mensaje para Kalmio')
+      textarea.focus()
+      fireEvent.change(textarea, {
+        target: { value: 'Madrid a Valencia con 20%' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+
+      expect(await screen.findByText(/No he podido completar la comprobación/)).toBeInTheDocument()
+      expect(blurSpy).toHaveBeenCalled()
+      expect(document.activeElement).not.toBe(textarea)
+    } finally {
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        writable: true,
+        value: originalMatchMedia,
+      })
+    }
+  })
+
   it('focuses the chat composer when users choose manual location entry', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = input.toString()
@@ -233,7 +309,7 @@ describe('App', () => {
     fireEvent.click(manualButton)
 
     expect(document.activeElement).toBe(composer)
-    expect(screen.getByText(/también sirven coordenadas/i)).toBeInTheDocument()
+    expect(screen.queryByText(/también sirven coordenadas/i)).not.toBeInTheDocument()
   })
 
   it('disables the composer when the agent service is unavailable', async () => {

@@ -1725,7 +1725,7 @@ def a2ui_contract_issues(
     issues.extend(departure_battery_copy_contract_issues(blocks, user_context))
     issues.extend(future_trip_volatility_copy_contract_issues(blocks, user_context))
     issues.extend(cheap_route_reserve_context_contract_issues(blocks, user_context))
-    issues.extend(price_preference_context_contract_issues(blocks, user_context, tool_history))
+    issues.extend(price_preference_context_contract_issues(blocks, user_context, tool_history, facts))
     issues.extend(minimum_charge_context_contract_issues(blocks, user_context))
     issues.extend(single_connector_preference_contract_issues(blocks, tool_history, user_context))
     issues.extend(action_button_sequence_contract_issues(blocks))
@@ -2659,6 +2659,7 @@ def price_preference_context_contract_issues(
     blocks: list[dict],
     message: str,
     tool_history: list[dict[str, Any]],
+    facts: dict[str, Any],
 ) -> list[str]:
     normalized_message = normalize(message)
     if not price_preference_request(normalized_message):
@@ -2666,9 +2667,9 @@ def price_preference_context_contract_issues(
     visible_text = normalize(" ".join(block_visible_text(block) for block in blocks))
     if not visible_text:
         return []
-    has_tool_context = price_preference_has_tool_context(tool_history)
+    has_context = price_preference_has_context(tool_history, facts)
     missing: list[str] = []
-    if not has_tool_context and not any(
+    if not has_context and not any(
         term in visible_text for term in ("origen", "destino", "ubicacion", "desde donde", "adonde", "a donde")
     ):
         missing.append("ruta o ubicación")
@@ -2686,6 +2687,12 @@ def price_preference_request(normalized_message: str) -> bool:
     return any(term in normalized_message for term in ("caro", "caros", "barato", "barata", "precio", "tarifa", "coste"))
 
 
+def price_preference_has_context(tool_history: list[dict[str, Any]], facts: dict[str, Any]) -> bool:
+    if price_preference_has_tool_context(tool_history):
+        return True
+    return any(station_has_price_or_location(station) for station in facts.get("stations", {}).values())
+
+
 def price_preference_has_tool_context(tool_history: list[dict[str, Any]]) -> bool:
     result = latest_station_search_result(tool_history)
     if not result or not result.get("ok"):
@@ -2695,6 +2702,16 @@ def price_preference_has_tool_context(tool_history: list[dict[str, Any]]) -> boo
     if result.get("location"):
         return True
     return bool(station_search_result_stops(result))
+
+
+def station_has_price_or_location(station: dict[str, Any]) -> bool:
+    return (
+        optional_float(station.get("pricePerKwhEur")) is not None
+        or (
+            optional_float(station.get("lat")) is not None
+            and optional_float(station.get("lon")) is not None
+        )
+    )
 
 
 def minimum_charge_context_contract_issues(blocks: list[dict], message: str) -> list[str]:

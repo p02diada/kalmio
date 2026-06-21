@@ -1576,6 +1576,55 @@ def test_a2ui_contract_allows_price_preference_with_route_and_tariff_context_req
     assert issues == []
 
 
+def test_a2ui_contract_allows_price_followup_with_station_history_context():
+    history_blocks = validate_blocks(
+        [
+            {
+                "id": "previous-station",
+                "type": "StationPreviewCard",
+                "version": 1,
+                "props": {
+                    "name": "BALLENOIL-ES336090-COLON",
+                    "stationName": "BALLENOIL-ES336090-COLON",
+                    "address": "Plaza de Colón, S/N, 14001, ESP",
+                    "distanceKm": 0.3,
+                    "powerKw": 150,
+                    "pricePerKwhEur": 0.6,
+                    "currency": "EUR",
+                    "priceIsEstimated": False,
+                    "lat": 37.890608,
+                    "lon": -4.777821,
+                },
+            }
+        ]
+    )
+    blocks = validate_blocks(
+        [
+            {
+                "id": "assistant",
+                "type": "AssistantMessage",
+                "version": 1,
+                "props": {
+                    "text": (
+                        "Según los datos disponibles, la estación de Plaza de Colón "
+                        "tiene una tarifa de 0,60 €/kWh. No hay otras estaciones con "
+                        "tarifa verificada en los resultados anteriores."
+                    ),
+                },
+            }
+        ]
+    )
+
+    issues = a2ui_contract_issues(
+        blocks,
+        tool_history=[],
+        message="hay algo más barato?",
+        history_blocks=history_blocks,
+    )
+
+    assert issues == []
+
+
 def test_a2ui_contract_rejects_minimum_charge_without_vehicle_context():
     blocks = validate_blocks(
         [
