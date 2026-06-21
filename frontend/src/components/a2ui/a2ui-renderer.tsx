@@ -623,19 +623,16 @@ function StationDetailPanel({
   const stationName = stationLabel(station) || stationTitle(station)
   const address = text(station.address, '')
   const title = titleOverride || text(station.title, 'Estación de carga')
-  const capacity = stationCapacity(station)
   const connectors = connectorLabels(station.connectorTypes)
   const amenities = amenityLabels(station.amenities, 12)
   const availabilityRows = stationAvailabilityRows(station)
   const chargingRows = compactRows([
     isKnownNumber(station.powerKw) ? [STATION_POWER_LABEL, metric(station.powerKw, 'kW')] : null,
-    connectors.length > 0 ? ['Conectores', connectors.join(', ')] : null,
     stationPriceDetailRow(station),
   ])
   const routeRows = compactRows([
     isKnownNumber(station.distanceKm) ? ['Distancia', metric(station.distanceKm, 'km')] : null,
     isKnownNumber(station.detourMin) ? ['Desvío', metric(station.detourMin, 'min')] : null,
-    capacity ? ['Puestos', capacity] : null,
   ])
   const notes = stationDetailNotes(station)
   const isSheet = mode === 'sheet'

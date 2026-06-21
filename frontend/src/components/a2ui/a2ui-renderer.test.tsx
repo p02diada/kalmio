@@ -264,6 +264,11 @@ describe('A2UIRenderer', () => {
     expect(screen.getByText('Almansa HPC')).toBeInTheDocument()
     expect(screen.getByText('Puestos de carga')).toBeInTheDocument()
     expect(screen.getByText('Carga y tarifa')).toBeInTheDocument()
+    expect(screen.queryByText('Puestos')).not.toBeInTheDocument()
+    expect(screen.queryByText('CCS2, TYPE2')).not.toBeInTheDocument()
+    expect(screen.getAllByText('Conectores')).toHaveLength(1)
+    expect(screen.getByText('Disponibles')).toBeInTheDocument()
+    expect(screen.getByText('Total')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Ver detalle completo de Almansa HPC' })).not.toBeInTheDocument()
   })
 
@@ -545,7 +550,8 @@ describe('A2UIRenderer', () => {
     expect(screen.getAllByText('Punto de muestra La Plana').length).toBeGreaterThan(1)
     expect(screen.getByText('Parada principal')).toBeInTheDocument()
     expect(screen.getByText('180 kW')).toBeInTheDocument()
-    expect(screen.getByText('2/5 disponibles')).toBeInTheDocument()
+    expect(screen.getByText('Disponibles')).toBeInTheDocument()
+    expect(screen.getByText('Total')).toBeInTheDocument()
     expect(screen.getAllByText('CCS2').length).toBeGreaterThan(0)
   })
 
