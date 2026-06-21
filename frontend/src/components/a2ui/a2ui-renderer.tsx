@@ -465,9 +465,8 @@ function TripSummaryCard({ block }: { block: A2UIBlock }) {
       <DecisionNarrative props={block.props} />
       <MetricGrid
         rows={[
-          ['Batería', percentOrUnknown(block.props.battery)],
-          ['Batería mínima al llegar', percent(block.props.arrivalReservePercent)],
-          ['Tipo', 'Conservadora'],
+          ['Batería actual', percentOrUnknown(block.props.battery)],
+          ['Llegar con al menos', percent(block.props.arrivalReservePercent)],
         ]}
       />
     </A2UICard>
