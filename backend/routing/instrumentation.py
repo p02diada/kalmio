@@ -206,8 +206,24 @@ def normalize_usage(usage: Any) -> dict[str, Any]:
     input_tokens = first_int(data, "prompt_tokens", "input_tokens")
     output_tokens = first_int(data, "completion_tokens", "output_tokens")
     total_tokens = first_int(data, "total_tokens")
-    cache_hit_tokens = first_int(data, "prompt_cache_hit_tokens", "cache_hit_tokens", "input_cache_hit_tokens")
+    cache_hit_tokens = first_int(
+        data,
+        "prompt_cache_hit_tokens",
+        "cache_hit_tokens",
+        "input_cache_hit_tokens",
+        "cached_input_tokens",
+        "cached_tokens",
+    )
+    if cache_hit_tokens is None:
+        cache_hit_tokens = first_nested_int(
+            data,
+            ("prompt_tokens_details", "cached_tokens"),
+            ("input_tokens_details", "cached_tokens"),
+            ("input_token_details", "cached_tokens"),
+        )
     cache_miss_tokens = first_int(data, "prompt_cache_miss_tokens", "cache_miss_tokens", "input_cache_miss_tokens")
+    if cache_miss_tokens is None and input_tokens is not None and cache_hit_tokens is not None:
+        cache_miss_tokens = max(input_tokens - cache_hit_tokens, 0)
 
     normalized = {
         "inputTokens": input_tokens,
@@ -222,6 +238,23 @@ def normalize_usage(usage: Any) -> dict[str, Any]:
 def first_int(data: dict[str, Any], *keys: str) -> int | None:
     for key in keys:
         value = data.get(key)
+        if value is None:
+            continue
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def first_nested_int(data: dict[str, Any], *paths: tuple[str, ...]) -> int | None:
+    for path in paths:
+        value: Any = data
+        for key in path:
+            if not isinstance(value, dict):
+                value = None
+                break
+            value = value.get(key)
         if value is None:
             continue
         try:

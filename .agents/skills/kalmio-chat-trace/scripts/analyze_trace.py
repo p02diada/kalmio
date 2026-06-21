@@ -94,7 +94,13 @@ def summarize_turn(turn_id: str, events: list[dict[str, Any]]) -> dict[str, Any]
     turn_events = [event for event in sorted_events if event.get("event") == "agent_turn"]
     final_turn = next((event for event in reversed(turn_events) if event.get("status") != "started"), {})
 
-    usage = {"inputTokens": 0, "outputTokens": 0, "totalTokens": 0}
+    usage = {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "cacheHitInputTokens": 0,
+        "cacheMissInputTokens": 0,
+    }
     cost_usd = 0.0
     cost_basis = set()
     for event in llm_events:
@@ -116,7 +122,8 @@ def summarize_turn(turn_id: str, events: list[dict[str, Any]]) -> dict[str, Any]
         "llmCallCount": len(llm_events),
         "toolCallCount": len(tool_events),
         "guardrailCount": len(guardrail_events),
-        "usage": {key: value for key, value in usage.items() if value},
+        "usage": compact_usage(usage),
+        "cache": cache_summary(usage),
         "estimatedCostUsd": round(cost_usd, 8),
         "costBasis": sorted(cost_basis),
         "events": [compact_event(event) for event in sorted_events],
@@ -187,7 +194,13 @@ def turn_warnings(
 
 
 def totals(turns: list[dict[str, Any]]) -> dict[str, Any]:
-    usage = {"inputTokens": 0, "outputTokens": 0, "totalTokens": 0}
+    usage = {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "cacheHitInputTokens": 0,
+        "cacheMissInputTokens": 0,
+    }
     cost = 0.0
     for turn in turns:
         turn_usage = turn.get("usage") if isinstance(turn.get("usage"), dict) else {}
@@ -199,8 +212,28 @@ def totals(turns: list[dict[str, Any]]) -> dict[str, Any]:
         "llmCallCount": sum(int(turn.get("llmCallCount") or 0) for turn in turns),
         "toolCallCount": sum(int(turn.get("toolCallCount") or 0) for turn in turns),
         "guardrailCount": sum(int(turn.get("guardrailCount") or 0) for turn in turns),
-        "usage": {key: value for key, value in usage.items() if value},
+        "usage": compact_usage(usage),
+        "cache": cache_summary(usage),
         "estimatedCostUsd": round(cost, 8),
+    }
+
+
+def compact_usage(usage: dict[str, int]) -> dict[str, int]:
+    return {key: value for key, value in usage.items() if value}
+
+
+def cache_summary(usage: dict[str, int]) -> dict[str, Any]:
+    hit_tokens = int(usage.get("cacheHitInputTokens") or 0)
+    miss_tokens = int(usage.get("cacheMissInputTokens") or 0)
+    if not hit_tokens and not miss_tokens:
+        return {}
+    denominator = hit_tokens + miss_tokens
+    hit_rate = hit_tokens / denominator if denominator else 0
+    return {
+        "hitInputTokens": hit_tokens,
+        "missInputTokens": miss_tokens,
+        "hitRate": round(hit_rate, 4),
+        "hitPercent": round(hit_rate * 100, 2),
     }
 
 
@@ -218,6 +251,13 @@ def print_human_report(report: dict[str, Any]) -> None:
     )
     if totals_data.get("usage"):
         print(f"Tokens: {json.dumps(totals_data['usage'], ensure_ascii=False)}")
+    if totals_data.get("cache"):
+        cache = totals_data["cache"]
+        print(
+            "Cache: "
+            f"{cache['hitInputTokens']} hit / {cache['missInputTokens']} miss "
+            f"({cache['hitPercent']:.2f}% hit)"
+        )
     print()
 
     for index, turn in enumerate(report["turns"], start=1):
@@ -229,6 +269,13 @@ def print_human_report(report: dict[str, Any]) -> None:
         )
         if turn.get("usage"):
             print(f"  Usage: {json.dumps(turn['usage'], ensure_ascii=False)}")
+        if turn.get("cache"):
+            cache = turn["cache"]
+            print(
+                "  Cache: "
+                f"{cache['hitInputTokens']} hit / {cache['missInputTokens']} miss "
+                f"({cache['hitPercent']:.2f}% hit)"
+            )
         if turn.get("warnings"):
             for warning in turn["warnings"]:
                 print(f"  Aviso: {warning}")

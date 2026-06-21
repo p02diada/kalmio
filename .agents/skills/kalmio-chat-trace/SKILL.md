@@ -47,8 +47,8 @@ python .agents/skills/kalmio-chat-trace/scripts/analyze_trace.py --file backend/
 ## Review Workflow
 
 1. Run the analyzer for the latest 3-10 turns.
-2. Identify total LLM calls, internal tool calls, duration, tokens, and estimated cost.
-3. Check warnings first: LLM errors, tool errors, missing usage, cache-cost assumptions, or missing payloads.
+2. Identify total LLM calls, internal tool calls, duration, tokens, estimated cost, and cache hit/miss rate.
+3. Check warnings first: LLM errors, tool errors, missing usage, cache-cost assumptions, unexpectedly low cache hit rate, or missing payloads.
 4. Reconstruct the sequence for each `turnId`: agent turn -> LLM decision -> internal tool calls -> final LLM response.
 5. If payloads are enabled, inspect only the relevant request/response fields needed to explain behavior. Summarize sensitive user data instead of dumping it.
 6. Compare tool results against final A2UI behavior: stations, coordinates, route metrics, and prices must come from tool results or explicit user input.
@@ -58,6 +58,7 @@ python .agents/skills/kalmio-chat-trace/scripts/analyze_trace.py --file backend/
 
 - DeepSeek cost is an estimate based on API `usage` and configured per-1M-token rates.
 - If cache hit/miss tokens are missing, the backend assumes cache miss for input cost and marks the basis.
+- The analyzer reports cache hit/miss tokens and hit percentage when the provider returns cache counters or the backend can derive them from cached-token fields.
 - Internal tools have duration and status but no direct monetary cost unless a future provider exposes one.
 - A tool event with `status=error` may be an honest no-data result, not necessarily a crash.
 - Missing payloads mean the high-level trace can still show cost/duration/sequence, but not prompts, tool args, or final raw model output.
