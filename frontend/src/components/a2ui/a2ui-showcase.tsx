@@ -26,6 +26,9 @@ const scenarios: ExperienceScenario[] = [
       block('urgent-user', 'UserMessage', {
         text: 'Estoy en Zaragoza con 9%, no conozco la zona y necesito cargar ya.',
       }),
+      block('urgent-risk-copy', 'AssistantMessage', {
+        text: 'Con 9% el margen es bajo. Primero confirmaré la zona y después te mostraré una parada cercana con acciones directas.',
+      }),
       block('urgent-position-request', 'PositionRequestCard', {
         reason: 'urgent_charge',
         title: 'Necesito tu ubicación',
@@ -34,7 +37,7 @@ const scenarios: ExperienceScenario[] = [
         manualFields: ['Ciudad', 'Coordenadas', 'Carretera o salida'],
       }),
       block('urgent-location-copy', 'AssistantMessage', {
-        text: 'Uso Zaragoza, entorno urbano como ubicación aproximada para orientar la búsqueda. Si no es tu zona, dime ciudad, carretera o coordenadas y ajusto el punto.',
+        text: 'Uso Zaragoza, entorno urbano como aproximación. Esta revisión no confirma disponibilidad ni precio en vivo; si no es tu zona, dime ciudad, carretera o coordenadas y ajusto el punto.',
       }),
       block('urgent-station', 'StationPreviewCard', {
         title: 'Estación cercana',
@@ -44,9 +47,6 @@ const scenarios: ExperienceScenario[] = [
         powerKw: 150,
         availableEvses: 2,
         connectorTypes: ['CCS2', 'TYPE2'],
-      }),
-      block('urgent-explanation', 'AssistantMessage', {
-        text: 'La batería actual deja poco margen. Esta revisión usa datos de muestra; no confirma disponibilidad ni precio.',
       }),
       block('urgent-actions', 'ActionButtons', {
         actions: [

@@ -756,6 +756,7 @@ def test_conversation_agent_prompt_guides_followups_without_backend_intent_mappi
     assert "una card principal" in prompt
     assert "colócalos inmediatamente después de la card" in prompt
     assert "pie de acción de esa decisión" in prompt
+    assert "nunca como bloque intermedio entre StationPreviewCard y ActionButtons" in prompt
     assert "no satures la primera respuesta" in prompt
     assert "no muestres StationList en esa primera respuesta" in prompt
     assert "ActionButtons inmediatamente después" in prompt
@@ -1020,7 +1021,7 @@ def test_conversation_agent_prompt_handles_qualitative_low_battery_and_children_
     assert "sin porcentaje explícito" in prompt
     assert "no inventes un número" in prompt
     assert "Orden exacto recomendado" in prompt
-    assert "nunca pongas StationList antes de ActionButtons" in prompt
+    assert "nunca pongas AssistantMessage ni StationList entre StationPreviewCard y ActionButtons" in prompt
     assert "si la herramienta trae amenities en la parada primaria" in prompt
     assert "debes mencionarlos brevemente por nombre" in prompt
     assert "no digas que están cerca, disponibles, son seguros, ideales, perfectos o aptos para niños" in prompt
