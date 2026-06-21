@@ -27,7 +27,7 @@ const scenarios: ExperienceScenario[] = [
         text: 'Estoy en Zaragoza con 9%, no conozco la zona y necesito cargar ya.',
       }),
       block('urgent-risk-copy', 'AssistantMessage', {
-        text: 'Con 9% el margen es bajo. Primero confirmaré la zona y después te mostraré una parada cercana con acciones directas.',
+        text: 'Con 9% el margen es bajo. Primero confirmaré la zona y después te mostraré un punto de carga cercano con acciones directas.',
       }),
       block('urgent-position-request', 'PositionRequestCard', {
         reason: 'urgent_charge',
@@ -47,16 +47,25 @@ const scenarios: ExperienceScenario[] = [
         powerKw: 150,
         availableEvses: 2,
         connectorTypes: ['CCS2', 'TYPE2'],
+        lat: 41.6561,
+        lon: -0.8773,
       }),
       block('urgent-actions', 'ActionButtons', {
         actions: [
           {
-            label: 'Confirmar esta parada',
+            label: 'Usar este punto',
             priority: 'primary',
             event: { name: 'confirm_stop', context: { scenario: 'urgent' } },
           },
           {
-            label: 'Buscar otra cercana',
+            label: 'Abrir ruta',
+            functionCall: {
+              call: 'openUrl',
+              args: { url: 'https://www.google.com/maps/dir/?api=1&destination=41.6561,-0.8773' },
+            },
+          },
+          {
+            label: 'Buscar otra opción',
             event: { name: 'find_alternative_stop', context: { scenario: 'urgent' } },
           },
         ],
@@ -213,17 +222,22 @@ const scenarios: ExperienceScenario[] = [
         powerKw: 22,
         availableEvses: 3,
         connectorTypes: ['TYPE2'],
+        lat: 39.4723,
+        lon: -0.3768,
       }),
       block('destination-actions', 'ActionButtons', {
         actions: [
           {
-            label: 'Confirmar hotel',
+            label: 'Usar este punto',
             priority: 'primary',
             event: { name: 'confirm_destination', context: { scenario: 'destination' } },
           },
           {
-            label: 'Abrir proveedor',
-            functionCall: { call: 'openUrl', args: { url: 'https://kalmio.app' } },
+            label: 'Abrir ruta',
+            functionCall: {
+              call: 'openUrl',
+              args: { url: 'https://www.google.com/maps/dir/?api=1&destination=39.4723,-0.3768' },
+            },
           },
           {
             label: 'Reservar plaza',

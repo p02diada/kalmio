@@ -842,12 +842,12 @@ describe('A2UIRenderer', () => {
             props: {
               actions: [
                 {
-                  label: 'Confirmar esta parada',
+                  label: 'Usar este punto',
                   priority: 'primary',
                   event: { name: 'confirm_stop' },
                 },
                 {
-                  label: 'Buscar otra cercana',
+                  label: 'Buscar otra opción',
                   event: { name: 'find_alternative_stop' },
                 },
               ],
@@ -857,10 +857,10 @@ describe('A2UIRenderer', () => {
       />,
     )
 
-    expect(screen.getByRole('button', { name: 'Confirmar esta parada' })).toHaveClass('w-full', 'font-bold')
-    expect(screen.getByRole('button', { name: 'Buscar otra cercana' })).toHaveClass('w-auto', 'text-body')
-    expect(screen.getByRole('button', { name: 'Buscar otra cercana' })).not.toHaveClass('border')
-    expect(screen.getByRole('button', { name: 'Buscar otra cercana' })).not.toHaveClass('w-full')
+    expect(screen.getByRole('button', { name: 'Usar este punto' })).toHaveClass('w-full', 'font-bold')
+    expect(screen.getByRole('button', { name: 'Buscar otra opción' })).toHaveClass('w-auto', 'text-body')
+    expect(screen.getByRole('button', { name: 'Buscar otra opción' })).not.toHaveClass('border')
+    expect(screen.getByRole('button', { name: 'Buscar otra opción' })).not.toHaveClass('w-full')
   })
 
   it('requests browser location through an allowlisted location block', () => {

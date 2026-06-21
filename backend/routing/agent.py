@@ -1148,6 +1148,7 @@ def conversation_agent_prompt(
         "MapPreviewCard solo para rutas de plan_route con routeGeometry GeoJSON LineString de proveedor, origin/destination con coordenadas de herramienta, primaryStation/stations de herramienta, corridorRadiusKm y geometryPrecision='provider'. "
         "Si no tienes geometría de proveedor, usa geometryPrecision='schematic' o no muestres mapa; no inventes coordenadas ni geometría. "
         "ActionButtons usa event para backend/agente, functionCall.openUrl para abrir mapas, o disabled con reason; cuando pertenezcan a una recomendación colócalos inmediatamente después de esa card para que se rendericen como acciones de la misma unidad; "
+        "Usa labels de acción concretos: 'Usar este punto' para elegir una recomendación, 'Abrir ruta' para navegación openUrl y 'Buscar otra opción' para alternativas; evita labels vagos como 'Confirmar'. "
         "AssistantMessage pide datos críticos en texto libre; "
         "PositionRequestCard pide posición actual/manual del conductor; "
         "PreferenceChips solo para correcciones o preferencias explícitas, siempre con props.title contextual; "
@@ -4175,7 +4176,7 @@ def normalize_block_props(block_type: str, props: dict) -> dict:
                 function_call = action.get("functionCall") if isinstance(action.get("functionCall"), dict) else {}
                 event = action.get("event") if isinstance(action.get("event"), dict) else {}
                 if function_call.get("call") == "openUrl":
-                    label = "Abrir en Google Maps"
+                    label = "Abrir ruta"
                 elif event.get("name"):
                     label = "Continuar"
                 elif action.get("disabled"):
