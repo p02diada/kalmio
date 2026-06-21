@@ -10,6 +10,7 @@ const maplibreMock = vi.hoisted(() => {
     addSource: ReturnType<typeof vi.fn>
     addLayer: ReturnType<typeof vi.fn>
     fitBounds: ReturnType<typeof vi.fn>
+    flyTo: ReturnType<typeof vi.fn>
     resize: ReturnType<typeof vi.fn>
     on: ReturnType<typeof vi.fn>
     remove: ReturnType<typeof vi.fn>
@@ -25,6 +26,7 @@ const maplibreMock = vi.hoisted(() => {
         addSource: vi.fn(),
         addLayer: vi.fn(),
         fitBounds: vi.fn(),
+        flyTo: vi.fn(),
         resize: vi.fn(),
         on: vi.fn(),
         remove: vi.fn(),
@@ -168,6 +170,81 @@ describe('A2UIRenderer', () => {
 
     expect(screen.getByText(/4 h 0 min/)).toBeInTheDocument()
     expect(screen.queryByText('240 min')).not.toBeInTheDocument()
+  })
+
+  it('opens route detail with a map station carousel', () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'route',
+            type: 'RouteCorridorCard',
+            version: 1,
+            props: {
+              distanceKm: 309,
+              durationMin: 204,
+              arrivalBattery: null,
+              origin: { label: 'Zaragoza', lat: 41.6488, lon: -0.8891 },
+              destination: { label: 'Valencia', lat: 39.4699, lon: -0.3763 },
+              primaryStation: {
+                stationName: 'Punto de muestra La Plana',
+                lat: 40.345,
+                lon: -0.997,
+                powerKw: 150,
+                distanceKm: 118,
+                detourMin: 6,
+                availableEvses: 4,
+                totalEvses: 8,
+                connectorTypes: ['CCS2'],
+              },
+              stations: [
+                {
+                  stationName: 'Punto de muestra Mudéjar',
+                  lat: 40.583,
+                  lon: -1.268,
+                  powerKw: 100,
+                  availableEvses: 2,
+                  totalEvses: 4,
+                  connectorTypes: ['CCS2'],
+                },
+              ],
+              routeGeometry: {
+                type: 'LineString',
+                coordinates: [
+                  [-0.8891, 41.6488],
+                  [-1.105, 40.343],
+                  [-0.3763, 39.4699],
+                ],
+              },
+              geometryPrecision: 'provider',
+            },
+          },
+        ]}
+      />,
+    )
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Abrir detalle de ruta' })[0]!)
+
+    expect(screen.getByLabelText('Detalle de ruta')).toHaveClass('a2ui-map-fullscreen')
+    expect(screen.queryByText('Estaciones')).not.toBeInTheDocument()
+    expect(screen.queryByText('Toca una parada para centrar el mapa.')).not.toBeInTheDocument()
+    expect(screen.queryByText('Orientativo')).not.toBeInTheDocument()
+    expect(screen.queryByText('No validada')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Volver' })).toHaveClass('a2ui-map-floating-back')
+    expect(screen.queryByText('Parada principal')).not.toBeInTheDocument()
+    expect(screen.queryByText('Alternativa cerca de la ruta')).not.toBeInTheDocument()
+    expect(screen.getAllByText('Punto de muestra La Plana').length).toBeGreaterThan(0)
+    expect(screen.getByText(/6 min desvío/)).toBeInTheDocument()
+    expect(screen.getByText('4/8')).toBeInTheDocument()
+    expect(screen.getByText('150 kW')).toBeInTheDocument()
+    expect(screen.queryByText('No disponible')).not.toBeInTheDocument()
+
+    const firstStationCard = screen.getAllByRole('button', { name: /Punto de muestra La Plana/ })[0]!
+    fireEvent.click(firstStationCard)
+    expect(firstStationCard).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByLabelText('Detalle de estación')).not.toBeInTheDocument()
   })
 
   it('renders a station preview as the primary charging decision', () => {
@@ -449,7 +526,9 @@ describe('A2UIRenderer', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Abrir detalle de ruta' })[0])
 
     expect(screen.getByLabelText('Detalle de ruta')).toHaveClass('a2ui-map-fullscreen')
-    expect(screen.getByText('Ruta calculada')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Volver' })).toHaveClass('a2ui-map-floating-back')
+    expect(screen.getAllByText('Punto de muestra La Plana').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Ruta calculada')).not.toBeInTheDocument()
   })
 
   it('initializes route maps with a default vector base map', async () => {
@@ -540,7 +619,7 @@ describe('A2UIRenderer', () => {
     const compactOptions = maplibreMock.Map.mock.calls[0]?.[0] as { attributionControl?: unknown; interactive?: unknown }
     const expandedOptions = maplibreMock.Map.mock.calls[1]?.[0] as { attributionControl?: unknown; interactive?: unknown }
     expect(compactOptions).toMatchObject({ attributionControl: false, interactive: false })
-    expect(expandedOptions).toMatchObject({ attributionControl: {}, interactive: true })
+    expect(expandedOptions).toMatchObject({ attributionControl: { compact: true }, interactive: true })
     expect(maplibreMock.NavigationControl).toHaveBeenCalledTimes(1)
     expect(maplibreMock.instances[1]?.on).not.toHaveBeenCalled()
 
@@ -548,19 +627,13 @@ describe('A2UIRenderer', () => {
       element.getAttribute('aria-label') === 'Ver Punto de muestra La Plana'
     ))
     expect(expandedPrimaryMarker?.textContent).toContain('1')
-    expect(expandedPrimaryMarker?.querySelector('.a2ui-map-marker-label')).toHaveTextContent('Punto de muestra La Plana')
-    expect(expandedPrimaryMarker?.querySelector('.a2ui-map-marker-label')).not.toHaveTextContent('2/5')
+    expect(expandedPrimaryMarker?.querySelector('.a2ui-map-marker-label')).toHaveTextContent('2/5')
+    expect(expandedPrimaryMarker?.querySelector('.a2ui-map-marker-label')).not.toHaveTextContent('Punto de muestra La Plana')
     expect(expandedPrimaryMarker?.querySelector('.a2ui-map-marker-label')).not.toHaveTextContent('puestos')
 
     fireEvent.click(expandedPrimaryMarker as HTMLElement)
 
-    expect(screen.getByLabelText('Detalle de estación')).toBeInTheDocument()
-    expect(screen.getByText('Punto de muestra La Plana')).toBeInTheDocument()
-    expect(screen.getByText('Parada principal')).toBeInTheDocument()
-    expect(screen.getByText('180 kW')).toBeInTheDocument()
-    expect(screen.getByText('Disponibles')).toBeInTheDocument()
-    expect(screen.getByText('Total')).toBeInTheDocument()
-    expect(screen.getAllByText('CCS2').length).toBeGreaterThan(0)
+    expect(screen.queryByLabelText('Detalle de estación')).not.toBeInTheDocument()
   })
 
   it('hides station prices marked as estimated', () => {

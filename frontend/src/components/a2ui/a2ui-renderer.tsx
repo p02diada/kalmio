@@ -9,7 +9,17 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react'
-import { Component, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Component,
+  type PointerEvent,
+  type ReactNode,
+  type WheelEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { createPortal } from 'react-dom'
 import type { Map as MapLibreMap, Marker as MapLibreMarker } from 'maplibre-gl'
 
@@ -669,6 +679,7 @@ function StationDetailSection({ title, children }: { title: string; children: Re
 function RouteCorridorCard({ block }: { block: A2UIBlock }) {
   const mapData = useMemo(() => routeMapData(block.props), [block.props])
   const [isExpanded, setIsExpanded] = useState(false)
+  const [selectedStationId, setSelectedStationId] = useState<string | null>(null)
   const stations = routeCorridorStations(block.props)
   const stationCount = stations.length
   const arrivalBattery = knownNumber(block.props.arrivalBattery, { zeroUnknown: true })
@@ -678,27 +689,29 @@ function RouteCorridorCard({ block }: { block: A2UIBlock }) {
     metric(block.props.distanceKm, 'km'),
     compactDuration(block.props.durationText, block.props.durationMin),
   ]).join(' · ')
-  const geometryLabel = mapData.geometryPrecision === 'provider' ? 'Ruta calculada' : 'Mapa orientativo'
   const expandedMap = isExpanded && typeof document !== 'undefined'
     ? createPortal(
       <section className="a2ui-map-fullscreen" aria-label="Detalle de ruta">
-        <div className="a2ui-map-fullscreen-header">
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold tracking-tight">Detalle de ruta</h2>
-            <p className="truncate text-sm text-muted-foreground">
-              {`${mapData.originLabel} → ${mapData.destinationLabel}`}
-            </p>
-          </div>
-          <Button type="button" variant="outline" size="sm" className="h-9 shrink-0" onClick={() => setIsExpanded(false)}>
-            <ArrowLeft className="size-4" aria-hidden="true" />
-            Volver
-          </Button>
-        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="a2ui-map-floating-back"
+          aria-label="Volver"
+          onClick={() => {
+            setIsExpanded(false)
+            setSelectedStationId(null)
+          }}
+        >
+          <ArrowLeft className="size-4" aria-hidden="true" />
+        </Button>
         <div className="a2ui-map-fullscreen-body">
-          <div className="a2ui-route-corridor-detail">
-            <RouteCorridorDetailSummary props={block.props} stations={stations} geometryLabel={geometryLabel} />
-            <RouteMapCanvas data={mapData} variant="expanded" />
-          </div>
+          <RouteCorridorExpandedDetail
+            props={block.props}
+            mapData={mapData}
+            selectedStationId={selectedStationId}
+            onStationSelect={setSelectedStationId}
+          />
         </div>
       </section>,
       document.body,
@@ -778,30 +791,280 @@ function RouteCorridorCard({ block }: { block: A2UIBlock }) {
 
 function RouteCorridorDetailSummary({
   props,
-  stations,
-  geometryLabel,
 }: {
   props: Record<string, unknown>
-  stations: RecordList
-  geometryLabel: string
 }) {
-  const rows = compactRows([
-    ['Estaciones', routeCorridorStationCountLabel(stations.length)],
-    ['Batería al llegar', percent(props.arrivalBattery, { zeroUnknown: true })],
-    ['Distancia', metric(props.distanceKm, 'km')],
-    ['Duración', duration(props.durationText, props.durationMin)],
-    ['Energía', metric(props.energyKwh, 'kWh', { zeroUnknown: true })],
-  ])
+  const origin = text(record(props.origin)?.label ?? props.origin, 'Origen')
+  const destination = text(record(props.destination)?.label ?? props.destination, 'Destino')
 
   return (
     <div className="a2ui-route-corridor-detail-summary">
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="secondary">{geometryLabel}</Badge>
-        <Badge variant="secondary">{routeCorridorStationCountShortLabel(stations.length)}</Badge>
+      <div className="a2ui-route-corridor-route">
+        <div className="min-w-0">
+          <span className="block text-[0.625rem] font-medium leading-3 text-muted-foreground">Origen</span>
+          <span className="block truncate text-xs font-semibold leading-4 text-foreground">{origin}</span>
+        </div>
+        <span className="a2ui-route-corridor-route-line" aria-hidden="true" />
+        <div className="min-w-0 text-right">
+          <span className="block text-[0.625rem] font-medium leading-3 text-muted-foreground">Destino</span>
+          <span className="block truncate text-xs font-semibold leading-4 text-foreground">{destination}</span>
+        </div>
       </div>
-      <MetricGridRows rows={rows} />
     </div>
   )
+}
+
+function RouteCorridorExpandedDetail({
+  props,
+  mapData,
+  selectedStationId,
+  onStationSelect,
+}: {
+  props: Record<string, unknown>
+  mapData: RouteMapData
+  selectedStationId: string | null
+  onStationSelect: (stationId: string | null) => void
+}) {
+  const stationCardRefs = useRef<Record<string, HTMLElement | null>>({})
+  const selectStation = useCallback((stationId: string | null) => {
+    onStationSelect(stationId)
+    if (!stationId) {
+      return
+    }
+    window.requestAnimationFrame(() => {
+      scrollStationCardIntoView(stationCardRefs.current[stationId] ?? null)
+    })
+  }, [onStationSelect])
+
+  return (
+    <div className="a2ui-route-corridor-detail">
+      <div className="a2ui-route-corridor-workspace">
+        <RouteMapCanvas
+          data={mapData}
+          variant="expanded"
+          selectedStationId={selectedStationId}
+          onStationSelect={selectStation}
+        />
+        <RouteCorridorDetailSummary props={props} />
+        <RouteCorridorStationCarousel
+          stations={mapData.stationPoints}
+          selectedStationId={selectedStationId}
+          onStationSelect={selectStation}
+          registerStationCard={(stationId, element) => {
+            stationCardRefs.current[stationId] = element
+          }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function RouteCorridorStationCarousel({
+  stations,
+  selectedStationId,
+  onStationSelect,
+  registerStationCard,
+}: {
+  stations: RouteMapPoint[]
+  selectedStationId: string | null
+  onStationSelect: (stationId: string | null) => void
+  registerStationCard: (stationId: string, element: HTMLElement | null) => void
+}) {
+  const dragStateRef = useRef<StationStripDragState | null>(null)
+  const suppressClickUntilRef = useRef(0)
+
+  const startDrag = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== 'mouse' || event.button !== 0) {
+      return
+    }
+    dragStateRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startScrollLeft: event.currentTarget.scrollLeft,
+      hasDragged: false,
+    }
+  }, [])
+
+  const moveDrag = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const dragState = dragStateRef.current
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return
+    }
+
+    const deltaX = event.clientX - dragState.startX
+    if (Math.abs(deltaX) > 8) {
+      dragState.hasDragged = true
+      event.currentTarget.classList.add('a2ui-route-station-strip-dragging')
+      if (!event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.setPointerCapture(event.pointerId)
+      }
+    }
+    if (!dragState.hasDragged) {
+      return
+    }
+
+    event.preventDefault()
+    event.currentTarget.scrollLeft = dragState.startScrollLeft - deltaX
+  }, [])
+
+  const endDrag = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const dragState = dragStateRef.current
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return
+    }
+    dragStateRef.current = null
+    event.currentTarget.classList.remove('a2ui-route-station-strip-dragging')
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    suppressClickUntilRef.current = dragState.hasDragged ? window.performance.now() + 250 : 0
+  }, [])
+
+  if (stations.length === 0) {
+    return (
+      <aside className="a2ui-route-station-carousel" aria-label="Estaciones del corredor">
+        <div className="a2ui-route-station-empty">
+          <p className="text-sm font-semibold leading-5 text-foreground">Sin estaciones trazadas</p>
+          <p className="mt-1 text-xs leading-5 text-body">El mapa conserva origen, destino y ruta cuando esos datos son válidos.</p>
+        </div>
+      </aside>
+    )
+  }
+
+  return (
+    <aside className="a2ui-route-station-carousel" aria-label="Estaciones del corredor">
+      <div
+        className="a2ui-route-station-strip"
+        role="list"
+        onClickCapture={(event) => {
+          if (window.performance.now() > suppressClickUntilRef.current) {
+            return
+          }
+          suppressClickUntilRef.current = 0
+          event.preventDefault()
+          event.stopPropagation()
+        }}
+        onPointerDown={startDrag}
+        onPointerMove={moveDrag}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onPointerLeave={endDrag}
+        onWheel={handleStationStripWheel}
+      >
+        {stations.map((station) => (
+          <RouteCorridorStationCard
+            key={station.id}
+            station={station}
+            selected={station.id === selectedStationId}
+            onSelect={() => onStationSelect(station.id)}
+            cardRef={(element) => registerStationCard(station.id, element)}
+          />
+        ))}
+      </div>
+    </aside>
+  )
+}
+
+type StationStripDragState = {
+  pointerId: number
+  startX: number
+  startScrollLeft: number
+  hasDragged: boolean
+}
+
+function RouteCorridorStationCard({
+  station,
+  selected,
+  onSelect,
+  cardRef,
+}: {
+  station: RouteMapPoint
+  selected: boolean
+  onSelect: () => void
+  cardRef: (element: HTMLElement | null) => void
+}) {
+  const tariff = stationTariffLabel(station.station ?? {})
+  const routeMeta = compactParts([
+    station.detourLabel ? `${station.detourLabel} desvío` : '',
+    station.distanceLabel ?? '',
+  ]).join(' · ')
+  const facts = compactParts([
+    tariff === 'No disponible' || tariff === 'Sin verificar' ? '' : tariff,
+    station.evseRatioLabel || station.capacityLabel || '',
+    station.powerLabel ?? '',
+  ]).slice(0, 3)
+
+  return (
+    <article
+      ref={cardRef}
+      className={cn('a2ui-route-station-card', selected && 'a2ui-route-station-card-selected')}
+      role="listitem"
+    >
+      <button
+        type="button"
+        className="a2ui-route-station-card-button"
+        aria-pressed={selected}
+        onClick={onSelect}
+      >
+        <span className="a2ui-route-station-card-main">
+          <span className="a2ui-route-station-card-marker">
+            {station.markerLabel}
+          </span>
+          <span className="min-w-0 flex-1 text-left">
+            <span className="line-clamp-1 break-words text-[0.8125rem] font-semibold leading-4 tracking-tight text-foreground [overflow-wrap:anywhere]">{station.label}</span>
+            {routeMeta ? (
+              <span className="mt-0.5 block truncate text-[0.6875rem] leading-4 text-body">{routeMeta}</span>
+            ) : null}
+          </span>
+        </span>
+        <span className="a2ui-route-station-card-footer">
+          <span className="a2ui-route-station-card-facts" aria-label="Datos principales">
+            {facts.map((fact) => (
+              <span key={fact} className="a2ui-route-station-card-fact">{fact}</span>
+            ))}
+            {station.connectorLabels && station.connectorLabels.length > 0 ? (
+              <StationConnectorBadge connector={station.connectorLabels[0]!} />
+            ) : null}
+          </span>
+        </span>
+      </button>
+    </article>
+  )
+}
+
+function scrollStationCardIntoView(card: HTMLElement | null) {
+  const strip = card?.closest<HTMLElement>('.a2ui-route-station-strip')
+  if (!card || !strip) {
+    return
+  }
+
+  const targetLeft = card.offsetLeft - ((strip.clientWidth - card.offsetWidth) / 2)
+  const nextLeft = Math.max(0, targetLeft)
+  if (typeof strip.scrollTo === 'function') {
+    strip.scrollTo({
+      left: nextLeft,
+      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+    })
+    return
+  }
+  strip.scrollLeft = nextLeft
+}
+
+function handleStationStripWheel(event: WheelEvent<HTMLDivElement>) {
+  const strip = event.currentTarget
+  const maxScrollLeft = strip.scrollWidth - strip.clientWidth
+  if (maxScrollLeft <= 0) {
+    return
+  }
+
+  const rawDelta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY
+  const multiplier = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? strip.clientWidth : 1
+  const nextLeft = Math.max(0, Math.min(maxScrollLeft, strip.scrollLeft + (rawDelta * multiplier)))
+  if (nextLeft === strip.scrollLeft) {
+    return
+  }
+
+  strip.scrollLeft = nextLeft
 }
 
 function routeCorridorStations(props: Record<string, unknown>): RecordList {
@@ -982,24 +1245,47 @@ function RouteMapCanvas({
   data,
   variant,
   density = 'default',
+  selectedStationId,
+  onStationSelect,
+  detailStationId,
+  onStationDetailClose,
 }: {
   data: RouteMapData
   variant: 'compact' | 'expanded'
   density?: 'default' | 'mini'
+  selectedStationId?: string | null
+  onStationSelect?: (stationId: string | null) => void
+  detailStationId?: string | null
+  onStationDetailClose?: () => void
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
+  const markerElementsRef = useRef<Record<string, HTMLElement>>({})
+  const activeSelectedStationIdRef = useRef<string | null>(null)
   const [status, setStatus] = useState<'idle' | 'static' | 'failed'>('idle')
-  const [selectedStationId, setSelectedStationId] = useState<string | null>(null)
+  const [internalSelectedStationId, setInternalSelectedStationId] = useState<string | null>(null)
   const isExpanded = variant === 'expanded'
   const usesDefaultStyle = !mapStyleUrl()
-  const selectedStation = isExpanded
-    ? data.stationPoints.find((station) => station.id === selectedStationId) ?? null
+  const activeSelectedStationId = selectedStationId !== undefined ? selectedStationId : internalSelectedStationId
+  const activeDetailStationId = detailStationId !== undefined ? detailStationId : null
+  const detailStation = isExpanded
+    ? data.stationPoints.find((station) => station.id === activeDetailStationId) ?? null
     : null
   const dataKey = useMemo(() => JSON.stringify({
     routeGeometry: data.routeGeometry,
     points: data.points.map((point) => [point.id, point.lat, point.lon, point.kind]),
   }), [data])
+  const selectStation = useCallback((stationId: string | null) => {
+    if (onStationSelect) {
+      onStationSelect(stationId)
+      return
+    }
+    setInternalSelectedStationId(stationId)
+  }, [onStationSelect])
+
+  useEffect(() => {
+    activeSelectedStationIdRef.current = activeSelectedStationId
+  }, [activeSelectedStationId])
 
   useEffect(() => {
     const container = containerRef.current
@@ -1010,6 +1296,7 @@ function RouteMapCanvas({
 
     let disposed = false
     const markers: MapLibreMarker[] = []
+    markerElementsRef.current = {}
 
     async function setupMap() {
       try {
@@ -1022,12 +1309,13 @@ function RouteMapCanvas({
           style: mapLibreStyle(),
           center: routeCenter(data),
           zoom: 6,
-          attributionControl: isExpanded ? {} : usesDefaultStyle ? false : { compact: true },
+          attributionControl: isExpanded ? { compact: true } : usesDefaultStyle ? false : { compact: true },
           interactive: isExpanded,
         })
         mapRef.current = map
         if (isExpanded) {
           map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
+          window.requestAnimationFrame(() => collapseMapAttribution(containerRef.current))
         }
         map.once('load', () => {
           if (disposed) {
@@ -1057,9 +1345,10 @@ function RouteMapCanvas({
           })
           for (const point of data.points) {
             const isClickableStation = isExpanded && isStationMapPoint(point)
-            const element = mapMarkerElement(point, isClickableStation)
+            const element = mapMarkerElement(point, isClickableStation, point.id === activeSelectedStationIdRef.current)
+            markerElementsRef.current[point.id] = element
             if (isClickableStation) {
-              element.addEventListener('click', () => setSelectedStationId(point.id))
+              element.addEventListener('click', () => selectStation(point.id))
             }
             const marker = new maplibregl.Marker({ element, anchor: 'center' })
               .setLngLat([point.lon, point.lat])
@@ -1075,6 +1364,9 @@ function RouteMapCanvas({
             })
           }
           map.resize()
+          if (isExpanded) {
+            window.requestAnimationFrame(() => collapseMapAttribution(containerRef.current))
+          }
         })
       } catch {
         if (!disposed) {
@@ -1089,10 +1381,33 @@ function RouteMapCanvas({
     return () => {
       disposed = true
       markers.forEach((marker) => marker.remove())
+      markerElementsRef.current = {}
       mapRef.current?.remove()
       mapRef.current = null
     }
-  }, [data, dataKey, density, isExpanded, usesDefaultStyle, variant])
+  }, [data, dataKey, density, isExpanded, selectStation, usesDefaultStyle, variant])
+
+  useEffect(() => {
+    for (const [stationId, element] of Object.entries(markerElementsRef.current)) {
+      element.classList.toggle('a2ui-map-marker-selected', stationId === activeSelectedStationId)
+    }
+
+    if (!isExpanded || !activeSelectedStationId) {
+      return
+    }
+
+    const selectedPoint = data.stationPoints.find((station) => station.id === activeSelectedStationId)
+    if (!selectedPoint) {
+      return
+    }
+
+    mapRef.current?.flyTo({
+      center: [selectedPoint.lon, selectedPoint.lat],
+      zoom: 10.2,
+      duration: prefersReducedMotion() ? 0 : 280,
+      essential: false,
+    })
+  }, [activeSelectedStationId, data.stationPoints, isExpanded])
 
   return (
     <div className={cn('a2ui-map-shell', isExpanded ? 'a2ui-map-shell-expanded' : 'a2ui-map-shell-compact', !isExpanded && density === 'mini' && 'a2ui-map-shell-mini')}>
@@ -1102,9 +1417,9 @@ function RouteMapCanvas({
           © OSM
         </a>
       ) : null}
-      {status !== 'idle' ? <StaticRouteMap data={data} /> : null}
-      {selectedStation ? (
-        <RouteMapStationDetails station={selectedStation} onClose={() => setSelectedStationId(null)} />
+      {status !== 'idle' ? <StaticRouteMap data={data} selectedStationId={activeSelectedStationId} /> : null}
+      {detailStation ? (
+        <RouteMapStationDetails station={detailStation} onClose={onStationDetailClose ?? (() => selectStation(null))} />
       ) : null}
       {status === 'failed' ? (
         <span className="absolute left-3 top-3 rounded-md bg-surface px-2 py-1 text-xs font-medium text-muted-foreground shadow-sm">
@@ -1117,7 +1432,7 @@ function RouteMapCanvas({
 
 function mapFitPadding(variant: 'compact' | 'expanded', density: 'default' | 'mini') {
   if (variant === 'expanded') {
-    return 72
+    return { top: 72, bottom: 220, left: 72, right: 72 }
   }
   if (density === 'mini') {
     return { top: 10, bottom: 10, left: 12, right: 12 }
@@ -1132,7 +1447,7 @@ function mapFitMaxZoom(variant: 'compact' | 'expanded', density: 'default' | 'mi
   return density === 'mini' ? 8.8 : 7.6
 }
 
-function StaticRouteMap({ data }: { data: RouteMapData }) {
+function StaticRouteMap({ data, selectedStationId }: { data: RouteMapData; selectedStationId?: string | null }) {
   const geometry = data.routeGeometry ?? schematicGeometry(data)
   const projected = projectedRoute(geometry, data.points)
   return (
@@ -1142,6 +1457,9 @@ function StaticRouteMap({ data }: { data: RouteMapData }) {
       <path d={projected.path} className="fill-none stroke-route stroke-[5] [stroke-linecap:round] [stroke-linejoin:round]" />
       {projected.points.map((point) => (
         <g key={point.id} transform={`translate(${point.x} ${point.y})`}>
+          {point.id === selectedStationId ? (
+            <circle r="14" className="fill-route/20 stroke-route stroke-[2]" />
+          ) : null}
           <circle r={point.kind === 'primary' ? 9 : 7} className={point.kind === 'primary' ? 'fill-warning stroke-surface stroke-[3]' : 'fill-primary stroke-surface stroke-[3]'} />
           <text x={point.kind === 'destination' ? -10 : 10} y="-10" textAnchor={point.kind === 'destination' ? 'end' : 'start'} className="fill-foreground text-[18px] font-bold">
             {point.label}
@@ -1260,7 +1578,6 @@ function stationMapPoint(item: Record<string, unknown>, kind: 'primary' | 'stati
     detourLabel: isKnownNumber(item.detourMin) ? metric(item.detourMin, 'min') : '',
     priceLabel: stationPrice(item) === 'No disponible' ? '' : stationPrice(item),
     connectorLabels: connectorLabels(item.connectorTypes),
-    roleLabel: kind === 'primary' ? 'Parada principal' : 'Alternativa cerca de la ruta',
     station: item,
   }
 }
@@ -1359,9 +1676,22 @@ function canUseWebGl() {
   }
 }
 
-function mapMarkerElement(point: RouteMapPoint, isClickable = false) {
+function prefersReducedMotion() {
+  return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+}
+
+function collapseMapAttribution(container: HTMLElement | null) {
+  const attribution = container?.querySelector<HTMLDetailsElement>('.maplibregl-ctrl-attrib.maplibregl-compact')
+  if (!attribution) {
+    return
+  }
+  attribution.open = false
+  attribution.classList.remove('maplibregl-compact-show')
+}
+
+function mapMarkerElement(point: RouteMapPoint, isClickable = false, isSelected = false) {
   const element = document.createElement('div')
-  element.className = `a2ui-map-marker a2ui-map-marker-${point.kind}`
+  element.className = `a2ui-map-marker a2ui-map-marker-${point.kind}${isSelected ? ' a2ui-map-marker-selected' : ''}`
   if (isClickable) {
     element.className += ' a2ui-map-marker-clickable'
     element.setAttribute('role', 'button')
@@ -1380,7 +1710,7 @@ function mapMarkerElement(point: RouteMapPoint, isClickable = false) {
   dot.textContent = point.markerLabel ?? ''
   const label = document.createElement('span')
   label.className = 'a2ui-map-marker-label'
-  label.textContent = point.label
+  label.textContent = isStationMapPoint(point) && point.evseRatioLabel ? point.evseRatioLabel : point.label
   element.append(dot, label)
   return element
 }
@@ -1727,6 +2057,22 @@ function stationPrice(item: Record<string, unknown>) {
   return value
 }
 
+function stationTariffLabel(item: Record<string, unknown>) {
+  if (bool(item.priceIsEstimated)) {
+    return 'Sin verificar'
+  }
+  const min = knownNumber(item.pricePerKwhMinEur ?? item.minPricePerKwhEur ?? item.tariffMinEurPerKwh)
+  const max = knownNumber(item.pricePerKwhMaxEur ?? item.maxPricePerKwhEur ?? item.tariffMaxEurPerKwh)
+  const currency = text(item.currency, 'EUR').toUpperCase() === 'EUR' ? '€' : text(item.currency, 'EUR')
+  if (min !== null && max !== null) {
+    return min === max
+      ? `${formatPrice(min)} ${currency}/kWh`
+      : `${formatPrice(min)}-${formatPrice(max)} ${currency}/kWh`
+  }
+  const row = stationPriceRow(item)
+  return row?.[1] ?? 'No disponible'
+}
+
 function stationPriceRow(item: Record<string, unknown>): [string, string] | null {
   const value = stationPrice(item)
   return value === 'No disponible' ? null : ['Precio', value]
@@ -1857,32 +2203,6 @@ function metric(value: unknown, unit: string, options: { zeroUnknown?: boolean }
     return 'No calculado'
   }
   return `${formatNumber(number)} ${unit}`
-}
-
-function percent(value: unknown, options: { zeroUnknown?: boolean } = {}) {
-  const number = knownNumber(value, options)
-  if (number === null) {
-    return 'No calculado'
-  }
-  return `${formatNumber(number)}%`
-}
-
-function duration(durationText: unknown, durationMin: unknown) {
-  const provided = text(durationText, '')
-  if (provided) {
-    return provided
-  }
-  const minutes = knownNumber(durationMin)
-  if (minutes === null) {
-    return 'No calculado'
-  }
-  if (minutes < 60) {
-    return `${formatNumber(minutes)} min`
-  }
-  const rounded = Math.round(minutes)
-  const hours = Math.floor(rounded / 60)
-  const remaining = rounded % 60
-  return remaining > 0 ? `${hours} h ${remaining} min` : `${hours} h`
 }
 
 function compactDuration(durationText: unknown, durationMin: unknown) {
