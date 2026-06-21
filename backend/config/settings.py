@@ -1,6 +1,7 @@
 """Django settings for Kalmio."""
 
 import os
+import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -236,7 +237,8 @@ if KALMIO_ROUTE_CONVERSATION_THROTTLE_WINDOW_SECONDS <= 0:
         "KALMIO_ROUTE_CONVERSATION_THROTTLE_WINDOW_SECONDS must be greater than zero.",
     )
 
-KALMIO_CONVERSATION_AGENT_MODE = os.getenv("KALMIO_CONVERSATION_AGENT_MODE", "local").strip().lower()
+default_agent_mode = "local" if "pytest" in Path(sys.argv[0]).name else "deepseek"
+KALMIO_CONVERSATION_AGENT_MODE = os.getenv("KALMIO_CONVERSATION_AGENT_MODE", default_agent_mode).strip().lower()
 if KALMIO_CONVERSATION_AGENT_MODE not in {"local", "deepseek"}:
     raise ImproperlyConfigured("KALMIO_CONVERSATION_AGENT_MODE must be local or deepseek.")
 

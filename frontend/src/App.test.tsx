@@ -111,7 +111,7 @@ describe('App', () => {
       expect(fetchSpy.mock.calls.some(([input]) => input.toString().includes('/api/conversation/message'))).toBe(true),
     )
     expect(fetchSpy.mock.calls.some(([input]) => input.toString().includes('/api/conversation/route'))).toBe(false)
-    const messageCall = fetchSpy.mock.calls.find(([input]) => input.toString().endsWith('/api/conversation/message'))
+    const messageCall = fetchSpy.mock.calls.find(([input]) => input.toString().endsWith('/api/conversation/message/stream'))
     expect(JSON.parse(messageCall?.[1]?.body?.toString() ?? '{}')).toEqual({
       text: 'Quiero planificar dónde cargar al llegar a mi hotel o destino. Si falta la ubicación exacta, pregúntame antes de buscar opciones.',
     })
@@ -197,9 +197,69 @@ describe('App', () => {
     expect(screen.queryByText(/JSON válido/i)).not.toBeInTheDocument()
   })
 
+  it('disables the composer when the agent service is unavailable', async () => {
+    document.cookie = 'csrftoken=test-token'
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = input.toString()
+      if (url.includes('/api/conversation/messages')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify(conversationBody([
+                {
+                  id: 'assistant-initial',
+                  type: 'AssistantMessage',
+                  version: 1,
+                  props: { text: 'Cuéntame qué necesitas.' },
+                },
+              ])),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        )
+      }
+      if (url.includes('/api/auth/csrf')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ detail: 'csrf cookie set', csrf_token: 'test-token' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+      }
+      if (url.includes('/api/conversation/message/stream')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              detail: 'No puedo conectar con el agente de conversación ahora mismo.',
+              code: 'agent_not_configured',
+              developer_detail: 'Revisa KALMIO_DEEPSEEK_API_KEY.',
+              disable_input: true,
+            }),
+            { status: 502, headers: { 'Content-Type': 'application/json' } },
+          ),
+        )
+      }
+      return Promise.reject(new Error(`Unexpected request: ${url}`))
+    })
+
+    render(<App />)
+    fireEvent.click((await screen.findAllByRole('link', { name: /Chat/i }))[0])
+    const textarea = await screen.findByLabelText('Mensaje para Kalmio')
+    fireEvent.change(textarea, {
+      target: { value: 'Carga ya en cordoba' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+
+    expect(await screen.findByText(/No puedo conectar con el agente/)).toBeInTheDocument()
+    expect(screen.getByText(/Diagnóstico: agent_not_configured/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reintentar' })).not.toBeInTheDocument()
+    expect(textarea).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Enviar' })).toBeDisabled()
+  })
+
   it('scrolls new agent results to the primary recommendation instead of the last alternative', async () => {
     document.cookie = 'csrftoken=test-token'
-    const scrollIntoView = vi.fn(function (this: HTMLElement, _options?: ScrollIntoViewOptions) {})
+    const scrollIntoView = vi.fn(function (this: HTMLElement, options?: ScrollIntoViewOptions) {
+      void options
+    })
     Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
       configurable: true,
       value: scrollIntoView,

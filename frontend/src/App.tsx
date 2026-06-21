@@ -63,10 +63,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { Toaster } from '@/components/ui/sonner'
 import {
   clearConversation,
+  ConversationApiError,
   conversationMessagesQueryKey,
   getConversationMessages,
-  sendConversationAction,
-  sendConversationMessage,
+  sendConversationActionStream,
+  sendConversationMessageStream,
+  type ConversationMessagesResponse,
+  type ConversationProgressUpdate,
 } from '@/lib/api/conversation'
 import type { A2UIBlock } from '@/lib/a2ui/types'
 import { cn } from '@/lib/utils'
@@ -109,11 +112,12 @@ const reassuranceSteps = [
   'Si no hay datos fiables, no recomendaré una parada.',
 ] as const
 
-const conversationPhases = [
-  'Interpretando tu petición',
-  'Comprobando ruta o ubicación',
-  'Buscando paradas con carga autorizada',
-  'Validando riesgo y próximos pasos',
+const conversationProgressSteps = [
+  { stage: 'accepted', label: 'Preparando la consulta' },
+  { stage: 'agent_reasoning', label: 'Entendiendo ruta, batería y preferencias' },
+  { stage: 'tool_started', label: 'Consultando datos autorizados' },
+  { stage: 'validating_a2ui', label: 'Comprobando la respuesta' },
+  { stage: 'done', label: 'Preparando la respuesta' },
 ] as const
 
 const chatScrollPriority = [
@@ -447,9 +451,11 @@ function ChatPage() {
   const [draft, setDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isSending, setIsSending] = useState(false)
-  const [phaseIndex, setPhaseIndex] = useState(0)
+  const [progressUpdate, setProgressUpdate] = useState<ConversationProgressUpdate | null>(null)
   const [retryText, setRetryText] = useState<string | null>(null)
+  const [inputDisabledReason, setInputDisabledReason] = useState<string | null>(null)
   const [pendingUserBlock, setPendingUserBlock] = useState<A2UIBlock | null>(null)
+  const [typewriter, setTypewriter] = useState<{ blockId: string; text: string; visibleChars: number } | null>(null)
   const sentInitialPrompt = useRef(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const latestRef = useRef<HTMLDivElement>(null)
@@ -467,25 +473,55 @@ function ChatPage() {
     }
     return pendingUserBlock ? [pendingUserBlock] : []
   }, [messagesQuery.data, pendingUserBlock])
+  const displayedBlocks = useMemo(() => {
+    if (!typewriter) {
+      return renderedBlocks
+    }
+    return renderedBlocks.map((block) => {
+      if (block.id !== typewriter.blockId || block.type !== 'AssistantMessage') {
+        return block
+      }
+      return {
+        ...block,
+        props: {
+          ...block.props,
+          text: typewriter.text.slice(0, typewriter.visibleChars),
+        },
+      }
+    })
+  }, [renderedBlocks, typewriter])
   const blockCount = renderedBlocks.length
   const blockSignature = renderedBlocks.map((block) => `${block.id}:${block.type}`).join('|')
+  const handleConversationSuccess = useCallback((data: ConversationMessagesResponse) => {
+    const previousIds = new Set((messagesQuery.data?.blocks ?? []).map((block) => block.id))
+    const assistantBlock = data.blocks.find((block) => (
+      block.type === 'AssistantMessage' &&
+      !previousIds.has(block.id) &&
+      typeof block.props.text === 'string' &&
+      block.props.text.length > 0
+    ))
+    setTypewriter(assistantBlock
+      ? { blockId: assistantBlock.id, text: assistantBlock.props.text as string, visibleChars: 0 }
+      : null)
+    queryClient.setQueryData(conversationMessagesQueryKey, data)
+  }, [messagesQuery.data?.blocks])
   const sendMutation = useMutation({
-    mutationFn: sendConversationMessage,
-    onSuccess: (data) => {
-      queryClient.setQueryData(conversationMessagesQueryKey, data)
-      setPendingUserBlock(null)
-    },
+    mutationFn: ({ text, onProgress }: { text: string; onProgress: (progress: ConversationProgressUpdate) => void }) =>
+      sendConversationMessageStream(text, onProgress),
+    onSuccess: handleConversationSuccess,
   })
   const actionMutation = useMutation({
-    mutationFn: sendConversationAction,
-    onSuccess: (data) => {
-      queryClient.setQueryData(conversationMessagesQueryKey, data)
-    },
+    mutationFn: ({ action, onProgress }: { action: Parameters<typeof sendConversationActionStream>[0]; onProgress: (progress: ConversationProgressUpdate) => void }) =>
+      sendConversationActionStream(action, onProgress),
+    onSuccess: handleConversationSuccess,
   })
   const clearMutation = useMutation({
     mutationFn: clearConversation,
     onSuccess: () => {
       setPendingUserBlock(null)
+      setProgressUpdate(null)
+      setTypewriter(null)
+      setInputDisabledReason(null)
       queryClient.invalidateQueries({ queryKey: conversationMessagesQueryKey })
     },
     onError: (mutationError) => {
@@ -495,12 +531,14 @@ function ChatPage() {
 
   const sendText = useCallback((value: string) => {
     const text = value.trim()
-    if (!text || isSending) {
+    if (!text || isSending || inputDisabledReason) {
       return
     }
     setDraft('')
     setError(null)
     setRetryText(null)
+    setProgressUpdate({ stage: 'accepted', label: 'Preparando la consulta' })
+    setTypewriter(null)
     setPendingUserBlock({
       id: `pending-user-${Date.now()}`,
       type: 'UserMessage',
@@ -508,39 +546,47 @@ function ChatPage() {
       props: { text },
     })
     setIsSending(true)
-    setPhaseIndex(0)
-    sendMutation.mutateAsync(text)
+    sendMutation.mutateAsync({ text, onProgress: setProgressUpdate })
       .catch((mutationError) => {
-        setError(mutationError instanceof Error ? mutationError.message : 'No se pudo enviar el mensaje.')
+        setError(conversationMutationMessage(mutationError, 'No se pudo enviar el mensaje.'))
+        setInputDisabledReason(conversationInputDisabledReason(mutationError))
         setRetryText(text)
       })
       .finally(() => {
+        setPendingUserBlock(null)
+        setProgressUpdate(null)
         setIsSending(false)
       })
-  }, [isSending, sendMutation])
+  }, [inputDisabledReason, isSending, sendMutation])
 
   const sendA2UIEvent = useCallback((name: string, context: Record<string, unknown> = {}, sourceComponentId?: string) => {
     const actionName = name.trim()
-    if (!actionName || isSending) {
+    if (!actionName || isSending || inputDisabledReason) {
       return
     }
     setError(null)
     setRetryText(null)
+    setProgressUpdate({ stage: 'accepted', label: 'Preparando la acción' })
+    setTypewriter(null)
     setIsSending(true)
-    setPhaseIndex(0)
     actionMutation.mutateAsync({
-      name: actionName,
-      context,
-      sourceComponentId,
-      surfaceId: messagesQuery.data?.surfaceId,
+      action: {
+        name: actionName,
+        context,
+        sourceComponentId,
+        surfaceId: messagesQuery.data?.surfaceId,
+      },
+      onProgress: setProgressUpdate,
     })
       .catch((mutationError) => {
-        setError(mutationError instanceof Error ? mutationError.message : 'No se pudo enviar la acción.')
+        setError(conversationMutationMessage(mutationError, 'No se pudo enviar la acción.'))
+        setInputDisabledReason(conversationInputDisabledReason(mutationError))
       })
       .finally(() => {
+        setProgressUpdate(null)
         setIsSending(false)
       })
-  }, [actionMutation, isSending, messagesQuery.data?.surfaceId])
+  }, [actionMutation, inputDisabledReason, isSending, messagesQuery.data?.surfaceId])
 
   useEffect(() => {
     if (sentInitialPrompt.current) {
@@ -562,14 +608,22 @@ function ChatPage() {
   }, [sendText])
 
   useEffect(() => {
-    if (!isSending) {
+    if (!typewriter || typewriter.visibleChars >= typewriter.text.length) {
       return
     }
     const timer = window.setInterval(() => {
-      setPhaseIndex((current) => Math.min(current + 1, conversationPhases.length - 1))
-    }, 1800)
+      setTypewriter((current) => {
+        if (!current) {
+          return current
+        }
+        return {
+          ...current,
+          visibleChars: Math.min(current.visibleChars + 8, current.text.length),
+        }
+      })
+    }, 20)
     return () => window.clearInterval(timer)
-  }, [isSending])
+  }, [typewriter])
 
   useEffect(() => {
     const previousBlockIds = previousBlockIdsRef.current
@@ -600,10 +654,10 @@ function ChatPage() {
         {messagesQuery.isPending ? <ConversationSkeleton /> : null}
         {!messagesQuery.isPending && renderedBlocks.length === 0 && !isSending && !error ? <ChatEmptyState /> : null}
         {renderedBlocks.length > 0 ? (
-          <A2UIRenderer blocks={renderedBlocks} onChipClick={sendText} onActionEvent={sendA2UIEvent} />
+          <A2UIRenderer blocks={displayedBlocks} onChipClick={sendText} onActionEvent={sendA2UIEvent} />
         ) : null}
-        {isSending ? <ConversationProgress phaseIndex={phaseIndex} /> : null}
-        {error ? <InlineError message={error} onRetry={retryText ? () => sendText(retryText) : undefined} /> : null}
+        {isSending ? <ConversationProgress progress={progressUpdate} /> : null}
+        {error ? <InlineError message={error} onRetry={retryText && !inputDisabledReason ? () => sendText(retryText) : undefined} /> : null}
         <div ref={latestRef} className="h-px" tabIndex={-1} aria-hidden="true" />
       </div>
 
@@ -630,11 +684,12 @@ function ChatPage() {
           aria-label="Mensaje para Kalmio"
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
-          placeholder="Ruta, batería o destino"
+          placeholder={inputDisabledReason ?? 'Ruta, batería o destino'}
           rows={1}
           className="chat-composer-input border-0 px-2 shadow-none focus-visible:outline-none"
+          disabled={Boolean(inputDisabledReason)}
         />
-        <Button type="submit" size="icon" className="size-9 shrink-0 rounded-full md:w-auto md:px-3" aria-label="Enviar" disabled={isSending || draft.trim().length === 0}>
+        <Button type="submit" size="icon" className="size-9 shrink-0 rounded-full md:w-auto md:px-3" aria-label="Enviar" disabled={isSending || Boolean(inputDisabledReason) || draft.trim().length === 0}>
           <ArrowUp className="size-4" aria-hidden="true" />
           <span className="hidden md:inline">Enviar</span>
         </Button>
@@ -1069,28 +1124,54 @@ function ThemeDecisionPreview() {
   )
 }
 
-function ConversationProgress({ phaseIndex }: { phaseIndex: number }) {
-  const progress = ((phaseIndex + 1) / conversationPhases.length) * 100
+function ConversationProgress({ progress: update }: { progress: ConversationProgressUpdate | null }) {
+  const stageIndex = conversationProgressStageIndex(update)
+  const progress = ((stageIndex + 1) / conversationProgressSteps.length) * 100
+  const label = update?.label || conversationProgressSteps[stageIndex]?.label || 'Preparando la consulta'
 
   return (
     <Card aria-live="polite">
       <CardContent className="flex flex-col gap-3 p-4">
         <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-          {conversationPhases[phaseIndex]}
+          {label}
         </div>
         <Progress value={progress} aria-label="Progreso de la comprobación" />
         <ol className="grid gap-2 text-xs leading-5 text-muted-foreground">
-          {conversationPhases.map((phase, index) => (
-            <li key={phase} className={cn('flex items-center gap-2', index <= phaseIndex && 'text-foreground')}>
-              <span className={cn('size-1.5 rounded-full bg-border', index <= phaseIndex && 'bg-primary')} aria-hidden="true" />
-              {phase}
+          {conversationProgressSteps.map((step, index) => (
+            <li key={step.stage} className={cn('flex items-center gap-2', index <= stageIndex && 'text-foreground')}>
+              <span className={cn('size-1.5 rounded-full bg-border', index <= stageIndex && 'bg-primary')} aria-hidden="true" />
+              {step.label}
             </li>
           ))}
         </ol>
       </CardContent>
     </Card>
   )
+}
+
+function conversationProgressStageIndex(update: ConversationProgressUpdate | null) {
+  if (!update) {
+    return 0
+  }
+  if (update.stage === 'tool_finished') {
+    return 2
+  }
+  if (update.stage === 'repairing_a2ui') {
+    return 3
+  }
+  return Math.max(0, conversationProgressSteps.findIndex((step) => step.stage === update.stage))
+}
+
+function conversationMutationMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback
+}
+
+function conversationInputDisabledReason(error: unknown) {
+  if (error instanceof ConversationApiError && error.disableInput) {
+    return 'Agente no disponible'
+  }
+  return null
 }
 
 function InlineError({ message, onRetry }: { message: string; onRetry?: () => void }) {

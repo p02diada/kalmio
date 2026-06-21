@@ -1,3 +1,12 @@
+from __future__ import annotations
+
+import json
+import queue
+import threading
+from typing import Any, Callable
+
+from django.db import close_old_connections
+from django.http import StreamingHttpResponse
 from ninja import Router
 from ninja import Query
 from ninja.responses import Response
@@ -6,7 +15,7 @@ from ninja.utils import check_csrf
 from django.conf import settings
 
 from routing.a2ui_protocol import A2UI_PROTOCOL_VERSION, action_payload_to_text, conversation_a2ui_response
-from routing.agent import AgentResponseError, conversation_failure_blocks, initial_blocks, run_conversation_agent, run_local_agent
+from routing.agent import AgentResponseError, initial_blocks, run_conversation_agent
 from routing.models import RoutePlan
 from routing.production_planner import PlanningDataError, ProductionPlanResult, plan_route_with_persisted_stations
 from routing.providers import Coordinate, RoutingProviderError, get_route_provider
@@ -46,6 +55,88 @@ def get_active_conversation_messages(request):
     response={200: ConversationMessageResponse, 403: RoutePlanError, 422: RoutePlanError, 429: RoutePlanError, 502: RoutePlanError},
 )
 def create_conversation_message(request, payload: ConversationMessageRequest):
+    result = prepare_conversation_message_response(request, payload)
+    if isinstance(result, Response):
+        return result
+    try:
+        body = run_conversation_turn(request, result["message_text"], result["is_action"])
+    except AgentResponseError as exc:
+        return Response(conversation_agent_error_payload(exc), status=502)
+    return Response(body, status=200)
+
+
+@router.post(
+    "/conversation/message/stream",
+    response={403: RoutePlanError, 422: RoutePlanError, 429: RoutePlanError},
+)
+def create_conversation_message_stream(request, payload: ConversationMessageRequest):
+    result = prepare_conversation_message_response(request, payload)
+    if isinstance(result, Response):
+        return result
+
+    current_blocks = request.session.get(ACTIVE_CONVERSATION_BLOCKS_KEY) or initial_blocks()
+    events: queue.Queue[tuple[str, Any] | None] = queue.Queue()
+
+    def progress_callback(progress: dict[str, Any]) -> None:
+        events.put(("progress", progress))
+
+    def worker() -> None:
+        close_old_connections()
+        try:
+            new_blocks = generate_conversation_blocks(
+                result["message_text"],
+                current_blocks,
+                progress_callback=progress_callback,
+            )
+        except AgentResponseError as exc:
+            events.put(("error", conversation_agent_error_payload(exc)))
+        except Exception:
+            events.put(
+                (
+                    "error",
+                    {
+                        "detail": (
+                            "No he podido completar esta respuesta con fiabilidad. "
+                            "Reintenta con origen o ubicación, destino si hay ruta, batería y conector."
+                        )
+                    },
+                )
+            )
+        else:
+            events.put(("blocks", new_blocks))
+        finally:
+            close_old_connections()
+            events.put(None)
+
+    def event_stream():
+        yield sse_event("progress", {"stage": "accepted", "label": "Preparando la consulta"})
+        thread = threading.Thread(target=worker, daemon=True)
+        thread.start()
+        while True:
+            item = events.get()
+            if item is None:
+                break
+            event, data = item
+            if event == "blocks":
+                body = finalize_conversation_turn(
+                    request,
+                    current_blocks,
+                    data,
+                    result["message_text"],
+                    result["is_action"],
+                    save_session=True,
+                )
+                yield sse_event("done", body)
+            else:
+                yield sse_event(event, data)
+
+    response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+    return response
+
+
+def prepare_conversation_message_response(request, payload: ConversationMessageRequest):
     csrf_response = check_csrf(request)
     if csrf_response:
         return Response({"detail": "CSRF verification failed."}, status=403)
@@ -69,25 +160,94 @@ def create_conversation_message(request, payload: ConversationMessageRequest):
     if not message_text:
         return Response({"detail": "Envía texto o una acción A2UI válida."}, status=422)
 
-    current_blocks = request.session.get(ACTIVE_CONVERSATION_BLOCKS_KEY) or initial_blocks()
-    try:
-        new_blocks = run_conversation_agent(message_text, history_blocks=current_blocks)
-    except AgentResponseError:
-        if getattr(settings, "KALMIO_CONVERSATION_AGENT_MODE", "local") == "local":
-            try:
-                new_blocks = run_local_agent(message_text, history_blocks=current_blocks)
-            except (AgentResponseError, PlanningDataError, RoutingProviderError):
-                new_blocks = conversation_failure_blocks(message_text)
-        else:
-            new_blocks = conversation_failure_blocks(message_text)
+    return {"message_text": message_text, "is_action": is_action}
 
+
+def run_conversation_turn(
+    request,
+    message_text: str,
+    is_action: bool,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    save_session: bool = False,
+) -> dict[str, Any]:
+    current_blocks = request.session.get(ACTIVE_CONVERSATION_BLOCKS_KEY) or initial_blocks()
+    new_blocks = generate_conversation_blocks(message_text, current_blocks, progress_callback=progress_callback)
+    return finalize_conversation_turn(request, current_blocks, new_blocks, message_text, is_action, save_session)
+
+
+def generate_conversation_blocks(
+    message_text: str,
+    current_blocks: list[dict[str, Any]],
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+) -> list[dict[str, Any]]:
+    return run_conversation_agent(
+        message_text,
+        history_blocks=current_blocks,
+        progress_callback=progress_callback,
+    )
+
+
+def finalize_conversation_turn(
+    request,
+    current_blocks: list[dict[str, Any]],
+    new_blocks: list[dict[str, Any]],
+    message_text: str,
+    is_action: bool,
+    save_session: bool = False,
+) -> dict[str, Any]:
     if is_action:
         new_blocks = without_action_echo(new_blocks, message_text)
 
     blocks = [*current_blocks, *new_blocks]
     request.session[ACTIVE_CONVERSATION_BLOCKS_KEY] = blocks[-80:]
     request.session.modified = True
-    return Response(conversation_a2ui_response(request.session[ACTIVE_CONVERSATION_BLOCKS_KEY]), status=200)
+    if save_session:
+        request.session.save()
+    return conversation_a2ui_response(request.session[ACTIVE_CONVERSATION_BLOCKS_KEY])
+
+
+def sse_event(event: str, data: dict[str, Any]) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+def conversation_agent_error_payload(exc: AgentResponseError) -> dict[str, Any]:
+    code = conversation_agent_error_code(str(exc))
+    return {
+        "detail": conversation_agent_error_detail(code),
+        "code": code,
+        "developer_detail": conversation_agent_developer_detail(code),
+        "disable_input": True,
+    }
+
+
+def conversation_agent_error_code(reason: str) -> str:
+    normalized = reason.lower()
+    if "no está configurado" in normalized or "api_key" in normalized or "api key" in normalized:
+        return "agent_not_configured"
+    if "json" in normalized or "decisión" in normalized or "decision" in normalized:
+        return "agent_invalid_response"
+    if "request" in normalized or "timeout" in normalized or "conectar" in normalized or "connection" in normalized:
+        return "agent_unavailable"
+    return "agent_error"
+
+
+def conversation_agent_error_detail(code: str) -> str:
+    if code == "agent_not_configured":
+        return "No puedo conectar con el agente de conversación ahora mismo. No voy a inventar recomendaciones de carga."
+    if code == "agent_unavailable":
+        return "El agente de conversación no está disponible ahora mismo. Reintenta cuando la conexión esté recuperada."
+    if code == "agent_invalid_response":
+        return "El agente no devolvió una respuesta válida para mostrar con seguridad. Reintenta en unos segundos."
+    return "No he podido completar esta respuesta con el agente de conversación. Reintenta en unos segundos."
+
+
+def conversation_agent_developer_detail(code: str) -> str:
+    details = {
+        "agent_not_configured": "Revisa KALMIO_DEEPSEEK_API_KEY/DEEPSEEK_API_KEY y KALMIO_CONVERSATION_AGENT_MODE.",
+        "agent_unavailable": "Revisa conectividad con el proveedor del agente y timeouts.",
+        "agent_invalid_response": "Revisa trazas del agente y validación JSON/A2UI.",
+    }
+    return details.get(code, "Revisa backend/.tmp/agent-traces.jsonl y la configuración del agente.")
 
 
 def conversation_message_text(payload: ConversationMessageRequest) -> tuple[str, bool]:

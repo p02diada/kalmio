@@ -246,6 +246,49 @@ def test_conversation_message_accepts_a2ui_action_transport_without_visible_acti
 
 
 @pytest.mark.django_db
+def test_conversation_message_stream_emits_progress_and_final_a2ui(client, settings, monkeypatch):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
+
+    def fake_deepseek_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+        return {
+            "type": "final",
+            "blocks": [
+                {
+                    "id": "assistant-stream-result",
+                    "type": "AssistantMessage",
+                    "version": 1,
+                    "props": {"text": "Uso Córdoba como ubicación para revisar opciones fiables."},
+                }
+            ],
+        }
+
+    monkeypatch.setattr("routing.agent.run_deepseek_decision", fake_deepseek_decision)
+
+    response = client.post(
+        "/api/conversation/message/stream",
+        data={"text": "Estoy en Córdoba con un 18%"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert response["Content-Type"].startswith("text/event-stream")
+    stream_text = "".join(
+        chunk.decode("utf-8") if isinstance(chunk, bytes) else chunk
+        for chunk in response.streaming_content
+    )
+    assert "event: progress" in stream_text
+    assert '"stage": "accepted"' in stream_text
+    assert '"stage": "agent_reasoning"' in stream_text
+    assert '"stage": "validating_a2ui"' in stream_text
+    assert "event: done" in stream_text
+
+    done_payload = json.loads(stream_text.split("event: done\n", 1)[1].split("data: ", 1)[1].strip())
+    blocks = blocks_from_a2ui_response(done_payload)
+    assert blocks[-1]["id"] == "assistant-stream-result"
+    assert "blocks" not in done_payload
+
+
+@pytest.mark.django_db
 def test_conversation_message_handles_destination_charging_without_route_planner(client, real_station):
     response = client.post(
         "/api/conversation/message",
@@ -4693,8 +4736,8 @@ def test_deepseek_conversation_agent_stops_at_tool_budget(client, settings, monk
 
 
 @pytest.mark.django_db
-def test_local_conversation_agent_failure_uses_dev_fallback_without_technical_detail(client, monkeypatch):
-    def failing_agent(message, history_blocks=None):
+def test_conversation_agent_failure_returns_diagnostic_error_without_fallback_blocks(client, monkeypatch):
+    def failing_agent(message, history_blocks=None, progress_callback=None):
         raise AgentResponseError("El agente no devolvió JSON válido.")
 
     monkeypatch.setattr("routing.api.run_conversation_agent", failing_agent)
@@ -4705,42 +4748,39 @@ def test_local_conversation_agent_failure_uses_dev_fallback_without_technical_de
         content_type="application/json",
     )
 
-    assert response.status_code == 200
-    blocks = blocks_from_a2ui_response(response)
-    rendered_text = " ".join(str(block.get("props", {})) for block in blocks)
-    assert "DeepSeek" not in rendered_text
-    assert "JSON" not in rendered_text
-    block_types = [block["type"] for block in blocks]
-    assert "UserMessage" in block_types
-    assert "PositionRequestCard" in block_types
-    assert "RiskExplanationCard" not in block_types
+    assert response.status_code == 502
+    body = response.json()
+    assert body["code"] == "agent_invalid_response"
+    assert body["disable_input"] is True
+    assert "agente" in body["detail"]
+    assert "JSON" not in body["detail"]
+    assert "messages" not in body
 
 
 @pytest.mark.django_db
-def test_deepseek_conversation_agent_failure_uses_minimal_safe_fallback(client, settings, monkeypatch):
+def test_conversation_agent_failure_streams_diagnostic_error_without_fallback_blocks(client, settings, monkeypatch):
     settings.KALMIO_CONVERSATION_AGENT_MODE = "deepseek"
 
-    def failing_agent(message, history_blocks=None):
-        raise AgentResponseError("El agente no devolvió JSON válido.")
+    def failing_agent(message, history_blocks=None, progress_callback=None):
+        raise AgentResponseError("DeepSeek no está configurado: falta KALMIO_DEEPSEEK_API_KEY.")
 
     monkeypatch.setattr("routing.api.run_conversation_agent", failing_agent)
 
     response = client.post(
-        "/api/conversation/message",
+        "/api/conversation/message/stream",
         data={"text": "Necesito cargar ya"},
         content_type="application/json",
     )
 
     assert response.status_code == 200
-    blocks = blocks_from_a2ui_response(response)
-    rendered_text = " ".join(str(block.get("props", {})) for block in blocks)
-    assert "DeepSeek" not in rendered_text
-    assert "JSON" not in rendered_text
-    block_types = [block["type"] for block in blocks]
-    assert "UserMessage" in block_types
-    assert "AssistantMessage" in block_types
-    assert "PositionRequestCard" not in block_types
-    assert "StationDetailCard" not in block_types
+    stream_text = "".join(
+        chunk.decode("utf-8") if isinstance(chunk, bytes) else chunk
+        for chunk in response.streaming_content
+    )
+    assert "event: error" in stream_text
+    assert '"code": "agent_not_configured"' in stream_text
+    assert '"disable_input": true' in stream_text
+    assert "event: done" not in stream_text
 
 
 @pytest.mark.django_db
