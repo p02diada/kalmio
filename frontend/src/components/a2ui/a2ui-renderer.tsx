@@ -6,6 +6,7 @@ import {
   Euro,
   Maximize2,
   MapPinned,
+  MessageCircle,
   Navigation,
   Route,
   X,
