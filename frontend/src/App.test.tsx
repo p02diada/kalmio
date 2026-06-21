@@ -30,21 +30,27 @@ afterEach(() => {
 })
 
 describe('App', () => {
-  it('renders a quick-start home that does not call the route planner', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ detail: 'unexpected' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    )
+  it('renders the chat landing state without calling the route planner', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = input.toString()
+      if (url.includes('/api/conversation/messages')) {
+        return Promise.resolve(
+          new Response(JSON.stringify(conversationBody([])), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+      }
+      return Promise.reject(new Error(`Unexpected request: ${url}`))
+    })
 
     render(<App />)
 
     expect((await screen.findAllByText('Kalmio'))[0]).toBeInTheDocument()
-    expect(screen.getByText('Cuenta tu ruta o urgencia')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Abrir chat/i })).toBeInTheDocument()
-    expect(screen.getByText('Antes de recomendar')).toBeInTheDocument()
-    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(await screen.findByText('Cuéntame ruta, batería o urgencia.')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Mensaje para Kalmio' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Carga urgente/i })).toBeInTheDocument()
+    expect(fetchSpy.mock.calls.some(([input]) => input.toString().includes('/api/conversation/route'))).toBe(false)
   })
 
   it('starts the chat when users choose a guided prompt', async () => {
@@ -53,17 +59,10 @@ describe('App', () => {
       const url = input.toString()
       if (url.includes('/api/conversation/messages')) {
         return Promise.resolve(
-          new Response(
-            JSON.stringify(conversationBody([
-                {
-                  id: 'assistant-initial',
-                  type: 'AssistantMessage',
-                  version: 1,
-                  props: { text: 'Cuéntame qué necesitas.' },
-                },
-              ])),
-            { status: 200, headers: { 'Content-Type': 'application/json' } },
-          ),
+          new Response(JSON.stringify(conversationBody([])), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
         )
       }
       if (url.includes('/api/auth/csrf')) {

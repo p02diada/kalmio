@@ -15,7 +15,6 @@ import {
   BatteryCharging,
   CheckCircle2,
   ClipboardList,
-  Home,
   Menu,
   MapPinned,
   MessageCircle,
@@ -34,8 +33,6 @@ import { ChatPendingStatus } from '@/components/chat/chat-pending-status'
 import { chatWaitingMessageScheduleMs } from '@/components/chat/chat-waiting-messages'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Sidebar,
@@ -72,7 +69,6 @@ import type { A2UIBlock } from '@/lib/a2ui/types'
 import { cn } from '@/lib/utils'
 
 const queryClient = new QueryClient()
-const pendingPromptKey = 'kalmio.pendingPrompt'
 
 const quickPrompts = [
   {
@@ -95,20 +91,6 @@ const quickPrompts = [
   },
 ]
 
-const intakeItems = [
-  'Ubicación',
-  'Batería',
-  'Conector',
-  'Destino',
-  'Urgencia',
-] as const
-
-const reassuranceSteps = [
-  'Te pediré ubicación, batería y conector si faltan.',
-  'Comprobaré ruta y paradas con datos autorizados de carga.',
-  'Si no hay datos fiables, no recomendaré una parada.',
-] as const
-
 const chatScrollPriority = [
   'StationPreviewCard',
   'StationDetailCard',
@@ -119,8 +101,7 @@ const chatScrollPriority = [
 ] as const
 
 const navItems = [
-  { to: '/', icon: Home, label: 'Inicio' },
-  { to: '/chat', icon: MessageCircle, label: 'Chat' },
+  { to: '/', icon: MessageCircle, label: 'Chat' },
   { to: '/history', icon: ClipboardList, label: 'Historial' },
 ] as const
 
@@ -161,7 +142,7 @@ function DesktopSidebar({ pathname }: { pathname: string }) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild tooltip="Kalmio">
-              <Link to="/" aria-label="Kalmio home">
+              <Link to="/" aria-label="Abrir chat de Kalmio">
                 <span className="grid size-8 place-items-center rounded-md" aria-hidden="true">
                   <KalmioBrandMark className="size-8" />
                 </span>
@@ -196,7 +177,7 @@ function DesktopSidebar({ pathname }: { pathname: string }) {
 
 function MobileTopBar({ pathname }: { pathname: string }) {
   const startNewChat = useStartNewChat()
-  const showNewChat = pathname.startsWith('/chat')
+  const showNewChat = pathname === '/' || pathname.startsWith('/chat')
 
   return (
     <header className="mobile-top-bar">
@@ -298,131 +279,24 @@ function DesktopNavItem({
 }
 
 function isActivePath(pathname: string, to: string) {
-  return to === '/' ? pathname === '/' : pathname.startsWith(to)
+  if (to === '/') {
+    return pathname === '/' || pathname.startsWith('/chat')
+  }
+  return pathname.startsWith(to)
 }
 
 function useStartNewChat() {
   const navigate = useNavigate()
 
   return useCallback(() => {
-    sessionStorage.removeItem(pendingPromptKey)
     queryClient.removeQueries({ queryKey: conversationMessagesQueryKey })
-    navigate({ to: '/chat' })
+    navigate({ to: '/' })
     void clearConversation()
       .catch(() => undefined)
       .finally(() => {
         queryClient.invalidateQueries({ queryKey: conversationMessagesQueryKey })
       })
   }, [navigate])
-}
-
-function HomePage() {
-  const navigate = useNavigate()
-  const [intent, setIntent] = useState('')
-  const trimmedIntent = intent.trim()
-
-  const startChat = (value: string) => {
-    const text = value.trim()
-    if (!text) {
-      return
-    }
-    sessionStorage.setItem(pendingPromptKey, text)
-    navigate({ to: '/chat' })
-  }
-
-  return (
-    <section className="flex flex-col gap-5">
-      <div className="flex flex-col gap-3 pt-2">
-        <p className="font-mono text-xs leading-4 text-muted-foreground">Viaja sin ansiedad de carga</p>
-        <h1 className="max-w-hero-width text-balance text-hero font-semibold leading-none tracking-display text-foreground">Cuenta tu ruta o urgencia</h1>
-        <p className="text-pretty text-base leading-7 text-body">
-          Kalmio preguntará lo que falte antes de recomendar. No inventa disponibilidad, precios ni estaciones.
-        </p>
-      </div>
-
-      <form
-        onSubmit={(event) => {
-          event.preventDefault()
-          startChat(intent)
-        }}
-      >
-        <FieldGroup>
-          <Field>
-            <FieldLabel htmlFor="home-intent" className="sr-only">Describe lo que necesitas</FieldLabel>
-            <InputGroup className="h-16 rounded-md bg-surface">
-              <InputGroupInput
-                id="home-intent"
-                value={intent}
-                onChange={(event) => setIntent(event.target.value)}
-                placeholder="Estoy en..., 18%, CCS2..."
-                className="h-14 text-input"
-              />
-              <InputGroupAddon align="inline-end">
-                <InputGroupButton type="submit" size="icon-sm" className="size-11 rounded-full" aria-label="Abrir chat" disabled={!trimmedIntent}>
-                  <ArrowUp aria-hidden="true" />
-                </InputGroupButton>
-              </InputGroupAddon>
-            </InputGroup>
-            <FieldDescription>
-              {trimmedIntent
-                ? 'Revisa el mensaje. Al enviarlo, Kalmio abrirá el chat y pedirá lo que falte.'
-                : 'No hace falta tenerlo todo. Empieza con lo que sepas.'}
-            </FieldDescription>
-          </Field>
-        </FieldGroup>
-      </form>
-
-      <div className="flex flex-wrap gap-2" aria-label="Datos útiles para Kalmio">
-        {intakeItems.map((item) => (
-          <span key={item} className="rounded-full bg-muted px-2.5 py-1 text-caption font-medium leading-4 text-body">
-            {item}
-          </span>
-        ))}
-      </div>
-
-      <div className="flex flex-col gap-2.5">
-        <div className="flex flex-col gap-1">
-          <p className="text-compact font-semibold text-foreground">Inicio guiado</p>
-          <p className="text-sm leading-5 text-muted-foreground">Elige una guía para abrir el chat con el primer mensaje preparado.</p>
-        </div>
-        <div className="grid gap-2 sm:grid-cols-3">
-          {quickPrompts.map((prompt) => {
-            const Icon = prompt.icon
-            return (
-              <Button
-                key={prompt.title}
-                type="button"
-                variant="outline"
-                className="h-auto w-full justify-start gap-3 whitespace-normal rounded-md px-3 py-3 text-left"
-                onClick={() => startChat(prompt.value)}
-              >
-                <Icon data-icon="inline-start" aria-hidden="true" />
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="text-compact font-semibold">{prompt.title}</span>
-                  <span className="text-xs font-normal leading-4 text-muted-foreground">{prompt.description}</span>
-                </span>
-              </Button>
-            )
-          })}
-        </div>
-      </div>
-
-      <div className="rounded-md bg-muted p-3">
-        <p className="text-compact font-semibold text-foreground">Antes de recomendar</p>
-        <ol className="mt-2 flex flex-col gap-2">
-          {reassuranceSteps.map((step, index) => (
-            <li key={step} className="flex gap-2 text-sm leading-5 text-body">
-              <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-surface font-mono text-[0.7rem] font-semibold text-foreground">
-                {index + 1}
-              </span>
-              <span>{step}</span>
-            </li>
-          ))}
-        </ol>
-      </div>
-
-    </section>
-  )
 }
 
 function ChatPage() {
@@ -432,7 +306,6 @@ function ChatPage() {
   const [waitMessageIndex, setWaitMessageIndex] = useState(0)
   const [retryText, setRetryText] = useState<string | null>(null)
   const [pendingUserBlock, setPendingUserBlock] = useState<A2UIBlock | null>(null)
-  const sentInitialPrompt = useRef(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const latestRef = useRef<HTMLDivElement>(null)
   const composerRef = useRef<HTMLTextAreaElement>(null)
@@ -535,25 +408,6 @@ function ChatPage() {
   }, [])
 
   useEffect(() => {
-    if (sentInitialPrompt.current) {
-      return
-    }
-    const pending = sessionStorage.getItem(pendingPromptKey)
-    if (!pending) {
-      return
-    }
-    const timer = window.setTimeout(() => {
-      if (sentInitialPrompt.current) {
-        return
-      }
-      sentInitialPrompt.current = true
-      sessionStorage.removeItem(pendingPromptKey)
-      sendText(pending)
-    }, 0)
-    return () => window.clearTimeout(timer)
-  }, [sendText])
-
-  useEffect(() => {
     if (!isSending) {
       return
     }
@@ -595,7 +449,9 @@ function ChatPage() {
 
       <div ref={scrollRef} className="chat-scroll" aria-live="polite">
         {messagesQuery.isPending && renderedBlocks.length === 0 ? <ConversationSkeleton /> : null}
-        {!messagesQuery.isPending && renderedBlocks.length === 0 && !isSending && !error ? <ChatEmptyState /> : null}
+        {!messagesQuery.isPending && renderedBlocks.length === 0 && !isSending && !error ? (
+          <ChatEmptyState onPromptSelect={sendText} />
+        ) : null}
         {renderedBlocks.length > 0 ? (
           <A2UIRenderer
             blocks={renderedBlocks}
@@ -671,11 +527,44 @@ function findA2UIBlockElement(container: HTMLElement | null, blockId: string) {
   ) ?? null
 }
 
-function ChatEmptyState() {
+function ChatEmptyState({ onPromptSelect }: { onPromptSelect: (value: string) => void }) {
   return (
     <div className="chat-empty">
-      <p className="text-compact font-semibold text-foreground">Cuéntame lo esencial.</p>
-      <p className="text-sm leading-5 text-body">Ruta, batería, conector, hotel o preferencia de parada. Si falta algo crítico, te lo pediré antes de recomendar.</p>
+      <div className="chat-empty-intro">
+        <p className="font-mono text-caption leading-4 text-muted-foreground">Viaja sin ansiedad de carga</p>
+        <h2 className="text-2xl font-semibold leading-8 tracking-normal text-foreground">Cuéntame ruta, batería o urgencia.</h2>
+        <p className="text-sm leading-6 text-body">
+          Kalmio preguntará lo que falte antes de recomendar. No inventa disponibilidad, precios ni estaciones.
+        </p>
+      </div>
+
+      <div className="chat-empty-prompts" aria-label="Inicios rápidos">
+        {quickPrompts.map((prompt) => {
+          const Icon = prompt.icon
+          return (
+            <Button
+              key={prompt.title}
+              type="button"
+              variant={prompt.title === 'Carga urgente' ? 'default' : 'outline'}
+              className="chat-empty-prompt !justify-start text-left"
+              onClick={() => onPromptSelect(prompt.value)}
+            >
+              <Icon data-icon="inline-start" aria-hidden="true" />
+              <span className="flex min-w-0 flex-col gap-0.5 text-left">
+                <span className="text-compact font-semibold">{prompt.title}</span>
+                <span className="text-xs font-normal leading-4 opacity-80">{prompt.description}</span>
+              </span>
+            </Button>
+          )
+        })}
+      </div>
+
+      <div className="chat-empty-boundary">
+        <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-route" aria-hidden="true" />
+        <p className="text-xs leading-5 text-body">
+          Si faltan datos críticos, te los pediré. Si no hay datos fiables, no recomendaré una parada.
+        </p>
+      </div>
     </div>
   )
 }
@@ -695,7 +584,7 @@ function HistoryPage() {
               Ahora puedes continuar la conversación activa. Cuando el historial persistente esté disponible, cada chat aparecerá aquí con su último estado.
             </p>
             <Button asChild variant="outline" className="w-fit">
-              <Link to="/chat">Abrir chat</Link>
+              <Link to="/">Abrir chat</Link>
             </Button>
           </div>
         </CardContent>
@@ -1116,7 +1005,7 @@ const rootRoute = createRootRoute({
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  component: HomePage,
+  component: ChatPage,
 })
 
 const chatRoute = createRoute({
