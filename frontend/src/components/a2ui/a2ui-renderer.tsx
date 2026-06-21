@@ -6,7 +6,6 @@ import {
   Euro,
   Maximize2,
   MapPinned,
-  MessageCircle,
   Navigation,
   Route,
   X,
@@ -234,9 +233,9 @@ function A2UICard({
 function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRendererActions }) {
   switch (block.type) {
     case 'AssistantMessage':
-      return <MessageCard icon={Bot} tone="assistant" text={text(block.props.text)} />
+      return <MessageCard icon={Bot} text={text(block.props.text)} />
     case 'UserMessage':
-      return <MessageCard icon={MessageCircle} tone="route" text={text(block.props.text)} align="right" />
+      return <MessageCard text={text(block.props.text)} align="right" />
     case 'RouteSummaryCard':
       return (
         <MetricCard
@@ -397,34 +396,36 @@ function PositionRequestCard({
 
 function MessageCard({
   icon: Icon,
-  tone,
   text: value,
   align = 'left',
 }: {
-  icon: typeof Bot
-  tone: 'assistant' | 'route'
+  icon?: LucideIcon
   text: string
   align?: 'left' | 'right'
 }) {
   const isUser = align === 'right'
 
+  if (isUser) {
+    return (
+      <div className="flex justify-end">
+        <div className="a2ui-message a2ui-message-user">
+          <span className="sr-only">Usuario: </span>
+          {value}
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className={isUser ? 'flex justify-end' : 'flex items-start gap-2'}>
-      {!isUser ? (
+    <div className="flex items-start gap-2">
+      {Icon ? (
         <span className="mt-1 grid size-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
           <Icon className="size-3.5" aria-hidden="true" />
         </span>
       ) : null}
-      <div
-        className={
-          isUser
-            ? 'a2ui-message a2ui-message-user'
-            : 'a2ui-message a2ui-message-assistant'
-        }
-      >
-        <span className={isUser ? 'mb-1 flex items-center gap-2 text-caption font-medium text-primary-foreground/70' : 'mb-1 flex items-center gap-2 text-caption font-medium text-muted-foreground'}>
-          {isUser ? <Icon className={`size-3.5 ${tone === 'assistant' ? 'text-assistant' : 'text-route'}`} aria-hidden="true" /> : null}
-          {isUser ? 'Usuario' : 'Kalmio'}
+      <div className="a2ui-message a2ui-message-assistant">
+        <span className="mb-1 flex items-center gap-2 text-caption font-medium text-muted-foreground">
+          Kalmio
         </span>
         {value}
       </div>

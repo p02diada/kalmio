@@ -426,8 +426,9 @@ textarea:focus-visible {
   }
 
   .a2ui-message-user {
-    background: var(--color-primary);
-    color: var(--color-primary-foreground);
+    border: 1px solid color-mix(in oklch, var(--color-border) 82%, transparent);
+    background: color-mix(in oklch, var(--color-muted) 72%, var(--color-surface));
+    color: var(--color-body);
   }
 
   .a2ui-message-assistant {
