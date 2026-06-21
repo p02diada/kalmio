@@ -197,7 +197,7 @@ def test_conversation_messages_initializes_a2ui_blocks(client):
     assert body["messages"][2]["updateDataModel"]["path"] == "/"
     blocks = blocks_from_a2ui_response(body)
     assert blocks[0]["type"] == "AssistantMessage"
-    assert blocks[1]["type"] == "PreferenceChips"
+    assert [block["type"] for block in blocks] == ["AssistantMessage"]
     assert "blocks" not in body
 
 

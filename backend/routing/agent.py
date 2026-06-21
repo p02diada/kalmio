@@ -91,18 +91,6 @@ def initial_blocks() -> list[dict]:
                 )
             },
         ),
-        block(
-            "preference-starters",
-            "PreferenceChips",
-            {
-                "chips": [
-                    "Necesito cargar ya",
-                    "Ruta con parada segura",
-                    "Parada cerca del hotel",
-                    "Priorizar servicios",
-                ]
-            },
-        ),
     ]
 
 
@@ -1166,7 +1154,9 @@ def conversation_agent_prompt(
         "Si no tienes geometría de proveedor, usa geometryPrecision='schematic' o no muestres mapa; no inventes coordenadas ni geometría. "
         "ActionButtons usa event para backend/agente, functionCall.openUrl para abrir mapas, o disabled con reason; cuando pertenezcan a una recomendación colócalos inmediatamente después de esa card para que se rendericen como acciones de la misma unidad; "
         "ClarifyingQuestionCard faltan datos críticos; "
-        "PositionRequestCard pide posición actual/manual del conductor; PreferenceChips preferencias; ErrorFallbackCard reservado.\n"
+        "PositionRequestCard pide posición actual/manual del conductor; "
+        "PreferenceChips solo para correcciones o preferencias explícitas, siempre con props.title contextual; "
+        "ErrorFallbackCard reservado.\n"
         "tool_call no es un componente A2UI y nunca debe aparecer dentro de blocks; si necesitas una herramienta, devuelve type=tool_call como objeto raíz.\n"
     )
     output_instructions = (

@@ -275,7 +275,12 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
       )
     case 'ClarifyingQuestionCard':
       return (
-        <A2UICard icon={CircleHelp} tone="assistant" title="Dato necesario" subtitle="Necesito confirmar esto antes de continuar.">
+        <A2UICard
+          icon={CircleHelp}
+          tone="assistant"
+          title="Datos por confirmar"
+          subtitle="Confirma la información que falta antes de continuar."
+        >
           <p className="text-sm leading-6 text-body">{text(block.props.question)}</p>
           <div className="flex flex-wrap gap-2">
             {strings(block.props.fields).map((field) => (
@@ -295,27 +300,49 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
         />
       )
     case 'PreferenceChips':
-      return (
-        <div className="flex min-w-0 max-w-full flex-wrap gap-2">
-          {strings(block.props.chips).map((chip) => (
-            <Button
-              key={chip}
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-auto min-h-10 max-w-full min-w-0 whitespace-normal break-words px-3 py-2 text-left leading-5"
-              onClick={() => actions.onChipClick?.(chip)}
-            >
-              {chip}
-            </Button>
-          ))}
-        </div>
-      )
+      return <PreferenceChips block={block} onChipClick={actions.onChipClick} />
     case 'ErrorFallbackCard':
       return <ErrorFallbackCard type={text(block.props.originalType)} message={text(block.props.message)} />
     default:
       return <ErrorFallbackCard type={block.type} message="No reconozco esta parte de la respuesta." />
   }
+}
+
+function PreferenceChips({
+  block,
+  onChipClick,
+}: {
+  block: A2UIBlock
+  onChipClick?: (value: string) => void
+}) {
+  const title = text(block.props.title, 'Ajusta el plan')
+  const chips = strings(block.props.chips)
+
+  if (!chips.length) {
+    return null
+  }
+
+  return (
+    <div className="flex min-w-0 max-w-full flex-col gap-2" role="group" aria-label={title}>
+      <p className="break-words text-caption font-semibold leading-4 text-muted-foreground [overflow-wrap:anywhere]">
+        {title}
+      </p>
+      <div className="flex min-w-0 max-w-full flex-wrap gap-2">
+        {chips.map((chip) => (
+          <Button
+            key={chip}
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-auto min-h-10 max-w-full min-w-0 whitespace-normal break-words px-3 py-2 text-left leading-5"
+            onClick={() => onChipClick?.(chip)}
+          >
+            {chip}
+          </Button>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function PositionRequestCard({
