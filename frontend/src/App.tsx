@@ -121,7 +121,6 @@ const chatScrollPriority = [
   'StationDetailCard',
   'RouteSummaryCard',
   'PlaceDetailCard',
-  'ClarifyingQuestionCard',
   'RiskExplanationCard',
   'ActionButtons',
   'StationList',

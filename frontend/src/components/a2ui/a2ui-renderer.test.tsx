@@ -68,31 +68,6 @@ describe('A2UIRenderer', () => {
     expect(screen.getByText('UnknownCard')).toBeInTheDocument()
   })
 
-  it('uses neutral plural copy for clarifying questions with multiple fields', () => {
-    render(
-      <A2UIRenderer
-        blocks={[
-          {
-            id: 'clarify-destination',
-            type: 'ClarifyingQuestionCard',
-            version: 1,
-            props: {
-              question: 'Para cerrar el plan necesito estos datos.',
-              fields: ['Dirección del hotel', 'Batería al llegar', 'Conector'],
-            },
-          },
-        ]}
-      />,
-    )
-
-    expect(screen.getByText('Datos por confirmar')).toBeInTheDocument()
-    expect(screen.getByText('Confirma la información que falta antes de continuar.')).toBeInTheDocument()
-    expect(screen.queryByText('Dato necesario')).not.toBeInTheDocument()
-    expect(screen.getByText('Dirección del hotel')).toBeInTheDocument()
-    expect(screen.getByText('Batería al llegar')).toBeInTheDocument()
-    expect(screen.getByText('Conector')).toBeInTheDocument()
-  })
-
   it('normalizes object labels before rendering text', () => {
     render(
       <A2UIRenderer
@@ -194,6 +169,34 @@ describe('A2UIRenderer', () => {
 
     expect(screen.getByText('4 h 0 min')).toBeInTheDocument()
     expect(screen.queryByText('240 min')).not.toBeInTheDocument()
+  })
+
+  it('renders trip summary arrival threshold without internal plan type copy', () => {
+    render(
+      <A2UIRenderer
+        blocks={[
+          {
+            id: 'trip',
+            type: 'TripSummaryCard',
+            version: 1,
+            props: {
+              origin: { label: 'Zaragoza' },
+              destination: { label: 'Valencia' },
+              battery: 24,
+              arrivalReservePercent: 12,
+            },
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('Batería actual')).toBeInTheDocument()
+    expect(screen.getByText('Llegar con al menos')).toBeInTheDocument()
+    expect(screen.getByText('12%')).toBeInTheDocument()
+    expect(screen.queryByText('Margen al llegar')).not.toBeInTheDocument()
+    expect(screen.queryByText('Reserva mínima')).not.toBeInTheDocument()
+    expect(screen.queryByText('Tipo')).not.toBeInTheDocument()
+    expect(screen.queryByText('Conservadora')).not.toBeInTheDocument()
   })
 
   it('renders a station preview as the primary charging decision', () => {

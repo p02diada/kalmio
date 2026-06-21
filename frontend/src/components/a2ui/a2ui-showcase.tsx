@@ -213,9 +213,8 @@ const scenarios: ExperienceScenario[] = [
       block('destination-user', 'UserMessage', {
         text: 'Llegaré a un hotel en Valencia y estaré dos noches. Quiero cargar sin perder la mañana.',
       }),
-      block('destination-question', 'ClarifyingQuestionCard', {
-        question: 'Para cerrar el plan necesito estos datos.',
-        fields: ['Dirección del hotel', 'Batería al llegar', 'Conector'],
+      block('destination-question', 'AssistantMessage', {
+        text: 'Para cerrar el plan necesito dirección del hotel, batería al llegar y conector.',
       }),
       block('destination-location', 'PlaceDetailCard', {
         label: { label: 'Valencia centro' },
@@ -301,7 +300,6 @@ function componentFocus(type: string) {
     CostComparisonCard: 'Debe mostrar ahorro solo cuando el precio está verificado y dejar clara la comparación.',
     MapPreviewCard: 'Debe apoyar la ruta, no convertirse en la tarea principal del conductor.',
     ActionButtons: 'Debe separar acción primaria, corrección y acciones bloqueadas sin ambigüedad.',
-    ClarifyingQuestionCard: 'Debe pedir los datos críticos mínimos y hacerlo parecer una continuación natural del chat.',
     PositionRequestCard: 'Debe obtener ubicación con permiso explícito y ofrecer alternativa manual equivalente.',
     PlaceDetailCard: 'Debe mostrar precisión y necesidad de confirmación sin exponer coordenadas como dato dominante.',
     PreferenceChips: 'Debe ofrecer correcciones rápidas con contexto visible, no aparecer como botones sueltos.',

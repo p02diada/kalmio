@@ -3,7 +3,6 @@ import {
   AlertTriangle,
   BatteryCharging,
   Bot,
-  CircleHelp,
   Euro,
   Maximize2,
   MapPinned,
@@ -237,24 +236,6 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
           onActionEvent={actions.onActionEvent ?? actions.onChipClick}
         />
       )
-    case 'ClarifyingQuestionCard':
-      return (
-        <A2UICard
-          icon={CircleHelp}
-          tone="assistant"
-          title="Datos por confirmar"
-          subtitle="Confirma la información que falta antes de continuar."
-        >
-          <p className="text-sm leading-6 text-body">{text(block.props.question)}</p>
-          <div className="flex flex-wrap gap-2">
-            {strings(block.props.fields).map((field) => (
-              <Badge key={field} variant="secondary">
-                {field}
-              </Badge>
-            ))}
-          </div>
-        </A2UICard>
-      )
     case 'PositionRequestCard':
       return (
         <PositionRequestCard
@@ -460,9 +441,8 @@ function TripSummaryCard({ block }: { block: A2UIBlock }) {
       <DecisionNarrative props={block.props} />
       <MetricGrid
         rows={[
-          ['Batería', percentOrUnknown(block.props.battery)],
-          ['Batería mínima al llegar', percent(block.props.arrivalReservePercent)],
-          ['Tipo', 'Conservadora'],
+          ['Batería actual', percentOrUnknown(block.props.battery)],
+          ['Llegar con al menos', percent(block.props.arrivalReservePercent)],
         ]}
       />
     </A2UICard>
