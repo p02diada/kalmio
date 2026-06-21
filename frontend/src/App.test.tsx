@@ -85,15 +85,10 @@ describe('App', () => {
                 },
                 {
                   id: 'location-1',
-                  type: 'PlaceDetailCard',
+                  type: 'AssistantMessage',
                   version: 1,
                   props: {
-                    label: 'Valencia',
-                    lat: 39.4699,
-                    lon: -0.3763,
-                    precision: 'approximate',
-                    context: 'Lugar usado para buscar estaciones de carga',
-                    needsConfirmation: true,
+                    text: 'Uso Valencia como ubicación aproximada para buscar estaciones de carga.',
                   },
                 },
               ])),
@@ -120,8 +115,7 @@ describe('App', () => {
     expect(JSON.parse(messageCall?.[1]?.body?.toString() ?? '{}')).toEqual({
       text: 'Quiero planificar dónde cargar al llegar a mi hotel o destino. Si falta la ubicación exacta, pregúntame antes de buscar opciones.',
     })
-    expect(await screen.findByText('Lugar resuelto')).toBeInTheDocument()
-    expect(screen.getByText('Valencia')).toBeInTheDocument()
+    expect(await screen.findByText(/Uso Valencia como ubicación aproximada/i)).toBeInTheDocument()
   })
 
   it('renders unknown A2UI blocks with a safe fallback', async () => {
@@ -205,7 +199,7 @@ describe('App', () => {
 
   it('scrolls new agent results to the primary recommendation instead of the last alternative', async () => {
     document.cookie = 'csrftoken=test-token'
-    const scrollIntoView = vi.fn(function (this: HTMLElement, _options?: boolean | ScrollIntoViewOptions) {})
+    const scrollIntoView = vi.fn(function (this: HTMLElement) {})
     Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
       configurable: true,
       value: scrollIntoView,

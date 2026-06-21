@@ -15,7 +15,6 @@ export type KalmioA2UIType =
   | 'ActionButtons'
   | 'ClarifyingQuestionCard'
   | 'PositionRequestCard'
-  | 'PlaceDetailCard'
   | 'PreferenceChips'
   | 'ErrorFallbackCard'
 

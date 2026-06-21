@@ -33,13 +33,8 @@ const scenarios: ExperienceScenario[] = [
         precision: 'approximate',
         manualFields: ['Ciudad', 'Coordenadas', 'Carretera o salida'],
       }),
-      block('urgent-place-detail', 'PlaceDetailCard', {
-        label: { label: 'Zaragoza, entorno urbano' },
-        lat: 41.6488,
-        lon: -0.8891,
-        precision: 'approximate',
-        context: 'Ubicación aproximada usada para orientar la búsqueda.',
-        needsConfirmation: true,
+      block('urgent-location-copy', 'AssistantMessage', {
+        text: 'Uso Zaragoza, entorno urbano como ubicación aproximada para orientar la búsqueda. Si no es tu zona, dime ciudad, carretera o coordenadas y ajusto el punto.',
       }),
       block('urgent-station', 'StationPreviewCard', {
         title: 'Estación cercana',
@@ -216,14 +211,6 @@ const scenarios: ExperienceScenario[] = [
         question: 'Para cerrar el plan necesito un dato más.',
         fields: ['Dirección del hotel', 'Batería al llegar', 'Conector'],
       }),
-      block('destination-location', 'PlaceDetailCard', {
-        label: { label: 'Valencia centro' },
-        lat: 39.4699,
-        lon: -0.3763,
-        precision: 'approximate',
-        context: 'Zona usada para buscar estaciones cerca del alojamiento',
-        needsConfirmation: true,
-      }),
       block('destination-explanation', 'AssistantMessage', {
         text: 'El hotel exacto no está confirmado. Uso esta zona como aproximación y conviene confirmar acceso, tarifa y disponibilidad antes de depender de estos resultados.',
       }),
@@ -300,7 +287,6 @@ function componentFocus(type: string) {
     ActionButtons: 'Debe separar acción primaria, corrección y acciones bloqueadas sin ambigüedad.',
     ClarifyingQuestionCard: 'Debe pedir el mínimo dato crítico y hacerlo parecer una continuación natural del chat.',
     PositionRequestCard: 'Debe obtener ubicación con permiso explícito y ofrecer alternativa manual equivalente.',
-    PlaceDetailCard: 'Debe mostrar precisión y necesidad de confirmación sin exponer coordenadas como dato dominante.',
     PreferenceChips: 'Debe ofrecer correcciones rápidas con textos que quepan y no desplacen el layout.',
     ErrorFallbackCard: 'Debe fallar de forma tranquila: ocultar lo inseguro y mantener vivo el chat.',
   }

@@ -68,21 +68,16 @@ describe('A2UIRenderer', () => {
     expect(screen.getByText('UnknownCard')).toBeInTheDocument()
   })
 
-  it('normalizes object labels before rendering text', () => {
+  it('normalizes object text before rendering assistant copy', () => {
     render(
       <A2UIRenderer
         blocks={[
           {
             id: 'destination',
-            type: 'PlaceDetailCard',
+            type: 'AssistantMessage',
             version: 1,
             props: {
-              label: { label: 'Alcobendas' },
-              lat: 40.5403,
-              lon: -3.6358,
-              precision: 'approximate',
-              context: 'Lugar usado para buscar estaciones de carga',
-              needsConfirmation: true,
+              text: { label: 'Alcobendas' },
             },
           },
         ]}
@@ -94,7 +89,7 @@ describe('A2UIRenderer', () => {
     expect(screen.queryByText(/\[object Object\]/i)).not.toBeInTheDocument()
   })
 
-  it('renders resolved location details without raw object labels', () => {
+  it('renders a fallback for removed place detail cards', () => {
     render(
       <A2UIRenderer
         blocks={[
@@ -115,11 +110,8 @@ describe('A2UIRenderer', () => {
       />,
     )
 
-    expect(screen.getByText('Lugar resuelto')).toBeInTheDocument()
-    expect(screen.getByText('Córdoba')).toBeInTheDocument()
-    expect(screen.getByText('Ubicación por confirmar.')).toBeInTheDocument()
-    expect(screen.getByText(/la búsqueda depende de esta zona/i)).toBeInTheDocument()
-    expect(screen.queryByText('37.88820, -4.77940')).not.toBeInTheDocument()
+    expect(screen.getByText('No puedo mostrar una parte de la respuesta')).toBeInTheDocument()
+    expect(screen.getByText('PlaceDetailCard')).toBeInTheDocument()
     expect(screen.queryByText(/\[object Object\]/i)).not.toBeInTheDocument()
   })
 

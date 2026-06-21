@@ -255,15 +255,17 @@ def test_conversation_message_handles_destination_charging_without_route_planner
 
     assert response.status_code == 200
     body = response.json()
-    block_types = [block["type"] for block in blocks_from_a2ui_response(body)]
+    blocks = blocks_from_a2ui_response(body)
+    block_types = [block["type"] for block in blocks]
     assert "UserMessage" in block_types
-    assert "PlaceDetailCard" in block_types
+    assert "AssistantMessage" in block_types
+    assert any("Valencia" in str(block.get("props", {})) for block in blocks if block["type"] == "AssistantMessage")
     assert "RouteSummaryCard" not in block_types
     assert RoutePlan.objects.count() == 0
 
 
 @pytest.mark.django_db
-def test_place_detail_card_normalizes_embedded_location_text():
+def test_removed_place_detail_card_renders_as_unknown_fallback():
     blocks = validate_blocks(
         [
             {
@@ -279,9 +281,8 @@ def test_place_detail_card_normalizes_embedded_location_text():
         ]
     )
 
-    assert blocks[0]["props"]["label"] == "Córdoba"
-    assert blocks[0]["props"]["precision"] == "approximate"
-    assert blocks[0]["props"]["needsConfirmation"] is True
+    assert blocks[0]["type"] == "ErrorFallbackCard"
+    assert blocks[0]["props"]["originalType"] == "PlaceDetailCard"
 
 
 def test_urgent_charge_card_normalizes_nested_recommended_stop():
@@ -739,7 +740,7 @@ def test_conversation_agent_prompt_guides_followups_without_backend_intent_mappi
     assert "no puedes ubicar esa calle exacta" in prompt
     assert "sin perfil de vehículo" in prompt
     assert "planningLevel=chargers_only" in prompt
-    assert "PlaceDetailCard + StationPreviewCard + ActionButtons" in prompt
+    assert "StationPreviewCard + ActionButtons" in prompt
     assert "preferences.max_useful_power_kw" in prompt
     assert "No presentes la potencia superior como ventaja" in prompt
     assert "llama search_destination_chargers directamente" in prompt
@@ -748,7 +749,7 @@ def test_conversation_agent_prompt_guides_followups_without_backend_intent_mappi
     assert "Una ciudad conocida ya es ubicación suficiente" in prompt
     assert "no esperes hotel/zona exacta" in prompt
     assert "usa primero la ciudad/zona como aproximación verificable" in prompt
-    assert "incluye un PlaceDetailCard como ancla" in prompt
+    assert "explica en AssistantMessage la ubicación usada" in prompt
     assert "no presentes el hotel exacto como ubicación validada" in prompt
     assert "unidad de decisión accionable" in prompt
     assert "no como una pila de tarjetas" in prompt
@@ -765,7 +766,7 @@ def test_conversation_agent_prompt_guides_followups_without_backend_intent_mappi
     assert "tool_call no es un componente A2UI" in prompt
     assert "nunca debe aparecer dentro de blocks" in prompt
     assert "No llames plan_route con coordenadas vacías o 0,0" in prompt
-    assert "AssistantMessage para explicar la incertidumbre de estancia y PlaceDetailCard para la ubicación" in prompt
+    assert "AssistantMessage para explicar la ubicación usada y la incertidumbre de estancia" in prompt
 
 
 def test_conversation_agent_prompt_exposes_max_useful_power_tool_argument():
@@ -782,7 +783,7 @@ def test_conversation_agent_prompt_uses_city_first_for_destination_poi_searches(
     prompt = conversation_agent_prompt("Voy el finde a Granada y duermo cerca de la Alhambra")
 
     assert "usa Granada como primera búsqueda aproximada" in prompt
-    assert "PlaceDetailCard de Granada/Alhambra como aproximación" in prompt
+    assert "Granada/Alhambra como aproximación" in prompt
 
 
 def test_station_search_result_prompt_anchors_destination_search_location():
@@ -803,9 +804,9 @@ def test_station_search_result_prompt_anchors_destination_search_location():
 
     prompt = station_search_result_prompt("Voy una semana a Cádiz y necesito cargar durante la estancia", tool_history)
 
-    assert "incluye PlaceDetailCard antes de las estaciones" in prompt
-    assert "precision='approximate'" in prompt
-    assert "needsConfirmation=true" in prompt
+    assert "explica en AssistantMessage la ubicación usada antes de las estaciones" in prompt
+    assert "di que es una aproximación" in prompt
+    assert "pide dirección, zona exacta o coordenadas" in prompt
 
 
 def test_conversation_agent_prompt_compacts_route_geometry_tool_history():
@@ -1042,7 +1043,7 @@ def test_conversation_agent_prompt_limits_night_safety_claims():
 
     assert "Preferencias de seguridad nocturna o evitar sitios solitarios" in prompt
     assert "llama search_destination_chargers con esa ubicación" in prompt
-    assert "no respondas solo con PlaceDetailCard" in prompt
+    assert "no respondas solo con una ubicación resuelta" in prompt
     assert "no afirmes seguridad, vigilancia, iluminación, afluencia" in prompt
     assert "Kalmio no valida seguridad ni entorno en vivo" in prompt
     assert "ese límite debe aparecer antes de StationList" in prompt
@@ -1168,12 +1169,12 @@ def test_conversation_agent_prompt_guides_granada_alhambra_weekend_destination_w
 
     assert "devuelve type=tool_call search_destination_chargers" in prompt
     assert "Granada como primera búsqueda aproximada" in prompt
-    assert "PlaceDetailCard de Granada/Alhambra como aproximación" in prompt
+    assert "Granada/Alhambra como aproximación" in prompt
     assert "si es finde" in prompt
     assert "disponibilidad, acceso y tarifas pueden cambiar" in prompt
     assert "no como ubicación exacta del alojamiento" in prompt
     assert "pide hotel/zona/direccion exacta" in prompt
-    assert "AssistantMessage para explicar la incertidumbre" in prompt
+    assert "AssistantMessage para explicar la ubicación usada" in prompt
     assert "no devuelvas solo un botón para buscar ni una respuesta final que diga 'buscaré'" in prompt
     assert "No respondas con 'buscaré', 'voy a buscar' o 'puedo buscar'" in prompt
     assert "no crees StationPreviewCard genéricos" in prompt
@@ -2705,12 +2706,6 @@ def test_deepseek_hotel_followup_with_known_city_can_search_from_location_hint(c
                     },
                 },
                 {
-                    "id": "destination-cordoba",
-                    "type": "PlaceDetailCard",
-                    "version": 1,
-                    "props": {"destination": "Córdoba (aproximación)", "needsConfirmation": True},
-                },
-                {
                     "id": "stops-cordoba",
                     "type": "StationList",
                     "version": 1,
@@ -2923,9 +2918,9 @@ def test_deepseek_conversation_agent_does_not_repair_component_choice_from_urgen
             "blocks": [
                 {
                     "id": "wrong-destination",
-                    "type": "PlaceDetailCard",
+                    "type": "AssistantMessage",
                     "version": 1,
-                    "props": {"destination": "Córdoba", "needsConfirmation": True},
+                    "props": {"text": "Uso Córdoba como ubicación aproximada para esta búsqueda."},
                 }
             ],
         }
@@ -2942,7 +2937,7 @@ def test_deepseek_conversation_agent_does_not_repair_component_choice_from_urgen
     new_blocks = blocks_from_a2ui_response(response)[len(session[ACTIVE_CONVERSATION_BLOCKS_KEY]) :]
     block_types = [block["type"] for block in new_blocks]
     assert repair_requests == []
-    assert "PlaceDetailCard" in block_types
+    assert "AssistantMessage" in block_types
     assert "StationDetailCard" not in block_types
 
 
@@ -2978,12 +2973,6 @@ def test_deepseek_conversation_agent_executes_allowlisted_tool(client, settings,
                             "Dime dirección o zona exacta para refinar la búsqueda."
                         )
                     },
-                },
-                {
-                    "id": "destination-from-tool",
-                    "type": "PlaceDetailCard",
-                    "version": 1,
-                    "props": {"destination": "Almansa", "needsConfirmation": True},
                 },
                 {
                     "id": "stops-from-tool",
@@ -3060,12 +3049,6 @@ def test_deepseek_conversation_agent_uses_same_tool_and_a2ui_validation_loop(
                             "Dime dirección o zona exacta para refinar la búsqueda."
                         )
                     },
-                },
-                {
-                    "id": "destination-deepseek",
-                    "type": "PlaceDetailCard",
-                    "version": 1,
-                    "props": {"destination": "Almansa", "needsConfirmation": True},
                 },
                 {
                     "id": "stops-deepseek",
@@ -3191,12 +3174,9 @@ def test_deepseek_station_list_requires_traced_station_data(client, settings, mo
             "blocks": [
                 {
                     "id": "place-from-agent",
-                    "type": "PlaceDetailCard",
+                    "type": "AssistantMessage",
                     "version": 1,
-                    "props": {
-                        "location": "Valencia",
-                        "approximate": True,
-                    },
+                    "props": {"text": "Uso Valencia como ubicación aproximada para la búsqueda."},
                 },
                 {
                     "id": "stops-from-agent",
@@ -3267,9 +3247,9 @@ def test_deepseek_conversation_agent_allows_bounded_tool_chain(client, settings,
             "blocks": [
                 {
                     "id": "destination-from-chain",
-                    "type": "PlaceDetailCard",
+                    "type": "AssistantMessage",
                     "version": 1,
-                    "props": {"destination": "Valencia", "needsConfirmation": True},
+                    "props": {"text": "Uso Valencia como ubicación aproximada para la búsqueda."},
                 },
                 {
                     "id": "stops-from-chain",
@@ -3297,7 +3277,10 @@ def test_deepseek_conversation_agent_allows_bounded_tool_chain(client, settings,
     assert response.status_code == 200
     assert calls == [0, 1, 2]
     blocks = blocks_from_a2ui_response(response)
-    assert any(block["type"] == "PlaceDetailCard" for block in blocks)
+    assert any(
+        block["type"] == "AssistantMessage" and "Valencia" in block["props"].get("text", "")
+        for block in blocks
+    )
     stops_block = next(block for block in blocks if block["type"] == "StationList")
     assert stops_block["props"]["stations"][0]["name"] == valencia_station.name
 
@@ -4427,12 +4410,6 @@ def test_a2ui_contract_rejects_hotel_exact_destination_from_city_search():
                 },
             },
             {
-                "id": "destination",
-                "type": "PlaceDetailCard",
-                "version": 1,
-                "props": {"destination": "Meliá Córdoba", "needsConfirmation": True},
-            },
-            {
                 "id": "stops",
                 "type": "StationList",
                 "version": 1,
@@ -4447,7 +4424,6 @@ def test_a2ui_contract_rejects_hotel_exact_destination_from_city_search():
         message="Me voy 3 días a Córdoba y me quedo en el hotel Meliá",
     )
 
-    assert any("presenta el hotel/POI como ubicación exacta" in issue for issue in issues)
     assert any("debe decir visiblemente que es una aproximación" in issue for issue in issues)
     assert any("para refinar la búsqueda" in issue for issue in issues)
 
@@ -4479,12 +4455,6 @@ def test_a2ui_contract_allows_hotel_city_approximation_with_refinement_request()
                         "Si me das la dirección o zona exacta puedo refinar la búsqueda."
                     )
                 },
-            },
-            {
-                "id": "destination",
-                "type": "PlaceDetailCard",
-                "version": 1,
-                "props": {"destination": "Córdoba (aproximación)", "needsConfirmation": True},
             },
             {
                 "id": "stops",
@@ -4538,12 +4508,6 @@ def test_a2ui_contract_allows_weekend_alhambra_destination_with_early_warning():
                         "hotel exacto, dirección o zona exacta puedo refinar la búsqueda."
                     )
                 },
-            },
-            {
-                "id": "destination",
-                "type": "PlaceDetailCard",
-                "version": 1,
-                "props": {"destination": "Alhambra, Granada (aproximación)", "needsConfirmation": True},
             },
             {
                 "id": "stops",
@@ -4797,9 +4761,9 @@ def test_deepseek_urgent_response_does_not_repair_component_choice_by_intent(cli
             "blocks": [
                 {
                     "id": "wrong-destination",
-                    "type": "PlaceDetailCard",
+                    "type": "AssistantMessage",
                     "version": 1,
-                    "props": {"destination": "Córdoba", "needsConfirmation": True},
+                    "props": {"text": "Uso Córdoba como ubicación aproximada para esta búsqueda."},
                 }
             ],
         }
@@ -4815,7 +4779,7 @@ def test_deepseek_urgent_response_does_not_repair_component_choice_by_intent(cli
     assert response.status_code == 200
     block_types = [block["type"] for block in blocks_from_a2ui_response(response)]
     assert repair_requests == []
-    assert "PlaceDetailCard" in block_types
+    assert "AssistantMessage" in block_types
     assert "StationDetailCard" not in block_types
 
 

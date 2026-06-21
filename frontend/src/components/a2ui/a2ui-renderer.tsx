@@ -121,7 +121,6 @@ function canHostActionFooter(block: A2UIBlock) {
     block.type === 'StationDetailCard' ||
     block.type === 'RouteSummaryCard' ||
     block.type === 'TripSummaryCard' ||
-    block.type === 'PlaceDetailCard' ||
     block.type === 'MapPreviewCard'
   )
 }
@@ -295,8 +294,6 @@ function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRend
           onManualPositionRequest={actions.onManualPositionRequest}
         />
       )
-    case 'PlaceDetailCard':
-      return <PlaceDetailCard block={block} />
     case 'PreferenceChips':
       return (
         <div className="flex min-w-0 max-w-full flex-wrap gap-2">
@@ -389,35 +386,6 @@ function PositionRequestCard({
         </Button>
       </div>
       {statusMessage ? <p className="text-xs leading-5 text-muted-foreground">{statusMessage}</p> : null}
-    </A2UICard>
-  )
-}
-
-function PlaceDetailCard({ block }: { block: A2UIBlock }) {
-  const needsConfirmation = bool(block.props.needsConfirmation)
-  const precision = text(block.props.precision, 'approximate') === 'exact' ? 'Precisa' : 'Aproximada'
-
-  return (
-    <A2UICard
-      icon={MapPinned}
-      tone="route"
-      title="Lugar resuelto"
-      subtitle={text(block.props.label, 'Lugar indicado')}
-      contentClassName="flex flex-col gap-3"
-    >
-      <p className="text-sm leading-6 text-body">{text(block.props.context, 'Lugar usado para la búsqueda.')}</p>
-      <div className="text-sm">
-        <div>
-          <span className="block text-caption font-medium text-muted-foreground">Precisión</span>
-          <span className="block text-compact font-semibold tracking-tight">{precision}</span>
-        </div>
-      </div>
-      {needsConfirmation ? (
-        <div className="rounded-md border border-warning bg-warning-soft px-3 py-2 text-sm leading-5 text-foreground">
-          <span className="font-semibold">Ubicación por confirmar.</span>{' '}
-          Ajusta el punto si no es donde estás; la búsqueda depende de esta zona.
-        </div>
-      ) : null}
     </A2UICard>
   )
 }

@@ -159,18 +159,6 @@
       "required": ["title", "body"],
       "additionalProperties": false
     },
-    "PlaceDetailCard": {
-      "type": "object",
-      "properties": {
-        "label": { "$ref": "#/$defs/displayValue" },
-        "lat": { "type": ["number", "null"], "minimum": -90, "maximum": 90 },
-        "lon": { "type": ["number", "null"], "minimum": -180, "maximum": 180 },
-        "precision": { "enum": ["exact", "approximate"] },
-        "context": { "type": "string" },
-        "needsConfirmation": { "type": "boolean" }
-      },
-      "additionalProperties": false
-    },
     "PreferenceChips": {
       "type": "object",
       "properties": {
