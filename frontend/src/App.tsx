@@ -112,7 +112,7 @@ const reassuranceSteps = [
 const chatScrollPriority = [
   'StationPreviewCard',
   'StationDetailCard',
-  'RouteSummaryCard',
+  'RouteCorridorCard',
   'ActionButtons',
   'StationList',
   'AssistantMessage',

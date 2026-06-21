@@ -115,19 +115,22 @@ describe('A2UIRenderer', () => {
     expect(screen.queryByText(/\[object Object\]/i)).not.toBeInTheDocument()
   })
 
-  it('renders unknown route numbers as not calculated', () => {
+  it('renders unknown route arrival as not calculated', () => {
     render(
       <A2UIRenderer
         blocks={[
           {
             id: 'route',
-            type: 'RouteSummaryCard',
+            type: 'RouteCorridorCard',
             version: 1,
             props: {
               distanceKm: 520,
               durationMin: 355,
               energyKwh: 0,
               arrivalBattery: 0,
+              origin: { label: 'Córdoba', lat: 37.8882, lon: -4.7794 },
+              destination: { label: 'Valencia', lat: 39.4699, lon: -0.3763 },
+              geometryPrecision: 'schematic',
             },
           },
         ]}
@@ -136,7 +139,8 @@ describe('A2UIRenderer', () => {
 
     expect(screen.queryByText('0 kWh')).not.toBeInTheDocument()
     expect(screen.queryByText('0%')).not.toBeInTheDocument()
-    expect(screen.getAllByText('No calculado')).toHaveLength(2)
+    expect(screen.queryByText('No calculado')).not.toBeInTheDocument()
+    expect(screen.getByText('Batería de llegada no validada')).toBeInTheDocument()
   })
 
   it('uses human route duration text when the agent provides it', () => {
@@ -145,7 +149,7 @@ describe('A2UIRenderer', () => {
         blocks={[
           {
             id: 'route',
-            type: 'RouteSummaryCard',
+            type: 'RouteCorridorCard',
             version: 1,
             props: {
               distanceKm: 356.7,
@@ -153,13 +157,16 @@ describe('A2UIRenderer', () => {
               durationText: '4 h 0 min',
               energyKwh: null,
               arrivalBattery: null,
+              origin: { label: 'Madrid', lat: 40.4168, lon: -3.7038 },
+              destination: { label: 'Valencia', lat: 39.4699, lon: -0.3763 },
+              geometryPrecision: 'schematic',
             },
           },
         ]}
       />,
     )
 
-    expect(screen.getByText('4 h 0 min')).toBeInTheDocument()
+    expect(screen.getByText(/4 h 0 min/)).toBeInTheDocument()
     expect(screen.queryByText('240 min')).not.toBeInTheDocument()
   })
 
@@ -436,7 +443,7 @@ describe('A2UIRenderer', () => {
 
     expect(screen.getByText('Mapa de ruta')).toBeInTheDocument()
     expect(screen.getByText('Ruta calculada')).toBeInTheDocument()
-    expect(screen.getByText('2 estaciones')).toBeInTheDocument()
+    expect(screen.getByText('2 estaciones cerca de la ruta')).toBeInTheDocument()
 
     expect(screen.getByRole('button', { name: 'Expandir mapa' })).toBeInTheDocument()
 
@@ -540,14 +547,15 @@ describe('A2UIRenderer', () => {
     const expandedPrimaryMarker = maplibreMock.markerElements.findLast((element) => (
       element.getAttribute('aria-label') === 'Ver Punto de muestra La Plana'
     ))
-    expect(expandedPrimaryMarker?.textContent).toContain('2/5')
-    expect(expandedPrimaryMarker?.querySelector('.a2ui-map-marker-label')).toHaveTextContent('2/5')
+    expect(expandedPrimaryMarker?.textContent).toContain('1')
+    expect(expandedPrimaryMarker?.querySelector('.a2ui-map-marker-label')).toHaveTextContent('Punto de muestra La Plana')
+    expect(expandedPrimaryMarker?.querySelector('.a2ui-map-marker-label')).not.toHaveTextContent('2/5')
     expect(expandedPrimaryMarker?.querySelector('.a2ui-map-marker-label')).not.toHaveTextContent('puestos')
 
     fireEvent.click(expandedPrimaryMarker as HTMLElement)
 
     expect(screen.getByLabelText('Detalle de estación')).toBeInTheDocument()
-    expect(screen.getAllByText('Punto de muestra La Plana').length).toBeGreaterThan(1)
+    expect(screen.getByText('Punto de muestra La Plana')).toBeInTheDocument()
     expect(screen.getByText('Parada principal')).toBeInTheDocument()
     expect(screen.getByText('180 kW')).toBeInTheDocument()
     expect(screen.getByText('Disponibles')).toBeInTheDocument()

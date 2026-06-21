@@ -73,8 +73,15 @@ def facts_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
         props = block.get("props") if isinstance(block.get("props"), dict) else {}
         source_component_id = str(block.get("id") or "")
 
-        if block_type == "RouteSummaryCard":
+        if block_type == "RouteCorridorCard":
             facts["routes"].append(with_source(props, source_component_id))
+            stations = props.get("stations")
+            if isinstance(stations, list):
+                facts["stations"].extend(
+                    with_source(station, source_component_id)
+                    for station in stations
+                    if isinstance(station, dict)
+                )
         elif block_type in {"StationPreviewCard", "StationDetailCard"}:
             facts["stations"].append(with_source(props, source_component_id))
         elif block_type == "StationList" and isinstance(props.get("stations"), list):

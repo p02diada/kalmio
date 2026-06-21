@@ -5,7 +5,7 @@ export const KALMIO_A2UI_SURFACE_ID = 'kalmio-chat'
 export type KalmioA2UIType =
   | 'AssistantMessage'
   | 'UserMessage'
-  | 'RouteSummaryCard'
+  | 'RouteCorridorCard'
   | 'StationPreviewCard'
   | 'StationDetailCard'
   | 'StationList'

@@ -753,10 +753,10 @@ def test_conversation_agent_prompt_guides_followups_without_backend_intent_mappi
     assert "no presentes el hotel exacto como ubicación validada" in prompt
     assert "unidad de decisión accionable" in prompt
     assert "no como una pila de tarjetas" in prompt
-    assert "una card principal" in prompt
+    assert "una sola card principal" in prompt
     assert "colócalos inmediatamente después de la card" in prompt
     assert "pie de acción de esa decisión" in prompt
-    assert "nunca como bloque intermedio entre StationPreviewCard y ActionButtons" in prompt
+    assert "nunca como bloque intermedio entre la card principal y ActionButtons" in prompt
     assert "no satures la primera respuesta" in prompt
     assert "no muestres StationList en esa primera respuesta" in prompt
     assert "ActionButtons inmediatamente después" in prompt
@@ -1101,29 +1101,26 @@ def test_conversation_agent_prompt_guides_chargers_only_route_without_claiming_d
     prompt = conversation_agent_prompt("Voy de Córdoba a Valencia con 58%. No quiero llegar justo")
 
     assert "planningLevel=chargers_only" in prompt
-    assert "Usa RouteSummaryCard para distancia/duración de la herramienta" in prompt
+    assert "Usa RouteCorridorCard para distancia/duración/mapa/estaciones cercanas de la herramienta" in prompt
     assert "no puedes validar batería de llegada ni reserva sin consumo/perfil" in prompt
     assert "El AssistantMessage inicial debe explicar antes de la card" in prompt
-    assert "qué puedes decidir, qué no puedes validar y cuál es el siguiente paso" in prompt
-    assert "muestra después la decisión principal pronto en móvil" in prompt
+    assert "qué puedes mostrar, qué no puedes validar y cuál es el siguiente paso" in prompt
+    assert "muestra después el mapa de corredor pronto en móvil" in prompt
     assert "Patrón recomendado: AssistantMessage explicativo" in prompt
-    assert "una card principal de contexto o recomendación" in prompt
-    assert "ActionButtons para navegar/ver alternativas/refinar" in prompt
-    assert "'Usar este punto'" in prompt
-    assert "'Abrir ruta'" in prompt
-    assert "'Buscar otra opción'" in prompt
-    assert "evita labels vagos como 'Confirmar'" in prompt
-    assert "solo después StationList cuando esté justificada" in prompt
+    assert "una RouteCorridorCard principal" in prompt
+    assert "ActionButtons para ver detalle/refinar" in prompt
+    assert "solo después StationPreviewCard o StationList" in prompt
     assert "no digas que indicó 20%" in prompt
     assert "margen conservador por defecto" in prompt
     assert "No digas asegurar/garantizar margen en chargers_only" in prompt
     assert "ni 'te ayudará a recuperar margen'" in prompt
+    assert "No la llames parada sugerida ni recomendación" in prompt
     assert "evita frases como '4 horas'" in prompt
     assert "arrivalBattery:null" in prompt
     assert "ese X% es batería de salida" in prompt
     assert "no escribas 'llegas con X%'" in prompt
     assert "Si el viaje es futuro" in prompt
-    assert "antes de cualquier StationPreviewCard o StationList" in prompt
+    assert "antes de cualquier RouteCorridorCard, StationPreviewCard o StationList" in prompt
     assert "disponibilidad, acceso y tarifas pueden cambiar" in prompt
 
 
@@ -1154,7 +1151,7 @@ def test_conversation_agent_prompt_guides_few_stops_without_vehicle_profile():
     assert "no como cientos de minutos" in prompt
     assert "prefiere parar pocas veces" in prompt
     assert "no puedes garantizar ni optimizar pocas paradas" in prompt
-    assert "antes de las paradas" in prompt
+    assert "antes de las estaciones" in prompt
     assert "punto de carga autorizado en el corredor" in prompt
     assert "Alicante a Bilbao, prefiero parar pocas veces" in prompt
 
@@ -1627,34 +1624,29 @@ def test_a2ui_contract_accepts_chargers_only_route_blocks_with_structured_metada
             },
             {
                 "id": "route",
-                "type": "RouteSummaryCard",
-                "version": 1,
-                "props": {"distanceKm": 520.3, "durationMin": 343, "energyKwh": None, "arrivalBattery": None},
-            },
-            {
-                "id": "recommended",
-                "type": "StationDetailCard",
+                "type": "RouteCorridorCard",
                 "version": 1,
                 "props": {
-                    "name": "V-VALENCIA-022-2",
-                    "stationName": "V-VALENCIA-022-2",
-                    "powerKw": 22,
-                    "distanceKm": 1.58,
-                    "detourMin": 4,
-                    "confidence": "media",
-                    "availableEvses": 4,
-                    "amenities": ["CAFE", "RESTAURANT"],
-                    "scoreReasons": ["Servicios cercanos"],
-                    "lat": 39.48123,
-                    "lon": -0.389118,
-                },
-            },
-            {
-                "id": "alternatives",
-                "type": "StationList",
-                "version": 1,
-                "props": {
-                    "stops": [
+                    "distanceKm": 520.3,
+                    "durationMin": 343,
+                    "energyKwh": None,
+                    "arrivalBattery": None,
+                    "origin": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794},
+                    "destination": {"label": "Valencia", "lat": 39.4699, "lon": -0.3763},
+                    "stations": [
+                        {
+                            "name": "V-VALENCIA-022-2",
+                            "stationName": "V-VALENCIA-022-2",
+                            "powerKw": 22,
+                            "distanceKm": 1.58,
+                            "detourMin": 4,
+                            "confidence": "media",
+                            "availableEvses": 4,
+                            "amenities": ["CAFE", "RESTAURANT"],
+                            "scoreReasons": ["Servicios cercanos"],
+                            "lat": 39.48123,
+                            "lon": -0.389118,
+                        },
                         {
                             "name": "V-VALENCIA-023",
                             "stationName": "V-VALENCIA-023",
@@ -1668,7 +1660,9 @@ def test_a2ui_contract_accepts_chargers_only_route_blocks_with_structured_metada
                             "lat": 39.49549,
                             "lon": -0.401537,
                         }
-                    ]
+                    ],
+                    "geometryPrecision": "schematic",
+                    "source": "plan_route",
                 },
             },
             {
@@ -1719,21 +1713,22 @@ def test_a2ui_contract_rejects_chargers_only_warning_after_alternatives():
         [
             {
                 "id": "route",
-                "type": "RouteSummaryCard",
+                "type": "RouteCorridorCard",
                 "version": 1,
-                "props": {"distanceKm": 356.7, "durationMin": 240, "energyKwh": None, "arrivalBattery": None},
-            },
-            {
-                "id": "recommended",
-                "type": "StationDetailCard",
-                "version": 1,
-                "props": {"name": "Moya Hub Honrubia", "powerKw": 240, "distanceKm": 1.23},
-            },
-            {
-                "id": "alternatives",
-                "type": "StationList",
-                "version": 1,
-                "props": {"stations": [{"name": "Aparcamiento CTM", "powerKw": 400, "distanceKm": 4.77}]},
+                "props": {
+                    "distanceKm": 356.7,
+                    "durationMin": 240,
+                    "energyKwh": None,
+                    "arrivalBattery": None,
+                    "origin": {"label": "Madrid", "lat": 40.4168, "lon": -3.7038},
+                    "destination": {"label": "Valencia", "lat": 39.4699, "lon": -0.3763},
+                    "stations": [
+                        {"name": "Moya Hub Honrubia", "powerKw": 240, "distanceKm": 1.23},
+                        {"name": "Aparcamiento CTM", "powerKw": 400, "distanceKm": 4.77},
+                    ],
+                    "geometryPrecision": "schematic",
+                    "source": "plan_route",
+                },
             },
             {
                 "id": "risk",
@@ -1749,7 +1744,7 @@ def test_a2ui_contract_rejects_chargers_only_warning_after_alternatives():
 
     issues = a2ui_contract_issues(blocks, tool_history, message="Voy de Madrid a Valencia")
 
-    assert any("AssistantMessage inicial debe explicar antes de StationList" in issue for issue in issues)
+    assert any("AssistantMessage inicial debe explicar antes de RouteCorridorCard o StationList" in issue for issue in issues)
 
 
 def test_a2ui_contract_rejects_available_evses_as_connector_count_copy():

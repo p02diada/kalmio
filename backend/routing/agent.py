@@ -34,7 +34,7 @@ from routing.instrumentation import (
 A2UI_COMPONENT_TYPES = {
     "AssistantMessage",
     "UserMessage",
-    "RouteSummaryCard",
+    "RouteCorridorCard",
     "StationPreviewCard",
     "StationDetailCard",
     "StationList",
@@ -984,7 +984,7 @@ def compact_block_props_for_prompt(block_type: str, props: Any) -> Any:
             compact["stations"] = compact_station_list_for_prompt(stations, limit=6)
             compact["stationCount"] = len(stations)
         return compact
-    if block_type == "MapPreviewCard":
+    if block_type in {"MapPreviewCard", "RouteCorridorCard"}:
         compact = {}
         for key, value in props.items():
             if key == "routeGeometry" and isinstance(value, dict):
@@ -1073,7 +1073,7 @@ def conversation_agent_prompt(
         "Comportamiento EV esperado:\n"
         "- Usa el historial útil, acepta correcciones naturales y no suenes como formulario.\n"
         "- Presenta las recomendaciones como paradas o lugares útiles para el viaje; usa name/stationName como punto de carga trazable y placeName solo si sale de herramienta o del usuario. No inventes lugares, servicios ni POIs.\n"
-        "- Modelo de composición A2UI: una respuesta debe sentirse como una unidad de decisión accionable, no como una pila de tarjetas. Por defecto empieza con AssistantMessage de 1-3 frases: explica la decisión, ubicación usada, límite o problema relevante y el siguiente paso útil sin ocultar incertidumbre. Después muestra una sola card principal (StationPreviewCard o RouteSummaryCard) y acciones útiles. Si usas ActionButtons para una recomendación, colócalos inmediatamente después de la card a la que pertenecen; el renderer los tratará como el pie de acción de esa decisión. Si hay cautela, riesgo o límite de datos, ponlo en el AssistantMessage previo a la card, nunca como bloque intermedio entre StationPreviewCard y ActionButtons. No uses ActionButtons para repetir texto ni como sustituto de herramientas necesarias.\n"
+        "- Modelo de composición A2UI: una respuesta debe sentirse como una unidad de decisión accionable, no como una pila de tarjetas. Por defecto empieza con AssistantMessage de 1-3 frases: explica la decisión, ubicación usada, límite o problema relevante y el siguiente paso útil sin ocultar incertidumbre. Después muestra una sola card principal (StationPreviewCard o RouteCorridorCard) y acciones útiles. RouteCorridorCard es mapa de corredor y estaciones cercanas a la ruta; no la presentes como parada recomendada. Si usas ActionButtons para una recomendación, colócalos inmediatamente después de la card a la que pertenecen; el renderer los tratará como el pie de acción de esa decisión. Si hay cautela, riesgo o límite de datos, ponlo en el AssistantMessage previo a la card, nunca como bloque intermedio entre la card principal y ActionButtons. No uses ActionButtons para repetir texto ni como sustituto de herramientas necesarias.\n"
         "- No existe un componente separado de riesgo ni de aclaración. Explica riesgos, incertidumbres, límites de datos, datos faltantes y siguientes pasos en AssistantMessage antes de la card principal. Usa ErrorFallbackCard solo para fallos técnicos renderizables. Mantén StationList fuera de la primera respuesta salvo que cambie una decisión, haya empate real, baja confianza, o el usuario pida comparar/ver más opciones.\n"
         "- En copy visible, expresa duraciones largas en horas y minutos (por ejemplo, 8 h 37 min), no como cientos de minutos. Evita la palabra técnica 'trazado/trazados': para el conductor usa 'según los datos disponibles', 'registrado', 'indicado', 'verificado' o 'autorizado' según el dato.\n"
         "- Carga urgente sin ubicación: pide solo ubicación actual, ciudad/zona o coordenadas. No pidas destino para una carga urgente. No llames resolve_location con frases que no son ubicaciones concretas, como 'ubicación actual', 'mi ubicación', 'estoy al 12%', 'no conozco la zona', 'estoy en carretera', 'tengo poca batería' o 'voy con niños'; pregunta el dato mínimo primero.\n"
@@ -1081,7 +1081,7 @@ def conversation_agent_prompt(
         "- Si el usuario corrige la ubicación, descarta la anterior, conserva batería, conector y preferencias si siguen teniendo sentido y busca con la nueva.\n"
         "- Si pregunta por un fallo anterior, no contradigas bloques ya validados; explica validación, cobertura, aproximación o datos autorizados.\n"
         "- Calle/POI/zona: intenta resolver la parte conocida con resolve_location. Si no puedes ubicar esa calle exacta, dilo y ofrece ciudad aproximada o coordenadas; no inventes coordenadas.\n"
-        "- Ruta sin consumo/modelo: puedes usar plan_route para explorar contexto de ruta y paradas de carga, pero no inventes autonomía, energía ni llegada. Si plan_route devuelve planningLevel=chargers_only, dilo. Usa RouteSummaryCard para distancia/duración de la herramienta y solo después de plan_route; no calcules ni inventes distancia/duración sin herramienta. StationPreviewCard sirve para una estación autorizada útil; StationList queda para comparar/ver más opciones, empate real o baja confianza. Di visiblemente que no puedes validar batería de llegada ni reserva sin consumo/perfil. No repitas la duración en prosa si ya está en RouteSummaryCard; evita frases como '4 horas' y deja el dato en la tarjeta o usa formato '4 h'. El AssistantMessage inicial debe explicar antes de la card qué puedes decidir, qué no puedes validar y cuál es el siguiente paso; muestra después la decisión principal pronto en móvil. Patrón recomendado: AssistantMessage explicativo, una card principal de contexto o recomendación, ActionButtons para navegar/ver alternativas/refinar, y solo después StationList cuando esté justificada. Si el usuario pregunta si 'le da', 'llega sin cargar' o 'puede llegar sin cargar' y hay origen/destino pero faltan batería actual, autonomía, modelo o consumo, debes llamar plan_route para mostrar distancia/duración de proveedor; no respondas sí/no, no afirmes que llega, pide esos datos críticos, y no muestres StationPreviewCard/StationList como recomendación principal salvo que el usuario pida paradas de respaldo o plan B. Si el usuario prefiere parar pocas veces y ya hay origen/destino, debes llamar plan_route; si faltan autonomía/consumo/modelo, di antes de las paradas que no puedes garantizar ni optimizar pocas paradas sin esos datos; presenta cualquier estación solo como punto de carga autorizado en el corredor, no como plan optimizado. Si el usuario dice que sale con X%, ese X% es batería de salida, no de llegada ni reserva; no escribas 'llegas con X%'. Si el usuario pide no llegar justo sin dar un porcentaje de reserva, no digas que indicó 20%; si usas reserve_min_percent por defecto, llámalo margen conservador por defecto. No digas asegurar/garantizar margen en chargers_only ni 'te ayudará a recuperar margen'; di que cargar ahí puede ayudar a recuperar margen operativo no validado. Si el viaje es futuro (mañana, fecha concreta, finde, viernes/domingo), añade en el AssistantMessage inicial, antes de cualquier StationPreviewCard o StationList, una advertencia visible: disponibilidad, acceso y tarifas pueden cambiar antes del viaje.\n"
+        "- Ruta sin consumo/modelo: puedes usar plan_route para explorar contexto de ruta y estaciones cercanas al corredor, pero no inventes autonomía, energía ni llegada. Si plan_route devuelve planningLevel=chargers_only, dilo. Usa RouteCorridorCard para distancia/duración/mapa/estaciones cercanas de la herramienta y solo después de plan_route; no calcules ni inventes distancia/duración sin herramienta. RouteCorridorCard debe ser compacta en chat: destaca el mapa y el número de estaciones cerca de la ruta, con batería al llegar solo si la herramienta la trae; deja energía, ratios, pins y lectura densa para el detalle del mapa. No la llames parada sugerida ni recomendación. StationPreviewCard queda para una estación autorizada concreta cuando el usuario pida o el contexto justifique una recomendación explícita; StationList queda para comparar/ver más opciones, empate real o baja confianza. Di visiblemente que no puedes validar batería de llegada ni reserva sin consumo/perfil. No repitas la duración en prosa si ya está en RouteCorridorCard; evita frases como '4 horas' y deja el dato en la tarjeta o usa formato '4 h'. El AssistantMessage inicial debe explicar antes de la card qué puedes mostrar, qué no puedes validar y cuál es el siguiente paso; muestra después el mapa de corredor pronto en móvil. Patrón recomendado: AssistantMessage explicativo, una RouteCorridorCard principal, ActionButtons para ver detalle/refinar, y solo después StationPreviewCard o StationList si hay una recomendación o comparación justificada. Si el usuario pregunta si 'le da', 'llega sin cargar' o 'puede llegar sin cargar' y hay origen/destino pero faltan batería actual, autonomía, modelo o consumo, debes llamar plan_route para mostrar distancia/duración de proveedor; no respondas sí/no, no afirmes que llega, pide esos datos críticos, y no muestres StationPreviewCard/StationList como recomendación principal salvo que el usuario pida paradas de respaldo o plan B. Si el usuario prefiere parar pocas veces y ya hay origen/destino, debes llamar plan_route; si faltan autonomía/consumo/modelo, di antes de las estaciones que no puedes garantizar ni optimizar pocas paradas sin esos datos; presenta cualquier estación solo como punto de carga autorizado en el corredor, no como plan optimizado. Si el usuario dice que sale con X%, ese X% es batería de salida, no de llegada ni reserva; no escribas 'llegas con X%'. Si el usuario pide no llegar justo sin dar un porcentaje de reserva, no digas que indicó 20%; si usas reserve_min_percent por defecto, llámalo margen conservador por defecto. No digas asegurar/garantizar margen en chargers_only ni 'te ayudará a recuperar margen'; di que cargar en el corredor puede ayudar a recuperar margen operativo no validado. Si el viaje es futuro (mañana, fecha concreta, finde, viernes/domingo), añade en el AssistantMessage inicial, antes de cualquier RouteCorridorCard, StationPreviewCard o StationList, una advertencia visible: disponibilidad, acceso y tarifas pueden cambiar antes del viaje.\n"
         "- Perfil de vehículo: un modelo comercial como Tesla Model Y y una batería de salida no son un perfil autorizado de consumo/autonomía. Para plan_route, usa vehicle:null u omite vehicle salvo que el usuario haya dado explícitamente batería, capacidad útil kWh, consumo kWh/100 km, conector y potencia máxima. No rellenes campos desconocidos con null, ceros o defaults. Puedes mencionar modelo y batería en el copy, pero no calcular energía, autonomía ni llegada con ellos.\n"
         "- Hotel/destino/estancia: si hay ciudad/POI suficiente y el usuario necesita cargar durante la estancia, llama search_destination_chargers directamente; no devuelvas solo un botón para buscar ni una respuesta final que diga 'buscaré'. Una ciudad conocida ya es ubicación suficiente para una búsqueda aproximada; no esperes hotel/zona exacta para la primera búsqueda, puedes pedir refinamiento después de mostrar resultados. Si tienes una ciudad conocida pero no tienes coordenadas exactas del hotel/POI, la primera decisión debe ser type=tool_call search_destination_chargers con la ciudad como location approximate, no type=final. Si el usuario da un POI/hotel dentro de una ciudad conocida, usa primero la ciudad/zona como aproximación verificable salvo que tengas coordenadas exactas autorizadas del POI; evita empezar por un punto muy estrecho que pueda ocultar cargadores urbanos útiles. No lo conviertas en ruta salvo que pidan origen-destino. Si muestras resultados de destino/estancia, explica en AssistantMessage la ubicación usada y si es aproximada; pide dirección, zona exacta o coordenadas para refinar cuando falte el punto exacto. Si el usuario dijo que el hotel no tiene cargador y la herramienta devuelve varias paradas, elige una parada primaria con StationPreviewCard usando solo distancia, potencia, conectores y puestos de carga registrados, y usa ActionButtons para navegar, refinar o pedir más opciones; no la presentes como disponibilidad en vivo ni como reserva. Reserva StationList para cuando el usuario pida ver/comparar opciones, haya empate real, baja confianza o alternativas materialmente útiles que cambien la decisión.\n"
         "- Si buscas por ciudad aproximada porque el hotel/POI exacto no está resuelto, la respuesta visible debe decirlo en AssistantMessage: usa la ciudad como aproximación, no como ubicación exacta del hotel/POI, y pide dirección, zona exacta o coordenadas para refinar.\n"
@@ -1128,8 +1128,8 @@ def conversation_agent_prompt(
         "'Quiero la ruta más barata, pero sin bajar del 20%' sin origen/destino -> no llames plan_route, pregunta origen, destino y datos de vehículo/batería; "
         "'Voy a Córdoba el viernes y vuelvo el domingo' -> AssistantMessage preguntando origen/salida para planificar ida/vuelta antes de llamar herramientas; "
         "'Zaragoza a Barcelona con 25%' sin consumo/modelo -> no valides ese 25%; "
-        "'Córdoba a Valencia con 58%, no quiero llegar justo' -> plan_route puede mostrar RouteSummaryCard y paradas autorizadas, pero debes decir que la llegada/reserva no se valida sin consumo o perfil; "
-        "'Sevilla a Granada, me da para llegar sin cargar?' -> plan_route puede mostrar RouteSummaryCard de distancia/duración, pero no respondas sí/no sin batería actual/autonomía/modelo/consumo; pide esos datos; "
+        "'Córdoba a Valencia con 58%, no quiero llegar justo' -> plan_route puede mostrar RouteCorridorCard con estaciones autorizadas del corredor, pero debes decir que la llegada/reserva no se valida sin consumo o perfil; "
+        "'Sevilla a Granada, me da para llegar sin cargar?' -> plan_route puede mostrar RouteCorridorCard de distancia/duración, pero no respondas sí/no sin batería actual/autonomía/modelo/consumo; pide esos datos; "
         "'Alicante a Bilbao, prefiero parar pocas veces' -> plan_route puede mostrar contexto y puntos de corredor, pero debes decir antes que no puedes optimizar pocas paradas sin autonomía/consumo/modelo; "
         "'Evita cargadores caros si hay alternativas razonables' -> pide ruta o ubicación; si la herramienta trae tarifas verificadas, compara tarifa/kWh, si no, aclara que no inventas tarifas; "
         "'Prefiero hubs grandes aunque sean un poco más caros' -> no llames herramientas sin ruta/ubicación; pide ruta o ubicación actual y usa tarifas verificadas solo si el proveedor las da; "
@@ -1141,11 +1141,11 @@ def conversation_agent_prompt(
     )
     catalog_instructions = (
         "Catálogo A2UI permitido por propósito, no por reglas rígidas de intención:\n"
-        "AssistantMessage texto breve para contexto conversacional como origen, destino, batería, margen, reserva e incertidumbre concreta; RouteSummaryCard solo plan_route; "
+        "AssistantMessage texto breve para contexto conversacional como origen, destino, batería, margen, reserva e incertidumbre concreta; RouteCorridorCard solo plan_route y debe combinar mapa compacto, ruta y estaciones cercanas al corredor sin declarar una estación recomendada; "
         "StationPreviewCard/StationList solo estaciones de carga respaldadas por herramientas; en esos bloques name/stationName debe ser una estación verificable; address puede ser dirección/zona de herramienta. AssistantMessage explica incertidumbre concreta; "
         "CostComparisonCard solo tarifas/costes de herramienta; para preferencias de precio usa pricePerKwhEur y savingPerKwhEur verificados y no estimados, no estimatedCostEur sin energía verificada. AssistantMessage muestra la ubicación/zona resuelta cuando aporte contexto; StationPreviewCard muestra estación concreta con distanceKm, powerKw, pricePerKwhEur, availableEvses, connectorTypes, lat/lon cuando vengan de herramienta; no muestres pricePerKwhEur si priceIsEstimated es true. "
         "si quieres mostrar alternativas, usa StationList solo cuando aporte una decisión distinta; si hay riesgo o límite crítico, explícalo en AssistantMessage antes de la card. "
-        "MapPreviewCard solo para rutas de plan_route con routeGeometry GeoJSON LineString de proveedor, origin/destination con coordenadas de herramienta, primaryStation/stations de herramienta, corridorRadiusKm y geometryPrecision='provider'. "
+        "MapPreviewCard solo para inspección de mapa cuando no haya RouteCorridorCard; para una ruta completa prefiere RouteCorridorCard con routeGeometry GeoJSON LineString de proveedor, origin/destination con coordenadas de herramienta, stations de herramienta, corridorRadiusKm y geometryPrecision='provider'. "
         "Si no tienes geometría de proveedor, usa geometryPrecision='schematic' o no muestres mapa; no inventes coordenadas ni geometría. "
         "ActionButtons usa event para backend/agente, functionCall.openUrl para abrir mapas, o disabled con reason; cuando pertenezcan a una recomendación colócalos inmediatamente después de esa card para que se rendericen como acciones de la misma unidad; "
         "Usa labels de acción concretos: 'Usar este punto' para elegir una recomendación, 'Abrir ruta' para navegación openUrl y 'Buscar otra opción' para alternativas; evita labels vagos como 'Confirmar'. "
@@ -1169,7 +1169,7 @@ def conversation_agent_prompt(
         "No inventes disponibilidad, precios, estaciones, coordenadas ni estado del vehículo. "
         "No uses ActionButtons para sustituir una herramienta de búsqueda cuando ya tienes ciudad/POI suficiente. "
         "No llames plan_route con coordenadas vacías o 0,0; si faltan origen/destino reales, usa AssistantMessage. "
-        "No devuelvas RouteSummaryCard ni distancia/duración de ruta si no tienes resultado de plan_route. "
+        "No devuelvas RouteCorridorCard ni distancia/duración de ruta si no tienes resultado de plan_route. "
         "No afirmes paradas/puntos de carga disponibles/encontrados ni incluyas listas vacías como resultado si no llamaste una herramienta de búsqueda/ruta. "
         "No afirmes paradas, puntos de carga o rutas si no vienen de herramientas, datos autorizados o texto explícito del usuario. "
         "No respondas con 'buscaré', 'voy a buscar' o 'puedo buscar' cuando ya tienes ciudad/POI suficiente para usar una herramienta; en ese caso devuelve type=tool_call. "
@@ -1519,27 +1519,19 @@ def blocks_from_tool_result(tool_result: dict[str, Any], message: str = "") -> l
         return [
             block(
                 f"route-{uuid4().hex[:10]}",
-                "RouteSummaryCard",
+                "RouteCorridorCard",
                 {
                     "distanceKm": tool_result.get("distanceKm"),
                     "durationMin": tool_result.get("durationMin"),
                     "energyKwh": tool_result.get("energyKwh"),
                     "arrivalBattery": tool_result.get("arrivalBattery"),
-                },
-            ),
-            block(
-                f"station-{uuid4().hex[:10]}",
-                "StationPreviewCard",
-                {"title": "Estación recomendada", **station_props_from_result(recommendation)},
-            ),
-            block(
-                f"map-{uuid4().hex[:10]}",
-                "MapPreviewCard",
-                {
                     "origin": tool_result.get("origin"),
                     "destination": tool_result.get("destination"),
-                    "primaryStation": station_props_from_result(recommendation),
-                    "stations": [station_props_from_result(station) for station in alternatives],
+                    "stations": [
+                        station_props_from_result(station)
+                        for station in [recommendation, *alternatives]
+                        if isinstance(station, dict) and station
+                    ],
                     "routeGeometry": tool_result.get("routeGeometry"),
                     "corridorRadiusKm": tool_result.get("corridorRadiusKm"),
                     "geometryPrecision": "provider" if tool_result.get("routeGeometry") else "unknown",
@@ -1641,10 +1633,11 @@ def a2ui_contract_issues(
             issues.extend(required_station_reference_contract_issues(f"{block_type}.name", station_name, facts))
             issues.extend(station_reference_contract_issues(f"{block_type}.name", station_name, facts))
             issues.extend(station_metric_contract_issues(str(block_type), props, facts))
-        elif block_type == "RouteSummaryCard":
-            issues.extend(route_summary_contract_issues(props, facts))
+        elif block_type == "RouteCorridorCard":
+            issues.extend(route_summary_contract_issues(props, facts, "RouteCorridorCard"))
+            issues.extend(map_preview_contract_issues(props, facts, explicit_coordinates, "RouteCorridorCard"))
         elif block_type == "MapPreviewCard":
-            issues.extend(map_preview_contract_issues(props, facts, explicit_coordinates))
+            issues.extend(map_preview_contract_issues(props, facts, explicit_coordinates, "MapPreviewCard"))
         elif block_type == "ActionButtons":
             issues.extend(action_buttons_contract_issues(props, facts, explicit_coordinates))
         elif block_type == "CostComparisonCard":
@@ -1728,8 +1721,12 @@ def add_history_facts(facts: dict[str, Any], history_blocks: list[dict]) -> None
                     add_station_fact(facts, station)
         elif block_type in STATION_CARD_TYPES:
             add_station_fact(facts, props)
-        elif block_type == "RouteSummaryCard":
+        elif block_type == "RouteCorridorCard":
             facts["routes"].append(props)
+            stations = props.get("stations")
+            if isinstance(stations, list):
+                for station in stations:
+                    add_station_fact(facts, station)
 
 
 def add_station_fact(facts: dict[str, Any], value: Any) -> None:
@@ -1966,7 +1963,7 @@ def user_message_mentions_night_safety(message: str) -> bool:
 def night_safety_warning_order_contract_issues(blocks: list[dict], message: str) -> list[str]:
     if not user_message_mentions_night_safety(message):
         return []
-    if first_block_index(blocks, "StationList") is None:
+    if first_block_index(blocks, "RouteCorridorCard") is None and first_block_index(blocks, "StationList") is None:
         return []
     early_text = normalize(" ".join(block_visible_text(block) for block in blocks_before_first_charge_option(blocks)))
     if (
@@ -2305,7 +2302,7 @@ def chargers_only_warning_order_contract_issues(
     route = latest_plan_route_result(tool_history)
     if not route or route.get("planningLevel") != "chargers_only":
         return []
-    if first_block_index(blocks, "StationList") is None:
+    if first_block_index(blocks, "RouteCorridorCard") is None and first_block_index(blocks, "StationList") is None:
         return []
     early_text = normalize(" ".join(block_visible_text(block) for block in blocks_before_first_charge_option(blocks)))
     if (
@@ -2315,7 +2312,7 @@ def chargers_only_warning_order_contract_issues(
     ):
         return []
     return [
-        "En una ruta chargers_only, el AssistantMessage inicial debe explicar antes de StationList "
+        "En una ruta chargers_only, el AssistantMessage inicial debe explicar antes de RouteCorridorCard o StationList "
         "que batería de llegada y reserva no están validadas."
     ]
 
@@ -2476,7 +2473,7 @@ def future_trip_volatility_copy_contract_issues(blocks: list[dict], message: str
     if not visible_text:
         return []
     has_route_or_charge_block = any(
-        block.get("type") == "RouteSummaryCard" or block.get("type") == "StationList" or block.get("type") in STATION_CARD_TYPES
+        block.get("type") in {"RouteCorridorCard", "StationList"} or block.get("type") in STATION_CARD_TYPES
         for block in blocks
     )
     claims_route_or_stops = any(
@@ -2732,7 +2729,7 @@ def departure_battery_percent_labels(normalized_message: str) -> list[str]:
 def blocks_before_first_charge_option(blocks: list[dict]) -> list[dict]:
     before: list[dict] = []
     for block in blocks:
-        if block.get("type") in STATION_CARD_TYPES or block.get("type") == "StationList":
+        if block.get("type") in STATION_CARD_TYPES or block.get("type") in {"RouteCorridorCard", "StationList"}:
             return before
         before.append(block)
     return before
@@ -2745,10 +2742,10 @@ def visible_text_has_term(visible_text: str, term: str) -> bool:
 def block_uses_factual_location(block: dict) -> bool:
     return block.get("type") in {
         "StationList",
+        "RouteCorridorCard",
         "MapPreviewCard",
         "StationPreviewCard",
         "StationDetailCard",
-        "RouteSummaryCard",
     }
 
 
@@ -3050,9 +3047,9 @@ def station_metric_contract_issues(label: str, props: dict, facts: dict[str, Any
     return issues
 
 
-def route_summary_contract_issues(props: dict, facts: dict[str, Any]) -> list[str]:
+def route_summary_contract_issues(props: dict, facts: dict[str, Any], label: str) -> list[str]:
     if not facts["routes"]:
-        return ["RouteSummaryCard necesita un resultado plan_route trazable."]
+        return [f"{label} necesita un resultado plan_route trazable."]
     route = facts["routes"][-1]
     issues: list[str] = []
     for field in ("distanceKm", "durationMin", "energyKwh", "arrivalBattery"):
@@ -3063,9 +3060,9 @@ def route_summary_contract_issues(props: dict, facts: dict[str, Any]) -> list[st
         if rendered is None:
             continue
         if expected is None:
-            issues.append(f"RouteSummaryCard.{field} no está en el resultado plan_route.")
+            issues.append(f"{label}.{field} no está en el resultado plan_route.")
         elif not values_match(rendered, expected):
-            issues.append(f"RouteSummaryCard.{field} no coincide con plan_route.")
+            issues.append(f"{label}.{field} no coincide con plan_route.")
     return issues
 
 
@@ -3073,22 +3070,23 @@ def map_preview_contract_issues(
     props: dict,
     facts: dict[str, Any],
     explicit_coordinates: list[tuple[float, float]],
+    label: str,
 ) -> list[str]:
     issues: list[str] = []
     route_geometry = props.get("routeGeometry")
     geometry_precision = props.get("geometryPrecision")
     if geometry_precision == "provider":
         if not facts["routes"]:
-            issues.append("MapPreviewCard necesita un resultado plan_route trazable.")
+            issues.append(f"{label} necesita un resultado plan_route trazable.")
         if not isinstance(route_geometry, dict):
-            issues.append("MapPreviewCard.routeGeometry debe venir de plan_route cuando geometryPrecision='provider'.")
+            issues.append(f"{label}.routeGeometry debe venir de plan_route cuando geometryPrecision='provider'.")
 
     if isinstance(route_geometry, dict):
         expected_geometry = facts["routes"][-1].get("routeGeometry") if facts["routes"] else None
         if expected_geometry is None:
-            issues.append("MapPreviewCard.routeGeometry no está en el resultado plan_route.")
+            issues.append(f"{label}.routeGeometry no está en el resultado plan_route.")
         elif not line_string_geometry_matches(route_geometry, expected_geometry):
-            issues.append("MapPreviewCard.routeGeometry no coincide con plan_route.")
+            issues.append(f"{label}.routeGeometry no coincide con plan_route.")
 
     for field in ("origin", "destination"):
         point = props.get(field)
@@ -3099,27 +3097,27 @@ def map_preview_contract_issues(
         if lat is None and lon is None:
             continue
         if lat is None or lon is None:
-            issues.append(f"MapPreviewCard.{field} necesita lat y lon juntos.")
+            issues.append(f"{label}.{field} necesita lat y lon juntos.")
         elif not coordinate_traced(lat, lon, facts["locations"], explicit_coordinates):
-            issues.append(f"MapPreviewCard.{field} no coincide con una ubicación de herramienta.")
+            issues.append(f"{label}.{field} no coincide con una ubicación de herramienta.")
 
     primary_station = props.get("primaryStation")
     if isinstance(primary_station, dict):
         station_name = primary_station.get("name") or primary_station.get("stationName")
-        issues.extend(required_station_reference_contract_issues("MapPreviewCard.primaryStation.name", station_name, facts))
-        issues.extend(station_reference_contract_issues("MapPreviewCard.primaryStation.name", station_name, facts))
-        issues.extend(station_metric_contract_issues("MapPreviewCard.primaryStation", primary_station, facts))
+        issues.extend(required_station_reference_contract_issues(f"{label}.primaryStation.name", station_name, facts))
+        issues.extend(station_reference_contract_issues(f"{label}.primaryStation.name", station_name, facts))
+        issues.extend(station_metric_contract_issues(f"{label}.primaryStation", primary_station, facts))
 
     stations = props.get("stations")
     if isinstance(stations, list):
         for index, station in enumerate(stations):
             if not isinstance(station, dict):
-                issues.append(f"MapPreviewCard.stations[{index}] debe ser un objeto.")
+                issues.append(f"{label}.stations[{index}] debe ser un objeto.")
                 continue
             station_name = station.get("name") or station.get("stationName")
-            issues.extend(required_station_reference_contract_issues(f"MapPreviewCard.stations[{index}].name", station_name, facts))
-            issues.extend(station_reference_contract_issues(f"MapPreviewCard.stations[{index}].name", station_name, facts))
-            issues.extend(station_metric_contract_issues(f"MapPreviewCard.stations[{index}]", station, facts))
+            issues.extend(required_station_reference_contract_issues(f"{label}.stations[{index}].name", station_name, facts))
+            issues.extend(station_reference_contract_issues(f"{label}.stations[{index}].name", station_name, facts))
+            issues.extend(station_metric_contract_issues(f"{label}.stations[{index}]", station, facts))
     return issues
 
 
@@ -3513,7 +3511,7 @@ def summarize_block_for_context(block_type: str, props: dict) -> str:
             f"distancia {props.get('distanceKm')} km, EVSEs {props.get('availableEvses')}, "
             f"conectores {props.get('connectorTypes')}, desvío {props.get('detourMin')} min{price_text}."
         )
-    if block_type == "RouteSummaryCard":
+    if block_type == "RouteCorridorCard":
         return (
             "Resultado previo de ruta: "
             f"{props.get('distanceKm')} km, {props.get('durationMin')} min, "
@@ -3721,47 +3719,24 @@ def route_planning_blocks(intent: ParsedIntent) -> list[dict]:
         ),
         block(
             f"route-{uuid4().hex[:10]}",
-            "RouteSummaryCard",
+            "RouteCorridorCard",
             {
                 "distanceKm": round(plan.route.distance_km, 1),
                 "durationMin": plan.route.duration_min,
                 "energyKwh": round_optional(plan.energy_kwh),
                 "arrivalBattery": round_optional(plan.arrival_battery_percent),
+                "origin": {"label": intent.origin.label, "lat": intent.origin.lat, "lon": intent.origin.lon},
+                "destination": {"label": intent.destination.label, "lat": intent.destination.lat, "lon": intent.destination.lon},
+                "stations": [primary_station_props, *alternative_station_props],
+                "routeGeometry": route_geometry_payload(plan.route),
+                "corridorRadiusKm": 25,
+                "geometryPrecision": "provider",
+                "source": "plan_route",
             },
         ),
-        block(
-            f"station-{uuid4().hex[:10]}",
-            "StationPreviewCard",
-            primary_station_props,
-        ),
     ]
-    if plan.alternatives:
-        blocks.append(
-            block(
-                f"stations-{uuid4().hex[:10]}",
-                "StationList",
-                {
-                    "title": "Otras estaciones viables",
-                    "stations": alternative_station_props,
-                },
-            )
-        )
     blocks.extend(
         [
-            block(
-                f"map-{uuid4().hex[:10]}",
-                "MapPreviewCard",
-                {
-                    "origin": {"label": intent.origin.label, "lat": intent.origin.lat, "lon": intent.origin.lon},
-                    "destination": {"label": intent.destination.label, "lat": intent.destination.lat, "lon": intent.destination.lon},
-                    "primaryStation": primary_station_props,
-                    "stations": alternative_station_props,
-                    "routeGeometry": route_geometry_payload(plan.route),
-                    "corridorRadiusKm": 25,
-                    "geometryPrecision": "provider",
-                    "source": "plan_route",
-                },
-            ),
             block(
                 f"actions-{uuid4().hex[:10]}",
                 "ActionButtons",
