@@ -571,7 +571,7 @@ def test_action_buttons_adds_label_for_open_url_function_call():
         ]
     )
 
-    assert blocks[0]["props"]["actions"][0]["label"] == "Abrir en Google Maps"
+    assert blocks[0]["props"]["actions"][0]["label"] == "Abrir ruta"
 
 
 def test_removed_destination_and_stay_cards_render_fallbacks():
@@ -1109,6 +1109,10 @@ def test_conversation_agent_prompt_guides_chargers_only_route_without_claiming_d
     assert "Patrón recomendado: AssistantMessage explicativo" in prompt
     assert "una card principal de contexto o recomendación" in prompt
     assert "ActionButtons para navegar/ver alternativas/refinar" in prompt
+    assert "'Usar este punto'" in prompt
+    assert "'Abrir ruta'" in prompt
+    assert "'Buscar otra opción'" in prompt
+    assert "evita labels vagos como 'Confirmar'" in prompt
     assert "solo después StationList cuando esté justificada" in prompt
     assert "no digas que indicó 20%" in prompt
     assert "margen conservador por defecto" in prompt
