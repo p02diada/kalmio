@@ -2,7 +2,6 @@ import {
   ArrowLeft,
   AlertTriangle,
   BatteryCharging,
-  Bot,
   Euro,
   Maximize2,
   MapPinned,
@@ -17,6 +16,7 @@ import { createPortal } from 'react-dom'
 import type { Map as MapLibreMap, Marker as MapLibreMarker } from 'maplibre-gl'
 
 import { StationConnectorBadge } from '@/components/a2ui/station-connector-badge'
+import { KalmioBrandMark } from '@/components/brand/kalmio-brand-mark'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -234,7 +234,7 @@ function A2UICard({
 function A2UIBlockView({ block, actions }: { block: A2UIBlock; actions: A2UIRendererActions }) {
   switch (block.type) {
     case 'AssistantMessage':
-      return <MessageCard icon={Bot} tone="assistant" text={text(block.props.text)} />
+      return <MessageCard tone="assistant" text={text(block.props.text)} />
     case 'UserMessage':
       return <MessageCard icon={MessageCircle} tone="route" text={text(block.props.text)} align="right" />
     case 'RouteSummaryCard':
@@ -401,7 +401,7 @@ function MessageCard({
   text: value,
   align = 'left',
 }: {
-  icon: typeof Bot
+  icon?: LucideIcon
   tone: 'assistant' | 'route'
   text: string
   align?: 'left' | 'right'
@@ -411,8 +411,8 @@ function MessageCard({
   return (
     <div className={isUser ? 'flex justify-end' : 'flex items-start gap-2'}>
       {!isUser ? (
-        <span className="mt-1 grid size-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
-          <Icon className="size-3.5" aria-hidden="true" />
+        <span className="mt-1 grid size-7 shrink-0 place-items-center rounded-full bg-assistant-soft text-assistant">
+          <KalmioBrandMark className="size-5" />
         </span>
       ) : null}
       <div
@@ -423,7 +423,7 @@ function MessageCard({
         }
       >
         <span className={isUser ? 'mb-1 flex items-center gap-2 text-caption font-medium text-primary-foreground/70' : 'mb-1 flex items-center gap-2 text-caption font-medium text-muted-foreground'}>
-          {isUser ? <Icon className={`size-3.5 ${tone === 'assistant' ? 'text-assistant' : 'text-route'}`} aria-hidden="true" /> : null}
+          {isUser && Icon ? <Icon className={`size-3.5 ${tone === 'assistant' ? 'text-assistant' : 'text-route'}`} aria-hidden="true" /> : null}
           {isUser ? 'Usuario' : 'Kalmio'}
         </span>
         {value}

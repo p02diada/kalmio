@@ -199,7 +199,9 @@ describe('App', () => {
 
   it('scrolls new agent results to the primary recommendation instead of the last alternative', async () => {
     document.cookie = 'csrftoken=test-token'
-    const scrollIntoView = vi.fn(function (this: HTMLElement, _options?: ScrollIntoViewOptions) {})
+    const scrollIntoView = vi.fn(function (this: HTMLElement, options?: ScrollIntoViewOptions) {
+      void options
+    })
     Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
       configurable: true,
       value: scrollIntoView,
@@ -346,6 +348,7 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
 
     expect(await screen.findByText('Estoy en Córdoba con un 18%')).toBeInTheDocument()
+    expect(screen.getByText('Contactando con Kalmio')).toBeInTheDocument()
 
     resolveMessage(
       new Response(

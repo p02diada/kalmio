@@ -13,11 +13,9 @@ import {
   AlertTriangle,
   ArrowUp,
   BatteryCharging,
-  Bot,
   CheckCircle2,
   ClipboardList,
   Home,
-  Loader2,
   Menu,
   MapPinned,
   MessageCircle,
@@ -31,11 +29,13 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 
 import { A2UIRenderer } from '@/components/a2ui/a2ui-renderer'
 import { A2UIShowcasePage } from '@/components/a2ui/a2ui-showcase'
+import { KalmioBrandMark } from '@/components/brand/kalmio-brand-mark'
+import { ChatPendingStatus } from '@/components/chat/chat-pending-status'
+import { chatWaitingMessages } from '@/components/chat/chat-waiting-messages'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
-import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Sidebar,
@@ -107,13 +107,6 @@ const reassuranceSteps = [
   'Te pediré ubicación, batería y conector si faltan.',
   'Comprobaré ruta y paradas con datos autorizados de carga.',
   'Si no hay datos fiables, no recomendaré una parada.',
-] as const
-
-const conversationPhases = [
-  'Interpretando tu petición',
-  'Comprobando ruta o ubicación',
-  'Buscando paradas con carga autorizada',
-  'Validando riesgo y próximos pasos',
 ] as const
 
 const chatScrollPriority = [
@@ -281,17 +274,6 @@ function MobileMenuItem({
   )
 }
 
-function KalmioBrandMark({ className }: { className?: string }) {
-  return (
-    <img
-      src="/logo-mark.svg"
-      alt=""
-      aria-hidden="true"
-      className={cn('block', className)}
-    />
-  )
-}
-
 function DesktopNavItem({
   to,
   icon: Icon,
@@ -447,7 +429,7 @@ function ChatPage() {
   const [draft, setDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isSending, setIsSending] = useState(false)
-  const [phaseIndex, setPhaseIndex] = useState(0)
+  const [waitMessageIndex, setWaitMessageIndex] = useState(0)
   const [retryText, setRetryText] = useState<string | null>(null)
   const [pendingUserBlock, setPendingUserBlock] = useState<A2UIBlock | null>(null)
   const sentInitialPrompt = useRef(false)
@@ -508,7 +490,7 @@ function ChatPage() {
       props: { text },
     })
     setIsSending(true)
-    setPhaseIndex(0)
+    setWaitMessageIndex(0)
     sendMutation.mutateAsync(text)
       .catch((mutationError) => {
         setError(mutationError instanceof Error ? mutationError.message : 'No se pudo enviar el mensaje.')
@@ -527,7 +509,7 @@ function ChatPage() {
     setError(null)
     setRetryText(null)
     setIsSending(true)
-    setPhaseIndex(0)
+    setWaitMessageIndex(0)
     actionMutation.mutateAsync({
       name: actionName,
       context,
@@ -566,7 +548,7 @@ function ChatPage() {
       return
     }
     const timer = window.setInterval(() => {
-      setPhaseIndex((current) => Math.min(current + 1, conversationPhases.length - 1))
+      setWaitMessageIndex((current) => Math.min(current + 1, chatWaitingMessages.length - 1))
     }, 1800)
     return () => window.clearInterval(timer)
   }, [isSending])
@@ -597,15 +579,16 @@ function ChatPage() {
       <h1 className="sr-only">Chat</h1>
 
       <div ref={scrollRef} className="chat-scroll" aria-live="polite">
-        {messagesQuery.isPending ? <ConversationSkeleton /> : null}
+        {messagesQuery.isPending && renderedBlocks.length === 0 ? <ConversationSkeleton /> : null}
         {!messagesQuery.isPending && renderedBlocks.length === 0 && !isSending && !error ? <ChatEmptyState /> : null}
         {renderedBlocks.length > 0 ? (
           <A2UIRenderer blocks={renderedBlocks} onChipClick={sendText} onActionEvent={sendA2UIEvent} />
         ) : null}
-        {isSending ? <ConversationProgress phaseIndex={phaseIndex} /> : null}
         {error ? <InlineError message={error} onRetry={retryText ? () => sendText(retryText) : undefined} /> : null}
         <div ref={latestRef} className="h-px" tabIndex={-1} aria-hidden="true" />
       </div>
+
+      {isSending ? <ChatPendingStatus messageIndex={waitMessageIndex} /> : null}
 
       <form
         className="chat-composer"
@@ -1008,7 +991,7 @@ function ThemeDecisionPreview() {
         <CardContent className="flex flex-col gap-3 p-4">
           <div className="flex items-start gap-3">
             <span className="grid size-9 shrink-0 place-items-center rounded-md bg-assistant-soft text-assistant">
-              <Bot aria-hidden="true" />
+              <KalmioBrandMark className="size-7" />
             </span>
             <div className="min-w-0">
               <p className="text-sm font-semibold leading-5">Necesito confirmar un dato</p>
@@ -1066,30 +1049,6 @@ function ThemeDecisionPreview() {
         </CardContent>
       </Card>
     </div>
-  )
-}
-
-function ConversationProgress({ phaseIndex }: { phaseIndex: number }) {
-  const progress = ((phaseIndex + 1) / conversationPhases.length) * 100
-
-  return (
-    <Card aria-live="polite">
-      <CardContent className="flex flex-col gap-3 p-4">
-        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-          {conversationPhases[phaseIndex]}
-        </div>
-        <Progress value={progress} aria-label="Progreso de la comprobación" />
-        <ol className="grid gap-2 text-xs leading-5 text-muted-foreground">
-          {conversationPhases.map((phase, index) => (
-            <li key={phase} className={cn('flex items-center gap-2', index <= phaseIndex && 'text-foreground')}>
-              <span className={cn('size-1.5 rounded-full bg-border', index <= phaseIndex && 'bg-primary')} aria-hidden="true" />
-              {phase}
-            </li>
-          ))}
-        </ol>
-      </CardContent>
-    </Card>
   )
 }
 
