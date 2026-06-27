@@ -33,6 +33,13 @@ import { ChatPendingStatus } from '@/components/chat/chat-pending-status'
 import { chatWaitingMessageScheduleMs } from '@/components/chat/chat-waiting-messages'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import {
+  MessageScroller,
+  MessageScrollerButton,
+  MessageScrollerContent,
+  MessageScrollerProvider,
+  MessageScrollerViewport,
+} from '@/components/ui/message-scroller'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Sidebar,
@@ -516,22 +523,30 @@ function ChatPage() {
     <section className="chat-page">
       <h1 className="sr-only">Chat</h1>
 
-      <div ref={scrollRef} className="chat-scroll" aria-live="polite">
-        {messagesQuery.isPending && renderedBlocks.length === 0 ? <ConversationSkeleton /> : null}
-        {!messagesQuery.isPending && renderedBlocks.length === 0 && !isSending && !error ? (
-          <ChatEmptyState onPromptSelect={sendText} />
-        ) : null}
-        {renderedBlocks.length > 0 ? (
-          <A2UIRenderer
-            blocks={displayedBlocks}
-            onChipClick={sendText}
-            onActionEvent={sendA2UIEvent}
-            onManualPositionRequest={focusComposer}
-          />
-        ) : null}
-        {error ? <InlineError message={error} onRetry={retryText && !inputDisabledReason ? () => sendText(retryText) : undefined} /> : null}
-        <div ref={latestRef} className="h-px" tabIndex={-1} aria-hidden="true" />
-      </div>
+      <MessageScrollerProvider autoScroll defaultScrollPosition="end" scrollPreviousItemPeek={56}>
+        <MessageScroller className="chat-scroll-shell">
+          <MessageScrollerViewport ref={scrollRef} className="chat-scroll" aria-label="Mensajes">
+            <MessageScrollerContent className="chat-scroll-content" aria-busy={isSending} aria-live="polite">
+              {messagesQuery.isPending && renderedBlocks.length === 0 ? <ConversationSkeleton /> : null}
+              {!messagesQuery.isPending && renderedBlocks.length === 0 && !isSending && !error ? (
+                <ChatEmptyState onPromptSelect={sendText} />
+              ) : null}
+              {renderedBlocks.length > 0 ? (
+                <A2UIRenderer
+                  blocks={displayedBlocks}
+                  useMessageScrollerItems
+                  onChipClick={sendText}
+                  onActionEvent={sendA2UIEvent}
+                  onManualPositionRequest={focusComposer}
+                />
+              ) : null}
+              {error ? <InlineError message={error} onRetry={retryText && !inputDisabledReason ? () => sendText(retryText) : undefined} /> : null}
+              <div ref={latestRef} className="h-px" tabIndex={-1} aria-hidden="true" />
+            </MessageScrollerContent>
+          </MessageScrollerViewport>
+          <MessageScrollerButton />
+        </MessageScroller>
+      </MessageScrollerProvider>
 
       {isSending ? <ChatPendingStatus messageIndex={waitMessageIndex} message={chatPendingProgressMessage(progressUpdate)} /> : null}
 

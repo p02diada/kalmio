@@ -25,9 +25,11 @@ import type { Map as MapLibreMap, Marker as MapLibreMarker } from 'maplibre-gl'
 
 import { StationConnectorBadge } from '@/components/a2ui/station-connector-badge'
 import { KalmioBrandMark } from '@/components/brand/kalmio-brand-mark'
-import { Badge } from '@/components/ui/badge'
+import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Message, MessageAvatar, MessageContent } from '@/components/ui/message'
+import { MessageScrollerItem } from '@/components/ui/message-scroller'
 import type { A2UIBlock } from '@/lib/a2ui/types'
 import { cn } from '@/lib/utils'
 
@@ -74,12 +76,14 @@ const STATION_POWER_LABEL = 'Potencia máx.'
 
 export function A2UIRenderer({
   blocks,
+  useMessageScrollerItems = false,
   onChipClick,
   onActionEvent,
   onPositionSubmit,
   onManualPositionRequest,
 }: {
   blocks: A2UIBlock[]
+  useMessageScrollerItems?: boolean
 } & A2UIRendererActions) {
   const actions = { onChipClick, onActionEvent, onPositionSubmit, onManualPositionRequest }
   const renderedBlocks: ReactNode[] = []
@@ -90,8 +94,10 @@ export function A2UIRenderer({
 
     if (nextBlock?.type === 'ActionButtons' && canHostActionFooter(block)) {
       renderedBlocks.push(
-        <div
+        <A2UIItem
           key={`${block.id}-${nextBlock.id}`}
+          block={block}
+          useMessageScrollerItems={useMessageScrollerItems}
           className="flex min-w-0 max-w-full flex-col gap-2"
           data-a2ui-decision-unit="true"
           data-a2ui-action-footer-for={block.id}
@@ -102,16 +108,22 @@ export function A2UIRenderer({
           <div className="-mt-1 px-1" data-a2ui-block-id={nextBlock.id} data-a2ui-block-type={nextBlock.type}>
             <A2UIBoundary block={nextBlock} actions={actions} />
           </div>
-        </div>,
+        </A2UIItem>,
       )
       index += 1
       continue
     }
 
     renderedBlocks.push(
-      <div key={block.id} data-a2ui-block-id={block.id} data-a2ui-block-type={block.type}>
+      <A2UIItem
+        key={block.id}
+        block={block}
+        useMessageScrollerItems={useMessageScrollerItems}
+        data-a2ui-block-id={block.id}
+        data-a2ui-block-type={block.type}
+      >
         <A2UIBoundary block={block} actions={actions} />
-      </div>,
+      </A2UIItem>,
     )
   }
 
@@ -120,6 +132,31 @@ export function A2UIRenderer({
       {renderedBlocks}
     </div>
   )
+}
+
+function A2UIItem({
+  block,
+  children,
+  useMessageScrollerItems,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & {
+  block: A2UIBlock
+  children: ReactNode
+  useMessageScrollerItems: boolean
+}) {
+  if (useMessageScrollerItems) {
+    return (
+      <MessageScrollerItem
+        messageId={block.id}
+        scrollAnchor={block.type === 'UserMessage'}
+        {...props}
+      >
+        {children}
+      </MessageScrollerItem>
+    )
+  }
+
+  return <div {...props}>{children}</div>
 }
 
 function canHostActionFooter(block: A2UIBlock) {
@@ -402,24 +439,30 @@ function MessageCard({
 
   if (isUser) {
     return (
-      <div className="flex justify-end">
-        <div className="a2ui-message a2ui-message-user">
-          <span className="sr-only">Usuario: </span>
-          {value}
-        </div>
-      </div>
+      <Message align="end">
+        <MessageContent>
+          <Bubble variant="muted" align="end" className="a2ui-message a2ui-message-user">
+            <BubbleContent>
+              <span className="sr-only">Usuario: </span>
+              {value}
+            </BubbleContent>
+          </Bubble>
+        </MessageContent>
+      </Message>
     )
   }
 
   return (
-    <div className="flex items-start gap-2">
-      <span className="mt-1 grid size-7 shrink-0 place-items-center rounded-full bg-assistant-soft text-assistant">
+    <Message align="start">
+      <MessageAvatar className="mt-1 bg-assistant-soft text-assistant">
         <KalmioBrandMark className="size-5" />
-      </span>
-      <div className="a2ui-message a2ui-message-assistant">
-        {value}
-      </div>
-    </div>
+      </MessageAvatar>
+      <MessageContent>
+        <Bubble variant="default" className="a2ui-message a2ui-message-assistant">
+          <BubbleContent>{value}</BubbleContent>
+        </Bubble>
+      </MessageContent>
+    </Message>
   )
 }
 
@@ -1083,16 +1126,6 @@ function routeCorridorStationCountLabel(count: number) {
     return '1 estación cerca de la ruta'
   }
   return `${formatNumber(count)} estaciones cerca de la ruta`
-}
-
-function routeCorridorStationCountShortLabel(count: number) {
-  if (count === 0) {
-    return 'Sin estaciones'
-  }
-  if (count === 1) {
-    return '1 estación'
-  }
-  return `${formatNumber(count)} estaciones`
 }
 
 function DecisionNarrative({ props }: { props: Record<string, unknown> }) {
