@@ -137,6 +137,38 @@ These are the most common patterns that differentiate correct shadcn/ui code. Fo
 | Menus                      | `DropdownMenu`, `ContextMenu`, `Menubar`                                                            |
 | Tooltips/info              | `Tooltip`, `HoverCard`, `Popover`                                                                   |
 
+## Chat Components
+
+As of 2026-06-27, shadcn has publicly announced chat-specific primitives: `MessageScroller`, `Message`, `Bubble`, `Attachment`, and `Marker`.
+
+Before recommending or using them, verify current registry availability in the target project:
+
+```bash
+npx shadcn@latest search @shadcn -q "message"
+npx shadcn@latest docs message-scroller message bubble attachment marker
+npx shadcn@latest add message-scroller message bubble attachment marker --dry-run
+```
+
+If simple-name install returns a registry 404 for the project's style, check the explicit `radix-rhea` registry URLs before concluding the components are unavailable:
+
+```bash
+npx shadcn@latest add \
+  https://ui.shadcn.com/r/styles/radix-rhea/message-scroller.json \
+  https://ui.shadcn.com/r/styles/radix-rhea/message.json \
+  https://ui.shadcn.com/r/styles/radix-rhea/bubble.json \
+  https://ui.shadcn.com/r/styles/radix-rhea/attachment.json \
+  https://ui.shadcn.com/r/styles/radix-rhea/marker.json \
+  --dry-run
+```
+
+Do not copy component source manually from rendered docs while a registry URL is available. Always inspect `--dry-run` and `--diff`; these components may pull in `@shadcn/react` and registry dependencies such as `button`.
+
+Do not assume a prerelease CLI fixes this. Check `npm view shadcn dist-tags --json`; if `latest` is already newer than `canary`/`rc`, keep using `npx shadcn@latest`.
+
+For chat apps, these primitives are layout/rendering primitives only. They should not replace application-specific protocols, backend validation, tool boundaries, or domain catalogs. In A2UI/agent-driven UIs, keep the agent/backend contract and allowlisted renderer catalog authoritative; use shadcn chat components only to render the chat shell, message scroller, bubbles, attachments, and status markers.
+
+When importing `radix-rhea` chat components into a project with a different style, preserve existing global primitives unless explicitly approved. In particular, do not overwrite a product-styled `Button` just because `message-scroller` or `attachment` lists `button` as a registry dependency. Adapt local chat component defaults such as `size="icon-sm"` / `size="icon-xs"` to the project's installed button or input-group APIs.
+
 ## Key Fields
 
 The injected project context contains these key fields:
