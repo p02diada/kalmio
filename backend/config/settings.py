@@ -43,6 +43,7 @@ def _ensure_value(values: list[str], candidate: str) -> list[str]:
 
 KALMIO_ENV = os.getenv("KALMIO_ENV", "development").strip().lower()
 IS_PRODUCTION = KALMIO_ENV == "production"
+KALMIO_LOGFIRE_ENABLED = env_bool("KALMIO_LOGFIRE_ENABLED", default=False)
 
 DEBUG = env_bool("DJANGO_DEBUG", default=not IS_PRODUCTION)
 if IS_PRODUCTION and DEBUG:
@@ -76,6 +77,7 @@ INSTALLED_APPS = [
     "accounts",
     "api",
     "charging",
+    "vehicles",
     "routing",
     "feedback",
 ]
@@ -164,6 +166,15 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+if KALMIO_LOGFIRE_ENABLED:
+    from config.logfire import configure_logfire
+
+    configure_logfire(
+        service_name=os.getenv("KALMIO_LOGFIRE_SERVICE_NAME", "kalmio-backend"),
+        environment=KALMIO_ENV,
+        local_default=not IS_PRODUCTION,
+    )
+
 KALMIO_ENABLE_ADMIN = env_bool("KALMIO_ENABLE_ADMIN", default=not IS_PRODUCTION)
 KALMIO_ADMIN_PATH = os.getenv("KALMIO_ADMIN_PATH", "admin/").strip().lstrip("/")
 if KALMIO_ENABLE_ADMIN and not KALMIO_ADMIN_PATH:
@@ -225,6 +236,40 @@ if KALMIO_AUTH_THROTTLE_WINDOW_SECONDS <= 0:
 
 KALMIO_ENABLE_API_DOCS = env_bool("KALMIO_ENABLE_API_DOCS", default=not IS_PRODUCTION)
 KALMIO_ROUTING_PROVIDER = os.getenv("KALMIO_ROUTING_PROVIDER", "osrm").strip().lower()
+KALMIO_GEOCODING_PROVIDER = os.getenv("KALMIO_GEOCODING_PROVIDER", "mapbox").strip().lower()
+if KALMIO_GEOCODING_PROVIDER not in {"mapbox", "local"}:
+    raise ImproperlyConfigured("KALMIO_GEOCODING_PROVIDER must be mapbox or local.")
+KALMIO_MAPBOX_ACCESS_TOKEN = os.getenv("KALMIO_MAPBOX_ACCESS_TOKEN", "").strip()
+KALMIO_MAPBOX_GEOCODING_BASE_URL = os.getenv(
+    "KALMIO_MAPBOX_GEOCODING_BASE_URL",
+    "https://api.mapbox.com",
+).strip()
+require_http_url("KALMIO_MAPBOX_GEOCODING_BASE_URL", KALMIO_MAPBOX_GEOCODING_BASE_URL)
+KALMIO_MAPBOX_SEARCH_API = os.getenv("KALMIO_MAPBOX_SEARCH_API", "auto").strip().lower()
+if KALMIO_MAPBOX_SEARCH_API not in {"auto", "searchbox", "geocoding"}:
+    raise ImproperlyConfigured("KALMIO_MAPBOX_SEARCH_API must be auto, searchbox, or geocoding.")
+KALMIO_GEOCODING_COUNTRY = os.getenv("KALMIO_GEOCODING_COUNTRY", "ES").strip()
+KALMIO_GEOCODING_LANGUAGE = os.getenv("KALMIO_GEOCODING_LANGUAGE", "es").strip()
+try:
+    KALMIO_GEOCODING_TIMEOUT_SECONDS = float(os.getenv("KALMIO_GEOCODING_TIMEOUT_SECONDS", "4"))
+except ValueError as exc:
+    raise ImproperlyConfigured("KALMIO_GEOCODING_TIMEOUT_SECONDS must be a number.") from exc
+if KALMIO_GEOCODING_TIMEOUT_SECONDS <= 0:
+    raise ImproperlyConfigured("KALMIO_GEOCODING_TIMEOUT_SECONDS must be greater than zero.")
+try:
+    KALMIO_GEOCODING_REQUEST_RETRIES = int(os.getenv("KALMIO_GEOCODING_REQUEST_RETRIES", "1"))
+except ValueError as exc:
+    raise ImproperlyConfigured("KALMIO_GEOCODING_REQUEST_RETRIES must be an integer.") from exc
+if KALMIO_GEOCODING_REQUEST_RETRIES < 0:
+    raise ImproperlyConfigured("KALMIO_GEOCODING_REQUEST_RETRIES must be greater than or equal to zero.")
+try:
+    KALMIO_GEOCODING_LIMIT = int(os.getenv("KALMIO_GEOCODING_LIMIT", "5"))
+except ValueError as exc:
+    raise ImproperlyConfigured("KALMIO_GEOCODING_LIMIT must be an integer.") from exc
+if KALMIO_GEOCODING_LIMIT < 1 or KALMIO_GEOCODING_LIMIT > 10:
+    raise ImproperlyConfigured("KALMIO_GEOCODING_LIMIT must be between 1 and 10.")
+if IS_PRODUCTION and KALMIO_GEOCODING_PROVIDER == "mapbox" and not KALMIO_MAPBOX_ACCESS_TOKEN:
+    raise ImproperlyConfigured("KALMIO_MAPBOX_ACCESS_TOKEN is required when KALMIO_GEOCODING_PROVIDER=mapbox.")
 
 KALMIO_ROUTE_CONVERSATION_THROTTLE_LIMIT = int(os.getenv("KALMIO_ROUTE_CONVERSATION_THROTTLE_LIMIT", "30"))
 KALMIO_ROUTE_CONVERSATION_THROTTLE_WINDOW_SECONDS = int(
@@ -239,15 +284,15 @@ if KALMIO_ROUTE_CONVERSATION_THROTTLE_WINDOW_SECONDS <= 0:
 
 default_agent_mode = "local" if "pytest" in Path(sys.argv[0]).name else "deepseek"
 KALMIO_CONVERSATION_AGENT_MODE = os.getenv("KALMIO_CONVERSATION_AGENT_MODE", default_agent_mode).strip().lower()
-if KALMIO_CONVERSATION_AGENT_MODE not in {"local", "deepseek"}:
-    raise ImproperlyConfigured("KALMIO_CONVERSATION_AGENT_MODE must be local or deepseek.")
+if KALMIO_CONVERSATION_AGENT_MODE not in {"local", "deepseek", "pydantic_ai"}:
+    raise ImproperlyConfigured("KALMIO_CONVERSATION_AGENT_MODE must be local, deepseek, or pydantic_ai.")
 
 KALMIO_DEEPSEEK_API_KEY = (
     os.getenv("KALMIO_DEEPSEEK_API_KEY") or os.getenv("DEEPSEEK_API_KEY") or ""
 ).strip()
-if KALMIO_CONVERSATION_AGENT_MODE == "deepseek" and not KALMIO_DEEPSEEK_API_KEY:
+if KALMIO_CONVERSATION_AGENT_MODE in {"deepseek", "pydantic_ai"} and not KALMIO_DEEPSEEK_API_KEY:
     raise ImproperlyConfigured(
-        "KALMIO_DEEPSEEK_API_KEY or DEEPSEEK_API_KEY is required when KALMIO_CONVERSATION_AGENT_MODE=deepseek."
+        "KALMIO_DEEPSEEK_API_KEY or DEEPSEEK_API_KEY is required when KALMIO_CONVERSATION_AGENT_MODE uses DeepSeek."
     )
 KALMIO_DEEPSEEK_BASE_URL = os.getenv("KALMIO_DEEPSEEK_BASE_URL", "https://api.deepseek.com").strip()
 require_http_url("KALMIO_DEEPSEEK_BASE_URL", KALMIO_DEEPSEEK_BASE_URL)

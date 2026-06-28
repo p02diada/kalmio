@@ -13,9 +13,9 @@ Manual runs used a now-removed local LLM runtime and authorized charger data fro
 Probable causes:
 
 - Prompt lacked concrete correction/follow-up examples.
-- Allowed tool failures were cut off by backend fallback before the legacy LLM runtime could explain them.
+- Allowed tool failures were cut off by backend fallback before the LLM runtime could explain them.
 - Location resolution did not normalize accents.
-- The legacy LLM runtime emitted station-name prop variants for `StationDetailCard`, but the normalizer did not consistently map them to the station identity expected by validation.
+- The LLM runtime emitted station-name prop variants for `StationDetailCard`, but the normalizer did not consistently map them to the station identity expected by validation.
 - Useful vehicle facts from earlier user text were not summarized compactly for the agent.
 
 ## Changes Made
@@ -99,7 +99,7 @@ Evaluation: passes. It does not convert the request into a route and stays hones
 
 ## Second Iteration: Expanded EV Matrix
 
-Manual runs were continued in the legacy LLM runtime after the first commit. The goal of this pass was not just to pass tests: the final responses had to sound useful for a real driver with low battery and avoid backend-authored intent routing.
+Manual runs were continued after the first commit. The goal of this pass was not just to pass tests: the final responses had to sound useful for a real driver with low battery and avoid backend-authored intent routing.
 
 ### Additional Findings
 

@@ -20,6 +20,7 @@ BASE_PRODUCTION_ENV = {
     "POSTGRES_HOST": "db",
     "POSTGRES_PORT": "5432",
     "KALMIO_DEEPSEEK_API_KEY": "ci-deepseek-key-for-production-settings-checks",
+    "KALMIO_MAPBOX_ACCESS_TOKEN": "ci-mapbox-token-for-production-settings-checks",
 }
 
 
@@ -53,6 +54,25 @@ def test_production_rejects_non_http_osrm_base_url():
 
 def test_production_accepts_explicit_routing_provider_url():
     result = import_settings({"KALMIO_OSRM_BASE_URL": "https://routes.kalmio.example"})
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_production_requires_mapbox_token_when_mapbox_geocoding_enabled():
+    result = import_settings({
+        "KALMIO_OSRM_BASE_URL": "https://routes.kalmio.example",
+        "KALMIO_MAPBOX_ACCESS_TOKEN": None,
+    })
+
+    assert result.returncode != 0
+    assert "KALMIO_MAPBOX_ACCESS_TOKEN is required" in result.stderr
+
+
+def test_production_accepts_pydantic_ai_deepseek_agent_mode():
+    result = import_settings({
+        "KALMIO_OSRM_BASE_URL": "https://routes.kalmio.example",
+        "KALMIO_CONVERSATION_AGENT_MODE": "pydantic_ai",
+    })
 
     assert result.returncode == 0, result.stderr
 

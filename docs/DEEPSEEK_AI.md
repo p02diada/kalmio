@@ -17,6 +17,12 @@ KALMIO_DEEPSEEK_USE_NATIVE_TOOLS=true
 KALMIO_DEEPSEEK_THINKING=false
 ```
 
+Experimental Pydantic AI comparison mode uses the same DeepSeek provider settings:
+
+```env
+KALMIO_CONVERSATION_AGENT_MODE=pydantic_ai
+```
+
 Enable traces during development:
 
 ```env
@@ -40,5 +46,28 @@ Then use the frontend chat or POST to `/api/conversation/message` with session c
 ```bash
 python .agents/skills/kalmio-chat-trace/scripts/analyze_trace.py --last-turns 10
 ```
+
+Run the outcome eval matrix and write comparable metrics:
+
+```bash
+python scripts/run_conversation_eval_matrix.py \
+  --dataset outcome \
+  --agent-modes deepseek,pydantic_ai \
+  --models deepseek-v4-pro \
+  --output-dir ../reports/pydantic-ai-spike
+```
+
+Or run one live backend manually:
+
+```bash
+python scripts/run_conversation_evals.py \
+  --api-base http://127.0.0.1:8000 \
+  --dataset outcome \
+  --label deepseek-v4-flash-evals \
+  --output ../reports/conversation-evals/deepseek-v4-flash.json \
+  --markdown-output ../reports/conversation-evals/deepseek-v4-flash.md
+```
+
+See `docs/conversation-evals.md` for evaluator layers and Logfire setup.
 
 The app must never invent charger availability, prices, stations, coordinates, route metrics, or vehicle state. If DeepSeek, routing, or authorized charger data cannot validate an answer, the backend should return a minimal honest fallback.

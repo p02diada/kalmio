@@ -213,6 +213,7 @@ def normalize_usage(usage: Any) -> dict[str, Any]:
         "input_cache_hit_tokens",
         "cached_input_tokens",
         "cached_tokens",
+        "cache_read_tokens",
     )
     if cache_hit_tokens is None:
         cache_hit_tokens = first_nested_int(

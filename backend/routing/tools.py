@@ -6,28 +6,12 @@ from typing import Any
 
 from charging.selectors import get_nearby_stations
 from django.utils import timezone
+from routing.geocoding import KNOWN_LOCATIONS, GeocodingProviderError, get_location_resolver
 from routing.production_planner import PlanningDataError, plan_route_with_persisted_stations
 from routing.providers import Coordinate, ProviderRoute, RoutingProviderError, get_route_provider
 from routing.scoring import Preferences, VehicleContext
 
 
-KNOWN_LOCATIONS = {
-    "madrid": ("Madrid", 40.4168, -3.7038),
-    "valencia": ("Valencia", 39.4699, -0.3763),
-    "cordoba": ("Córdoba", 37.8882, -4.7794),
-    "sevilla": ("Sevilla", 37.3891, -5.9845),
-    "barcelona": ("Barcelona", 41.3874, 2.1686),
-    "malaga": ("Málaga", 36.7213, -4.4214),
-    "granada": ("Granada", 37.1773, -3.5986),
-    "alicante": ("Alicante", 38.3452, -0.4810),
-    "bilbao": ("Bilbao", 43.2630, -2.9350),
-    "zaragoza": ("Zaragoza", 41.6488, -0.8891),
-    "cadiz": ("Cádiz", 36.5271, -6.2886),
-    "alhambra": ("Alhambra, Granada", 37.1761, -3.5881),
-    "almansa": ("Almansa", 38.8690, -1.0971),
-    "alcobendas": ("Alcobendas", 40.5317, -3.6419),
-    "alcora": ("Alcora", 39.1230, -0.5025),
-}
 ALLOWED_CONVERSATION_TOOLS = {"resolve_location", "search_destination_chargers", "plan_route"}
 CHARGER_SEARCH_PURPOSES = {"urgent", "destination", "stay", "near_route_fallback"}
 DEFAULT_RADIUS_BY_PURPOSE = {
@@ -60,33 +44,44 @@ def execute_conversation_tool(call: ToolCall) -> dict[str, Any]:
 
 def resolve_location_tool(args: dict[str, Any]) -> dict[str, Any]:
     raw_query = str(args.get("query") or "").strip()
-    query = normalize_location_query(raw_query)
-    for key, (label, lat, lon) in KNOWN_LOCATIONS.items():
-        if key in query:
-            return {
-                "ok": True,
-                "location": {
-                    "label": label,
-                    "lat": lat,
-                    "lon": lon,
-                    "precision": location_resolution_precision(query, key),
-                    "query": raw_query,
-                },
-            }
-    return {"ok": False, "error": "No conozco esa ubicación. Pide ciudad o coordenadas exactas."}
+    search_mode = clean_location_search_mode(args.get("searchMode") or args.get("search_mode"))
+    if not raw_query:
+        return {"ok": False, "tool": "resolve_location", "error": "La herramienta necesita una ubicación concreta."}
+    try:
+        candidates = [
+            candidate.as_payload()
+            for candidate in get_location_resolver().resolve(raw_query, search_mode=search_mode)
+        ]
+    except GeocodingProviderError as exc:
+        return {"ok": False, "tool": "resolve_location", "error": str(exc)}
+    if not candidates:
+        return {
+            "ok": False,
+            "tool": "resolve_location",
+            "query": raw_query,
+            "searchMode": search_mode,
+            "candidates": [],
+            "error": "No he podido resolver esa ubicación. Pide ciudad, dirección, POI o coordenadas exactas.",
+        }
+    location = candidates[0]
+    return {
+        "ok": True,
+        "tool": "resolve_location",
+        "query": raw_query,
+        "searchMode": search_mode,
+        "location": location,
+        "candidates": candidates,
+        "source": location.get("source"),
+        "precision": location.get("precision"),
+        "isApproximate": location.get("isApproximate"),
+    }
 
 
-def normalize_location_query(value: str) -> str:
-    substitutions = str.maketrans("áéíóúüñ", "aeiouun")
-    return value.lower().translate(substitutions)
-
-
-def location_resolution_precision(query: str, matched_key: str) -> str:
-    if query.strip(" .,") == matched_key:
-        return "known_location"
-    if any(term in query for term in ("hotel", "calle", "paseo", "avenida", "plaza", "melia", "alhambra", "atocha")):
-        return "city_approximation"
-    return "known_location"
+def clean_location_search_mode(value: Any) -> str:
+    mode = str(value or "auto").strip().lower()
+    if mode in {"poi", "address", "place", "auto"}:
+        return mode
+    return "auto"
 
 
 def search_destination_chargers_tool(args: dict[str, Any]) -> dict[str, Any]:

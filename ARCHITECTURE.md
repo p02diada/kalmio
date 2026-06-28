@@ -55,7 +55,7 @@ Official transports can be JSONL/SSE, WebSocket, A2A, AG-UI, or REST for simple 
    - `codex`: local Codex CLI adapter using `KALMIO_CODEX_MODEL`, with an internal Django tool loop.
    - `deepseek`: DeepSeek Chat Completions adapter using `KALMIO_DEEPSEEK_MODEL`, OpenAI-compatible SDK calls, JSON output, and optional native tool calls.
 4. In provider-backed modes (`codex` and `deepseek`), the model receives the useful conversation transcript, the allowed internal tools, and the Kalmio A2UI catalog described by purpose and data requirements. The model returns final local adapter blocks or an allowlisted tool call; Django converts validated final blocks into protocol envelopes for transport. Django validates and executes each tool, appends the validated result to the turn history, and asks the configured model again until it returns final UI or reaches the provider tool-call budget. The model chooses intent, tool calls, and UI components. Django validates component allowlist, structural props, catalog schema, data traceability, and supported actions; it does not choose components from regex or intent rules. Contract violations get one repair request back to the same provider with concrete safety/data issues. Failed allowlisted tools are returned to the model so it can explain the validated failure in context. Unknown tools, repeated identical calls, exhausted budgets, failed repairs, or missing final UI return minimal fallback A2UI instead of arbitrary behavior.
-5. Current internal tools are `resolve_location`, `search_destination_chargers`, and `plan_route`. They are Python functions inside Django, not MCP tools, so they keep session, data-source, provider, and authorization boundaries inside the backend.
+5. Current internal tools are `resolve_location`, `search_destination_chargers`, and `plan_route`. They are Python functions inside Django, not MCP tools, so they keep session, data-source, provider, and authorization boundaries inside the backend. `resolve_location` uses the configured geocoding adapter, currently Mapbox or local development fallback, and returns candidate locations with precision, source, confidence, and approximation metadata.
 6. Domain facts come only from authorized charger data, route provider responses, internal tool outputs, or explicit user input.
 7. Validate generated A2UI component types against the Kalmio catalog and normalize known Codex prop variants before rendering. Structured station data, route metrics, coordinates, costs, availability, uncertainty, and actions are checked against tool results or previously validated session blocks.
 8. Store the latest validated UI blocks in the Django session and return only A2UI v0.9.1 `messages` to the frontend.
@@ -111,6 +111,7 @@ It must respect minimum reserve. If a plan cannot respect reserve, it must warn 
 
 The production route-planning path uses:
 
+- `resolve_location` through the configured geocoding provider. Mapbox is the default provider for place, street, POI, hotel, zone, and "near X" resolution; local known locations are only a development/test fallback when no token is configured.
 - `OsrmRouteProvider`, configured with `KALMIO_OSRM_BASE_URL`.
 - Persisted charger data loaded from authorized sources.
 - Explicit provider/data errors when a real answer cannot be produced.

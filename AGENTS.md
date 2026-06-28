@@ -49,6 +49,14 @@ Backend: Django, Django Ninja, Django ORM, GeoDjango, Postgres/PostGIS, provider
 - Backend: `cd backend && python -m venv .venv && source .venv/bin/activate && pip install -r requirements-dev.txt && python manage.py migrate && python manage.py runserver`.
 - Docker: `docker compose up --build`.
 
+## Conversation Evals
+
+- Use `backend/scripts/run_conversation_evals.py` for one backend/model run against an already running API. `outcome` is the product benchmark dataset.
+- Use `backend/scripts/run_conversation_eval_matrix.py` when comparing agent modes or OpenAI-compatible models. It starts a temporary backend per variant and writes JSON, Markdown and trace JSONL artifacts.
+- Keep eval artifacts under `reports/` with labels that identify agent mode, model, dataset, and any material agent-contract version. Do not add runtime prompt modes; Kalmio currently has one production agent contract.
+- Run automated tests in local mode: `cd backend && KALMIO_CONVERSATION_AGENT_MODE=local .venv/bin/python -m pytest`.
+- For live model evals, provide API keys through environment variables only. Do not store keys in the repo or committed reports.
+
 ## Agent Runtime Rules
 
 - Use local mode only for automated unit tests and e2e test runs.

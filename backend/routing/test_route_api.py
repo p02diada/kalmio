@@ -18,8 +18,10 @@ from routing.agent import (
     conversation_agent_prompt,
     contextualized_prompt,
     decode_agent_json,
+    deepseek_tool_definitions,
     fallback_from_tool_history,
     parse_openai_compatible_decision,
+    run_provider_agent,
     run_deepseek_decision,
     station_search_result_prompt,
     tool_call_argument_grounding_issues,
@@ -2858,6 +2860,13 @@ def test_deepseek_decision_parser_accepts_native_tool_call():
     assert decision == {"type": "tool_call", "tool": "resolve_location", "args": {"query": "Córdoba"}}
 
 
+def test_deepseek_tool_schema_allows_location_search_mode_hint():
+    resolve_tool = next(tool for tool in deepseek_tool_definitions() if tool["function"]["name"] == "resolve_location")
+    search_mode = resolve_tool["function"]["parameters"]["properties"]["searchMode"]
+
+    assert search_mode["enum"] == ["auto", "poi", "address", "place"]
+
+
 def test_deepseek_decision_parser_accepts_json_final_content():
     decision = parse_openai_compatible_decision(
         {
@@ -3574,6 +3583,81 @@ def test_deepseek_conversation_agent_uses_same_tool_and_a2ui_validation_loop(
     assert tool_event["name"] == "search_destination_chargers"
     assert tool_event["metadata"]["stopCount"] == 1
     assert tool_event["request"]["location"]["label"] == "Almansa"
+
+
+@pytest.mark.django_db
+def test_pydantic_ai_conversation_agent_uses_same_tool_and_a2ui_validation_loop(
+    client, settings, monkeypatch, real_station, tmp_path
+):
+    settings.KALMIO_CONVERSATION_AGENT_MODE = "pydantic_ai"
+    settings.KALMIO_AGENT_TRACE_ENABLED = True
+    settings.KALMIO_AGENT_TRACE_INCLUDE_PAYLOADS = True
+    settings.KALMIO_AGENT_TRACE_FILE = str(tmp_path / "agent-traces.jsonl")
+    calls = []
+
+    def fake_pydantic_ai_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+        tool_history = tool_history or []
+        calls.append((len(tool_history), repair_issues or []))
+        if not tool_history:
+            return {
+                "type": "tool_call",
+                "tool": "search_destination_chargers",
+                "args": {
+                    "location": {"label": "Almansa", "lat": 38.87, "lon": -1.09},
+                    "radius_km": 5,
+                    "limit": 1,
+                },
+            }
+        tool_result = tool_history[-1]["result"]
+        assistant_text = (
+            "Uso Almansa como aproximación porque no tengo la dirección exacta del hotel. "
+            "Dime dirección, zona exacta, coordenadas o el hotel exacto para refinar la búsqueda."
+            if repair_issues
+            else "Uso datos autorizados cerca de Almansa."
+        )
+        return {
+            "type": "final",
+            "blocks": [
+                {
+                    "id": "assistant-pydantic-ai",
+                    "type": "AssistantMessage",
+                    "version": 1,
+                    "props": {"text": assistant_text},
+                },
+                {
+                    "id": "station-pydantic-ai",
+                    "type": "StationPreviewCard",
+                    "version": 1,
+                    "props": tool_result["stops"][0],
+                },
+            ],
+        }
+
+    monkeypatch.setattr("routing.pydantic_ai_agent.request_pydantic_ai_decision", fake_pydantic_ai_decision)
+
+    response = client.post(
+        "/api/conversation/message",
+        data={"text": "Busca cargadores cerca de mi hotel en Almansa"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert [(count, bool(repair)) for count, repair in calls] == [(0, False), (1, False), (1, True)]
+    blocks = blocks_from_a2ui_response(response)
+    station_block = next(block for block in blocks if block["type"] == "StationPreviewCard")
+    assert station_block["props"]["name"] == real_station.name
+    trace_events = [
+        json.loads(line)
+        for line in (tmp_path / "agent-traces.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert any(
+        event["event"] == "agent_turn" and event["provider"] == "pydantic_ai:deepseek"
+        for event in trace_events
+    )
+    tool_event = next(event for event in trace_events if event["event"] == "internal_tool_call")
+    assert tool_event["name"] == "search_destination_chargers"
+    assert tool_event["metadata"]["stopCount"] == 1
 
 
 @pytest.mark.django_db
@@ -5230,6 +5314,113 @@ def test_deepseek_conversation_agent_stops_at_tool_budget(client, settings, monk
         for block in blocks_from_a2ui_response(response)
         if block["type"] == "AssistantMessage"
     )
+
+
+def test_provider_agent_retries_invalid_initial_decision_once():
+    calls = []
+
+    def fake_request_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+        calls.append(message)
+        if len(calls) == 1:
+            raise AgentResponseError("DeepSeek no devolvió un objeto JSON válido.")
+        return {
+            "type": "final",
+            "blocks": [
+                {
+                    "id": "ask-vehicle-data",
+                    "type": "AssistantMessage",
+                    "version": 1,
+                    "props": {
+                        "text": (
+                            "Para llegar con al menos 30% necesito origen, destino, batería actual "
+                            "y modelo/consumo/autonomía."
+                        )
+                    },
+                }
+            ],
+        }
+
+    blocks = run_provider_agent(
+        "Quiero llegar con al menos 30% de bateria",
+        history_blocks=[],
+        request_decision=fake_request_decision,
+        max_tool_calls=3,
+    )
+
+    assert len(calls) == 2
+    assert "no fue JSON válido" in calls[1]
+    assert blocks[0]["type"] == "AssistantMessage"
+    assert "origen" in blocks[0]["props"]["text"]
+
+
+def test_provider_agent_retries_promised_tool_without_call(monkeypatch):
+    decisions = []
+    executed_tools = []
+
+    def fake_request_decision(message, tool_history=None, repair_issues=None, candidate_blocks=None):
+        decisions.append({"message": message, "tool_history": list(tool_history or [])})
+        if len(decisions) == 1:
+            return {
+                "type": "final",
+                "blocks": [
+                    {
+                        "id": "promise-search",
+                        "type": "AssistantMessage",
+                        "version": 1,
+                        "props": {
+                            "text": (
+                                "Voy a buscar cargadores en Madrid y te mostraré opciones para cargar de noche."
+                            )
+                        },
+                    }
+                ],
+            }
+        if len(decisions) == 2:
+            return {
+                "type": "tool_call",
+                "tool": "search_destination_chargers",
+                "args": {"location": {"label": "Madrid", "lat": 40.4168, "lon": -3.7038}, "limit": 3},
+            }
+        return {
+            "type": "final",
+            "blocks": [
+                {
+                    "id": "safe-night-search",
+                    "type": "AssistantMessage",
+                    "version": 1,
+                    "props": {
+                        "text": (
+                            "He buscado puntos de carga autorizados en Madrid. Kalmio no valida seguridad, "
+                            "iluminación ni afluencia en tiempo real; confirma el entorno antes de ir."
+                        )
+                    },
+                }
+            ],
+        }
+
+    def fake_execute_conversation_tool(call):
+        executed_tools.append(call.name)
+        return {
+            "ok": True,
+            "tool": call.name,
+            "location": {"label": "Madrid", "lat": 40.4168, "lon": -3.7038},
+            "stops": [],
+        }
+
+    monkeypatch.setattr("routing.agent.execute_conversation_tool", fake_execute_conversation_tool)
+
+    blocks = run_provider_agent(
+        "Quiero el cargador mas seguro de noche en Madrid",
+        history_blocks=[],
+        request_decision=fake_request_decision,
+        max_tool_calls=3,
+    )
+
+    assert executed_tools == ["search_destination_chargers"]
+    assert len(decisions) == 3
+    assert "prometía buscar" in decisions[1]["message"]
+    assert blocks[0]["type"] == "AssistantMessage"
+    assert "no valida seguridad" in blocks[0]["props"]["text"].lower()
 
 
 @pytest.mark.django_db

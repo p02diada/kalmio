@@ -9,7 +9,10 @@ packaging==26.2
 psycopg==3.3.4
 psycopg-binary==3.3.4
 pydantic==2.13.4
+pydantic-ai-slim[openai]==2.0.0
+pydantic-evals==2.0.0
 pydantic_core==2.46.4
+logfire[django,httpx]==4.16.0
 sqlparse==0.5.5
 typing-inspection==0.4.2
 typing_extensions==4.15.0

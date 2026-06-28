@@ -104,6 +104,13 @@ def run_conversation_agent(
         if not any(item.get("type") == "UserMessage" for item in blocks):
             blocks.insert(0, block(f"user-{uuid4().hex[:10]}", "UserMessage", {"text": message.strip()}))
         return blocks
+    if mode == "pydantic_ai":
+        blocks = validate_blocks(
+            run_pydantic_ai_agent(message, history_blocks=history_blocks, progress_callback=progress_callback)
+        )
+        if not any(item.get("type") == "UserMessage" for item in blocks):
+            blocks.insert(0, block(f"user-{uuid4().hex[:10]}", "UserMessage", {"text": message.strip()}))
+        return blocks
     if mode != "local":
         raise AgentResponseError(f"Modo de agente no soportado: {mode}.")
     return validate_blocks(run_local_agent(message, history_blocks=history_blocks))
@@ -211,6 +218,23 @@ def run_deepseek_agent(
         )
 
 
+def run_pydantic_ai_agent(
+    message: str,
+    history_blocks: list[dict] | None = None,
+    progress_callback: ProgressCallback | None = None,
+) -> list[dict]:
+    from routing.pydantic_ai_agent import request_pydantic_ai_decision
+
+    with agent_trace_turn("pydantic_ai:deepseek"):
+        return run_provider_agent(
+            message,
+            history_blocks=history_blocks,
+            request_decision=request_pydantic_ai_decision,
+            max_tool_calls=getattr(settings, "KALMIO_DEEPSEEK_MAX_TOOL_CALLS", 3),
+            progress_callback=progress_callback,
+        )
+
+
 def run_provider_agent(
     message: str,
     *,
@@ -223,6 +247,8 @@ def run_provider_agent(
     decision_message = contextualized_prompt(message, history_blocks)
     tool_history: list[dict[str, Any]] = []
     seen_calls: set[str] = set()
+    invalid_decision_retry_used = False
+    promised_tool_retry_used = False
 
     for _ in range(max_tool_calls + 1):
         try:
@@ -233,18 +259,72 @@ def run_provider_agent(
             )
             decision = request_decision(decision_message, tool_history=tool_history)
         except AgentResponseError as exc:
-            if tool_history:
-                return fallback_from_tool_history(tool_history, str(exc), decision_message)
-            raise
+            if not tool_history and not invalid_decision_retry_used:
+                invalid_decision_retry_used = True
+                record_trace_event(
+                    event="agent_guardrail",
+                    name="invalid_decision_retry",
+                    status="warning",
+                    metadata={"reason": str(exc), "recovery": "retry_with_json_reminder"},
+                )
+                try:
+                    decision = request_decision(
+                        decision_message
+                        + "\n\nTu respuesta anterior no fue JSON válido o no respetó el contrato. "
+                        "Reintenta una sola vez: devuelve exactamente un objeto JSON raíz type=tool_call o type=final. "
+                        "Si hay datos suficientes para usar una herramienta autorizada, emite tool_call ahora; "
+                        "no prometas buscar datos en texto visible.",
+                        tool_history=tool_history,
+                    )
+                except AgentResponseError:
+                    raise
+            else:
+                if tool_history:
+                    return fallback_from_tool_history(tool_history, str(exc), decision_message)
+                raise
         if decision["type"] == "final":
-            return validated_or_repaired_final_blocks(
-                decision_message,
-                decision["blocks"],
-                tool_history,
-                history_blocks=history_blocks,
-                request_decision=request_decision,
-                progress_callback=progress_callback,
-            )
+            if (
+                not tool_history
+                and not promised_tool_retry_used
+                and final_blocks_promise_tool_without_result(decision["blocks"])
+            ):
+                promised_tool_retry_used = True
+                record_trace_event(
+                    event="agent_guardrail",
+                    name="promised_tool_without_call",
+                    status="warning",
+                    metadata={"recovery": "retry_allowing_tool_call"},
+                    request_payload=decision["blocks"],
+                )
+                decision = request_decision(
+                    decision_message
+                    + "\n\nTu respuesta anterior prometía buscar, consultar o mostrar cargadores/ruta, "
+                    "pero no emitió ninguna llamada de herramienta. Si el usuario dio ubicación, origen/destino "
+                    "o zona suficiente, devuelve type=tool_call. Si falta un dato crítico, devuelve type=final "
+                    "preguntando ese dato sin prometer que ya estás buscando.",
+                    tool_history=tool_history,
+                )
+                if decision["type"] != "final":
+                    # Continue below so the retried tool_call goes through the same grounding, loop and execution path.
+                    pass
+                elif final_blocks_promise_tool_without_result(decision["blocks"]):
+                    return fallback_from_tool_history(
+                        tool_history,
+                        "El agente prometió consultar herramientas pero no emitió una llamada ejecutable.",
+                        decision_message,
+                    )
+            if decision["type"] != "final":
+                # Fall through to the shared tool-call handling below.
+                pass
+            else:
+                return validated_or_repaired_final_blocks(
+                    decision_message,
+                    decision["blocks"],
+                    tool_history,
+                    history_blocks=history_blocks,
+                    request_decision=request_decision,
+                    progress_callback=progress_callback,
+                )
 
         grounding_issues = tool_call_argument_grounding_issues(
             decision,
@@ -394,6 +474,17 @@ def validated_or_repaired_final_blocks(
     if not issues:
         return blocks
 
+    record_trace_event(
+        event="agent_guardrail",
+        name="a2ui_contract_issues",
+        status="warning",
+        metadata={
+            "issueCount": len(issues),
+            "issues": issues,
+            "recovery": "repair_retry",
+        },
+        request_payload=candidate_blocks,
+    )
     try:
         emit_progress(progress_callback, "repairing_a2ui", "Ajustando la respuesta antes de mostrarla")
         repair_decision = request_decision(
@@ -499,12 +590,14 @@ def call_deepseek_chat_completion(prompt: str, *, allow_tools: bool) -> Any:
     except ImportError as exc:
         raise AgentResponseError("El SDK openai no está instalado. Ejecuta pip install -r requirements.txt.") from exc
 
+    base_url = getattr(settings, "KALMIO_DEEPSEEK_BASE_URL", "https://api.deepseek.com")
     client = OpenAI(
         api_key=api_key,
-        base_url=getattr(settings, "KALMIO_DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+        base_url=base_url,
         timeout=getattr(settings, "KALMIO_DEEPSEEK_TIMEOUT_SECONDS", 30),
     )
     model = getattr(settings, "KALMIO_DEEPSEEK_MODEL", "deepseek-v4-flash")
+    provider = openai_compatible_provider_label(base_url)
     request: dict[str, Any] = {
         "model": model,
         "messages": [
@@ -519,14 +612,16 @@ def call_deepseek_chat_completion(prompt: str, *, allow_tools: bool) -> Any:
             {"role": "user", "content": prompt},
         ],
         "response_format": {"type": "json_object"},
-        "max_tokens": getattr(settings, "KALMIO_DEEPSEEK_MAX_TOKENS", 1800),
         "stream": False,
-        "extra_body": {
+    }
+    max_tokens_key = "max_completion_tokens" if provider == "openai" else "max_tokens"
+    request[max_tokens_key] = getattr(settings, "KALMIO_DEEPSEEK_MAX_TOKENS", 1800)
+    if provider == "deepseek":
+        request["extra_body"] = {
             "thinking": {
                 "type": "enabled" if getattr(settings, "KALMIO_DEEPSEEK_THINKING", False) else "disabled"
             }
-        },
-    }
+        }
     if getattr(settings, "KALMIO_DEEPSEEK_THINKING", False):
         request["reasoning_effort"] = getattr(settings, "KALMIO_DEEPSEEK_REASONING_EFFORT", "high")
     else:
@@ -544,7 +639,7 @@ def call_deepseek_chat_completion(prompt: str, *, allow_tools: bool) -> Any:
             event="llm_api_call",
             name="chat.completions.create",
             status="error",
-            provider="deepseek",
+            provider=provider,
             model=model,
             duration_ms=elapsed_ms(started),
             metadata=deepseek_request_metadata(request),
@@ -559,7 +654,7 @@ def call_deepseek_chat_completion(prompt: str, *, allow_tools: bool) -> Any:
             event="llm_api_call",
             name="chat.completions.create",
             status="error",
-            provider="deepseek",
+            provider=provider,
             model=model,
             duration_ms=elapsed_ms(started),
             usage=normalize_usage(getattr(response, "usage", None)),
@@ -575,7 +670,7 @@ def call_deepseek_chat_completion(prompt: str, *, allow_tools: bool) -> Any:
             event="llm_api_call",
             name="chat.completions.create",
             status="error",
-            provider="deepseek",
+            provider=provider,
             model=model,
             duration_ms=elapsed_ms(started),
             usage=normalize_usage(getattr(response, "usage", None)),
@@ -590,7 +685,7 @@ def call_deepseek_chat_completion(prompt: str, *, allow_tools: bool) -> Any:
         event="llm_api_call",
         name="chat.completions.create",
         status="ok",
-        provider="deepseek",
+        provider=provider,
         model=model,
         duration_ms=elapsed_ms(started),
         usage=usage,
@@ -606,6 +701,15 @@ def call_deepseek_chat_completion(prompt: str, *, allow_tools: bool) -> Any:
     return message
 
 
+def openai_compatible_provider_label(base_url: str) -> str:
+    normalized = base_url.lower()
+    if "api.openai.com" in normalized:
+        return "openai"
+    if "deepseek" in normalized:
+        return "deepseek"
+    return "openai_compatible"
+
+
 def deepseek_request_metadata(request: dict[str, Any]) -> dict[str, Any]:
     messages = request.get("messages") if isinstance(request.get("messages"), list) else []
     prompt_chars = sum(len(str(message.get("content") or "")) for message in messages if isinstance(message, dict))
@@ -615,7 +719,7 @@ def deepseek_request_metadata(request: dict[str, Any]) -> dict[str, Any]:
     return {
         "messageCount": len(messages),
         "promptChars": prompt_chars,
-        "maxTokens": request.get("max_tokens"),
+        "maxTokens": request.get("max_tokens") or request.get("max_completion_tokens"),
         "nativeTools": bool(tools),
         "toolCount": len(tools),
         "thinking": thinking.get("type"),
@@ -639,10 +743,17 @@ def deepseek_tool_definitions() -> list[dict[str, Any]]:
             "type": "function",
             "function": {
                 "name": "resolve_location",
-                "description": "Resuelve una ciudad, zona o POI conocido antes de buscar paradas de carga o calcular ruta.",
+                "description": "Resuelve una ciudad, zona, dirección o POI conocido antes de buscar paradas de carga o calcular ruta.",
                 "parameters": {
                     "type": "object",
-                    "properties": {"query": {"type": "string", "description": "Ciudad, zona, hotel o POI textual."}},
+                    "properties": {
+                        "query": {"type": "string", "description": "Ciudad, zona, dirección, hotel o POI textual."},
+                        "searchMode": {
+                            "type": "string",
+                            "enum": ["auto", "poi", "address", "place"],
+                            "description": "Pista opcional: poi para hoteles/estaciones/monumentos, address para calles/direcciones, place para ciudades/zonas.",
+                        },
+                    },
                     "required": ["query"],
                     "additionalProperties": False,
                 },
@@ -964,6 +1075,32 @@ def chat_content_text(value: Any) -> str:
     return "" if value is None else str(value).strip()
 
 
+def final_blocks_promise_tool_without_result(blocks: list[dict]) -> bool:
+    visible_text = normalize(" ".join(block_visible_text(block) for block in blocks if isinstance(block, dict)))
+    if not visible_text:
+        return False
+    promise_patterns = (
+        r"\b(voy|vamos)\s+a\s+(buscar|consultar|comprobar|calcular|mostrar)\b",
+        r"\b(te\s+)?(busco|consulto|compruebo|calculo|muestro)\b",
+        r"\b(he\s+de\s+buscar|necesito\s+buscar)\b",
+    )
+    tool_subject_terms = (
+        "cargador",
+        "cargadores",
+        "carga",
+        "punto de carga",
+        "puntos de carga",
+        "estacion",
+        "estaciones",
+        "ruta",
+        "parada",
+        "paradas",
+    )
+    return any(re.search(pattern, visible_text) for pattern in promise_patterns) and any(
+        term in visible_text for term in tool_subject_terms
+    )
+
+
 def attr_or_key(value: Any, key: str, default: Any = None) -> Any:
     if isinstance(value, dict):
         return value.get(key, default)
@@ -1052,9 +1189,12 @@ def compact_tool_result_for_prompt(result: dict[str, Any], tool_name: str = "") 
 
     if tool_name == "resolve_location":
         compact = {}
-        for key in ("ok", "tool", "location", "precision", "error"):
+        for key in ("ok", "tool", "searchMode", "location", "candidates", "source", "precision", "isApproximate", "error"):
             if key in result:
                 compact[key] = compact_prompt_value(result[key])
+        if isinstance(compact.get("candidates"), list):
+            compact["candidates"] = compact["candidates"][:3]
+            compact["candidateCount"] = len(result.get("candidates") or [])
         return compact
 
     return compact_prompt_value(result)
@@ -1175,7 +1315,9 @@ def conversation_agent_prompt(
     )
     tool_instructions = (
         "Herramientas permitidas. Puedes llamar solo una por respuesta tool_call:\n"
-        '- resolve_location: resuelve una ciudad o texto conocido. Args: {"query":"ciudad o texto"}\n'
+        '- resolve_location: resuelve ciudad, zona, calle/dirección o POI. Args: {"query":"texto",'
+        '"searchMode":"auto|poi|address|place"}; usa poi para hoteles, estaciones, monumentos o recintos; '
+        "address para calles/direcciones; place para ciudades/zonas; auto si no está claro.\n"
         "- search_destination_chargers: busca puntos de carga autorizados alrededor de una ubicación ya resuelta o "
         'coordenadas dadas por el usuario. Args: {"location":{"label":"...","lat":0,"lon":0},"connector":null,'
         '"purpose":"destination|urgent|stay|near_route_fallback","radius_km":80,"limit":3,'
@@ -1351,7 +1493,6 @@ def conversation_agent_prompt(
         f"{output_instructions}\n"
         f"Usuario: {message}"
     )
-
 
 def station_search_result_prompt(message: str, tool_history: list[dict[str, Any]]) -> str:
     result = latest_station_search_result(tool_history)
@@ -1999,6 +2140,9 @@ def add_approximate_location_fact(facts: dict[str, Any], query: Any, location: A
     normalized_query = normalize(query_text)
     normalized_label = normalize(label)
     if normalized_query == normalized_label or normalized_label not in normalized_query:
+        return
+    if location.get("isApproximate") is True:
+        facts["approximateLocations"].append({"query": query_text, "resolvedLabel": label})
         return
     if location.get("precision") in {"city_approximation", "known_location_approximation"}:
         facts["approximateLocations"].append({"query": query_text, "resolvedLabel": label})
