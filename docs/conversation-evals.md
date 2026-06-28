@@ -4,27 +4,57 @@ Kalmio conversation quality is evaluated with the `outcome` dataset. It accepts 
 
 ## Runner
 
+Use the current `outcome` dataset in `backend/scripts/run_conversation_evals.py`
+and evaluate with `deepseek-v4-pro` unless an experiment explicitly says
+otherwise. The current dataset contains 50 cases (`101`-`150`); seeing only 30
+cases means an old script or old worktree is being used.
+
+Run DeepSeek/pro evals against the local Docker PostGIS charger database.
+SQLite is only for unit tests and will distort route-tool latency. Prefer restoring the local
+charger snapshot for repeated eval runs; reimport the JSON only when regenerating
+the snapshot after data or importer changes.
+
+```bash
+make charger-restore
+```
+
+Regenerate the snapshot from the canonical JSON fixture when needed:
+
+```bash
+make reve-import
+make charger-snapshot
+```
+
 Run against a live backend:
 
 ```bash
-cd backend
-python scripts/run_conversation_evals.py \
-  --api-base http://127.0.0.1:8000 \
+docker compose up -d backend
+docker compose run --rm backend python scripts/run_conversation_evals.py \
+  --api-base http://backend:8000 \
   --dataset outcome \
-  --label deepseek-v4-flash-evals \
-  --output ../reports/conversation-evals/deepseek-v4-flash.json \
-  --markdown-output ../reports/conversation-evals/deepseek-v4-flash.md
+  --label deepseek-v4-pro-evals \
+  --output ../reports/conversation-evals/deepseek-v4-pro.json \
+  --markdown-output ../reports/conversation-evals/deepseek-v4-pro.md
 ```
 
 Use `--repeat 3` for stability checks. Keep `--max-concurrency 1` when using the session-based Django conversation endpoint.
 
+Latest local launch-readiness run, 2026-06-28:
+
+- Runtime: `KALMIO_CONVERSATION_AGENT_RUNTIME=pydantic_ai`
+- Model: `deepseek-v4-pro`
+- DB: local Docker PostGIS charger data
+- Dataset: `outcome` cases `101`-`150`
+- Result: `50/50` task success, hard contracts, tool policy, UI family and safety
+- Report: `reports/conversation-eval-direct-pro-postgis/101-150-full-guardrail.json`
+- Average duration: `5660.9534 ms`, repairs `0`, fallbacks `0`
+
 Run a controlled matrix when comparing runtimes or models. The matrix runner starts one temporary backend per variant and writes JSON, Markdown and trace JSONL artifacts:
 
 ```bash
-cd backend
-python scripts/run_conversation_eval_matrix.py \
+docker compose run --rm backend python scripts/run_conversation_eval_matrix.py \
   --dataset outcome \
-  --agent-modes deepseek,pydantic_ai \
+  --agent-modes deepseek \
   --models deepseek-v4-pro \
   --repeat 3 \
   --max-concurrency 1 \
@@ -34,9 +64,8 @@ python scripts/run_conversation_eval_matrix.py \
 OpenAI-compatible model experiments can use the same runner without storing keys in the repo:
 
 ```bash
-cd backend
 export OPENAI_API_KEY=...
-python scripts/run_conversation_eval_matrix.py \
+docker compose run --rm -e OPENAI_API_KEY backend python scripts/run_conversation_eval_matrix.py \
   --dataset outcome \
   --agent-modes deepseek \
   --base-url https://api.openai.com/v1 \
@@ -85,8 +114,8 @@ LOGFIRE_TOKEN=...
 The eval runner can also enable Logfire for a run:
 
 ```bash
-python scripts/run_conversation_evals.py \
-  --api-base http://127.0.0.1:8000 \
+docker compose run --rm backend python scripts/run_conversation_evals.py \
+  --api-base http://backend:8000 \
   --dataset outcome \
   --label deepseek-pro-evals \
   --logfire

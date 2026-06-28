@@ -58,6 +58,8 @@ def run_eval(
     logfire: bool,
     output_dir: Path,
     startup_timeout: float,
+    request_timeout: int,
+    case_timeout: int,
 ) -> Path:
     port = free_port()
     api_base = f"http://127.0.0.1:{port}"
@@ -69,6 +71,7 @@ def run_eval(
     env.update(
         {
             "KALMIO_CONVERSATION_AGENT_MODE": agent_mode,
+            "KALMIO_CONVERSATION_AGENT_RUNTIME": "pydantic_ai",
             "KALMIO_DEEPSEEK_MODEL": model,
             "KALMIO_DEEPSEEK_API_KEY": api_key or "",
             "KALMIO_AGENT_TRACE_ENABLED": "true",
@@ -113,6 +116,10 @@ def run_eval(
             str(repeat),
             "--max-concurrency",
             str(max_concurrency),
+            "--request-timeout",
+            str(request_timeout),
+            "--case-timeout",
+            str(case_timeout),
         ]
         if logfire:
             command.append("--logfire")
@@ -165,6 +172,8 @@ def main() -> int:
     parser.add_argument("--logfire", action="store_true")
     parser.add_argument("--output-dir", type=Path, default=Path("../reports/conversation-eval-matrix"))
     parser.add_argument("--startup-timeout", type=float, default=30)
+    parser.add_argument("--request-timeout", type=int, default=180)
+    parser.add_argument("--case-timeout", type=int, default=300)
     parser.add_argument("--skip-key-check", action="store_true")
     args = parser.parse_args()
 
@@ -191,6 +200,8 @@ def main() -> int:
                     logfire=args.logfire,
                     output_dir=args.output_dir,
                     startup_timeout=args.startup_timeout,
+                    request_timeout=args.request_timeout,
+                    case_timeout=args.case_timeout,
                 )
             )
     print("outputs:")

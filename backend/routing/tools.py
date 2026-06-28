@@ -6,13 +6,18 @@ from typing import Any
 
 from charging.selectors import get_nearby_stations
 from django.utils import timezone
-from routing.geocoding import KNOWN_LOCATIONS, GeocodingProviderError, get_location_resolver
+from routing.geocoding import KNOWN_LOCATIONS, GeocodingProviderError, get_location_resolver, normalize_location_query
 from routing.production_planner import PlanningDataError, plan_route_with_persisted_stations
 from routing.providers import Coordinate, ProviderRoute, RoutingProviderError, get_route_provider
 from routing.scoring import Preferences, VehicleContext
+from routing.tool_contracts import (
+    ToolContractValidationError,
+    allowed_conversation_tools,
+    conversation_tool_contract,
+)
 
 
-ALLOWED_CONVERSATION_TOOLS = {"resolve_location", "search_destination_chargers", "plan_route"}
+ALLOWED_CONVERSATION_TOOLS = allowed_conversation_tools()
 CHARGER_SEARCH_PURPOSES = {"urgent", "destination", "stay", "near_route_fallback"}
 DEFAULT_RADIUS_BY_PURPOSE = {
     "urgent": 25,
@@ -33,13 +38,25 @@ class ToolCall:
 
 
 def execute_conversation_tool(call: ToolCall) -> dict[str, Any]:
+    try:
+        contract = conversation_tool_contract(call.name)
+        args = contract.validate_args(call.args)
+    except ToolContractValidationError as exc:
+        raise ConversationToolError(str(exc)) from exc
+
     if call.name == "resolve_location":
-        return resolve_location_tool(call.args)
-    if call.name == "search_destination_chargers":
-        return search_destination_chargers_tool(call.args)
-    if call.name == "plan_route":
-        return plan_route_tool(call.args)
-    raise ConversationToolError(f"Herramienta no permitida: {call.name}")
+        result = resolve_location_tool(args)
+    elif call.name == "search_destination_chargers":
+        result = search_destination_chargers_tool(args)
+    elif call.name == "plan_route":
+        result = plan_route_tool(args)
+    else:
+        raise ConversationToolError(f"Herramienta no permitida: {call.name}")
+
+    try:
+        return contract.validate_result(result)
+    except ToolContractValidationError as exc:
+        raise ConversationToolError(str(exc)) from exc
 
 
 def resolve_location_tool(args: dict[str, Any]) -> dict[str, Any]:

@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := dev
 
-.PHONY: help dev dev-local reve-import down logs
+.PHONY: help dev dev-local reve-import charger-restore charger-snapshot down logs
 
 LAN_IP ?= $(shell python -c 'import socket; s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.connect(("8.8.8.8", 80)); print(s.getsockname()[0])' 2>/dev/null || echo 127.0.0.1)
 DEV_ORIGIN := http://$(LAN_IP):5173
@@ -10,7 +10,9 @@ DEV_ORIGINS := http://localhost:5173,http://127.0.0.1:5173,$(DEV_ORIGIN)
 help:
 	@printf "Targets:\n"
 	@printf "  make dev         Start the Docker Compose dev stack and expose it on the LAN IP (%s)\n" "$(LAN_IP)"
-	@printf "  make reve-import Run the REVE bootstrap import into the Postgres dev database\n"
+	@printf "  make reve-import Run the REVE bootstrap import into the PostGIS dev database\n"
+	@printf "  make charger-restore Restore the local charger PostGIS snapshot\n"
+	@printf "  make charger-snapshot Regenerate the local charger PostGIS snapshot from current DB state\n"
 	@printf "  make down        Stop the Compose stack\n"
 	@printf "  make logs        Tail Compose logs\n"
 
@@ -38,6 +40,19 @@ reve-import:
 	  export CORS_ALLOWED_ORIGINS="$(DEV_ORIGINS)"; \
 	  export CSRF_TRUSTED_ORIGINS="$(DEV_ORIGINS)"; \
 	  docker compose --profile tools run --rm reve-import
+
+charger-restore:
+	@set -euo pipefail; \
+	  docker compose up -d db; \
+	  docker compose build backend; \
+	  docker compose run --rm -e KALMIO_CONVERSATION_AGENT_MODE=local backend python manage.py migrate --noinput; \
+	  docker compose run --rm -e KALMIO_CONVERSATION_AGENT_MODE=local backend python manage.py restore_charger_snapshot .dev-data/kalmio-chargers.postgis.dump
+
+charger-snapshot:
+	@set -euo pipefail; \
+	  docker compose up -d db; \
+	  docker compose build backend; \
+	  docker compose run --rm -e KALMIO_CONVERSATION_AGENT_MODE=local backend python manage.py dump_charger_snapshot .dev-data/kalmio-chargers.postgis.dump
 
 down:
 	@docker compose down

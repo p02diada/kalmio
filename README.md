@@ -16,7 +16,7 @@ Docker Compose development stack:
 make dev
 ```
 
-After the stack is up, bootstrap the authorized REVE data into the Postgres database:
+After the stack is up, bootstrap the authorized REVE data into the PostGIS database:
 
 ```bash
 make reve-import
@@ -36,23 +36,17 @@ npm install
 npm run dev
 ```
 
-Backend:
+Backend runs through Docker PostGIS by default:
 
 ```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements-dev.txt
-python manage.py migrate
-python manage.py runserver
+docker compose up --build backend
 ```
 
 Run backend tests:
 
 ```bash
-cd backend
-source .venv/bin/activate
-pytest
+docker compose -f docker-compose.ci.yml build backend-ci
+docker compose -f docker-compose.ci.yml run --rm backend-ci
 ```
 
 Run frontend checks:
@@ -125,7 +119,7 @@ docker compose --env-file .env.production -f docker-compose.production.yml up -d
 curl https://api.kalmio.example/api/ready
 ```
 
-`docker-compose.production.yml` is an operational example, not a managed hosting substitute. It requires real secrets through `.env.production`, refuses missing critical variables, rejects placeholder secrets at Django startup, builds the frontend with an explicit HTTPS `VITE_API_BASE_URL`, runs the backend with Gunicorn, and uses PostGIS. If you replace the bundled database with managed Postgres, set `POSTGRES_SSLMODE=require`.
+`docker-compose.production.yml` is an operational example, not a managed hosting substitute. It requires real secrets through `.env.production`, refuses missing critical variables, rejects placeholder secrets at Django startup, builds the frontend with an explicit HTTPS `VITE_API_BASE_URL`, runs the backend with Gunicorn, and uses PostGIS. If you replace the bundled database with managed PostGIS, set `POSTGRES_SSLMODE=require`.
 
 Authentication endpoints validate email/password input and throttle repeated failed register/login attempts through persisted hashed throttle keys. Tune `KALMIO_AUTH_THROTTLE_LIMIT` and `KALMIO_AUTH_THROTTLE_WINDOW_SECONDS` per environment.
 
@@ -163,9 +157,10 @@ The chat screen uses `/api/conversation/message`. Kalmio targets official A2UI v
 
 - `KALMIO_CONVERSATION_AGENT_MODE=local` for deterministic local development.
 - `KALMIO_CONVERSATION_AGENT_MODE=deepseek` to use DeepSeek through the OpenAI-compatible SDK adapter.
+- `KALMIO_CONVERSATION_AGENT_RUNTIME=pydantic_ai` for the canonical DeepSeek agent loop. `legacy` is a temporary comparison path only.
 - `KALMIO_DEEPSEEK_API_KEY` or `DEEPSEEK_API_KEY` (required only when `KALMIO_CONVERSATION_AGENT_MODE=deepseek`)
 - `KALMIO_DEEPSEEK_BASE_URL` (default `https://api.deepseek.com`)
-- `KALMIO_DEEPSEEK_MODEL` (default `deepseek-v4-flash`; use `deepseek-v4-pro` for stronger eval runs)
+- `KALMIO_DEEPSEEK_MODEL` (default `deepseek-v4-pro`; evaluation runs must use `deepseek-v4-pro`)
 - `KALMIO_DEEPSEEK_TIMEOUT_SECONDS` (default `30`)
 - `KALMIO_DEEPSEEK_MAX_TOOL_CALLS` (default `3`)
 - `KALMIO_DEEPSEEK_MAX_TOKENS` (default `1800`)
@@ -179,7 +174,9 @@ The chat screen uses `/api/conversation/message`. Kalmio targets official A2UI v
 - `KALMIO_GEOCODING_COUNTRY` / `KALMIO_GEOCODING_LANGUAGE` (default `ES` / `es`)
 - `VITE_KALMIO_MAP_STYLE_URL` (optional frontend MapLibre style URL; if omitted, route maps use the default OpenFreeMap Positron vector style)
 
-In `deepseek` mode, the model does not access the database or providers directly. It can request a bounded sequence of allowlisted Django tool calls (`resolve_location`, `search_destination_chargers`, or `plan_route`), Django executes them, and the model receives only the validated tool results to compose final Kalmio A2UI components. `resolve_location` uses the configured geocoding provider to return candidates with precision, source, confidence, and approximation metadata; charger recommendations still come only from authorized charger data. The model chooses the UI components that best fit the user request and tool results; Django validates the catalog, factual constraints, action model, and semantic obligations. The DeepSeek adapter uses the OpenAI-compatible Chat Completions SDK with JSON output and optional native tool calls; it also accepts the existing JSON `type=tool_call` shape to keep provider behavior testable. Actions normalize to official A2UI semantics: `event` for backend/agent handling or registered `functionCall` for safe local renderer behavior such as opening a URL. Client-to-server events are posted as `{ "version": "v0.9.1", "action": { ... } }`, not as visible user messages. If an allowlisted tool returns no usable data, the model receives that failure and must answer honestly from the validated state. If the final A2UI is incomplete, Django asks the model for one repair with the concrete contract issues. If the model repeats the same tool call or exceeds the configured tool-call budget after validated results exist, the backend records an `agent_guardrail` event and gives the model one final-only recovery pass using the existing tool history. If the model asks for an unknown tool, fails recovery or repair, or fails to return final A2UI, the backend returns safe fallback A2UI instead of executing arbitrary behavior.
+In `deepseek` mode, the model does not access the database or providers directly. With the canonical `pydantic_ai` runtime, Pydantic AI owns the model/tool/output loop: registered function tools, bounded tool calls, final structured output, and output-validator retries. Django executes only allowlisted tools (`resolve_location`, `search_destination_chargers`, or `plan_route`) through versioned Pydantic contracts, and the model receives only validated tool results to compose final Kalmio A2UI components. `resolve_location` uses the configured geocoding provider to return candidates with precision, source, confidence, and approximation metadata; charger recommendations still come only from authorized charger data. The model chooses the UI components that best fit the user request and tool results; Django validates the catalog, factual constraints, action model, and semantic obligations through the typed evidence ledger and policy modules. Actions normalize to official A2UI semantics: `event` for backend/agent handling or registered `functionCall` for safe local renderer behavior such as opening a URL. Client-to-server events are posted as `{ "version": "v0.9.1", "action": { ... } }`, not as visible user messages. If an allowlisted tool returns no usable data, the model receives that failure and must answer honestly from the validated state. If the final A2UI is incomplete or untraceable, the Pydantic AI output validator retries with concrete contract issues before Kalmio falls back to validated tool history. If the model asks for an unknown tool, repeats the same tool call, exhausts budget, fails recovery, or fails to return final A2UI, the backend returns safe fallback A2UI instead of executing arbitrary behavior.
+
+Do not add new tool schemas, A2UI output schemas, factuality rules, copy guardrails, or action-safety checks directly to the agent prompt or DeepSeek loop. Tool contracts live in `backend/routing/tool_contracts.py`, A2UI output models in `backend/routing/a2ui_output_models.py`, evidence in `backend/routing/evidence.py`, and A2UI/factual policies in `backend/routing/policies/`.
 
 `RouteCorridorCard` is the route inspection surface, not a frontend route planner. It renders MapLibre from validated `plan_route` geometry and traced station coordinates; when WebGL is unavailable or MapLibre fails, the renderer falls back to a static route drawing from the same coordinates. Charger discovery near a route remains a backend/agent action and must return through validated A2UI data.
 
@@ -299,10 +296,8 @@ Feedback is rejected unless the plan belongs to the current account.
 Import authorized charger data:
 
 ```bash
-cd backend
-source .venv/bin/activate
-python manage.py import_chargers ./path/to/authorized-chargers.csv --dry-run
-python manage.py import_chargers ./path/to/authorized-chargers.csv
+docker compose run --rm -e KALMIO_CONVERSATION_AGENT_MODE=local backend python manage.py import_chargers ./path/to/authorized-chargers.csv --dry-run
+docker compose run --rm -e KALMIO_CONVERSATION_AGENT_MODE=local backend python manage.py import_chargers ./path/to/authorized-chargers.csv
 ```
 
 Accepted formats are CSV and JSON. Use `--dry-run` to validate counts and authorization rules without writing to the database. The import rejects records marked as sample data or non-provider fixtures. Required fields are `source_name`, `operator_name`, `station_external_id`, `station_name`, `latitude`, `longitude`, `evse_uid`, `connector_type`, and `max_power_kw`.
@@ -310,13 +305,20 @@ Accepted formats are CSV and JSON. Use `--dry-run` to validate counts and author
 For local development only, you can build a temporary REVE cache from the public map endpoints and import it into your local database:
 
 ```bash
-cd backend
-source .venv/bin/activate
-python manage.py scrape_reve_dev --output .dev-data/reve-chargers.json --page-size 25
-python manage.py import_chargers .dev-data/reve-chargers.json --replace-source
+docker compose run --rm -e KALMIO_CONVERSATION_AGENT_MODE=local backend python manage.py scrape_reve_dev --output .dev-data/reve-chargers.json --page-size 25
+make reve-import
+make charger-snapshot
 ```
 
-`scrape_reve_dev` is disabled when `DEBUG=false` unless `KALMIO_ALLOW_REVE_DEV_SCRAPE=1` is explicitly set for an isolated non-production environment. It caches raw REVE pages under `.dev-data/reve-pages`, so a rate-limited run can be repeated later without refetching completed pages. REVE currently accepts up to `--page-size 25`; larger values are rejected by the provider. Use `python manage.py scrape_reve_dev --offline --output .dev-data/reve-chargers.json --page-size 25` to rebuild the import file from cached pages only. The raw cached pages are ignored by git; `.dev-data/reve-chargers.json` can be committed as a development fixture, but is not approved production data.
+`scrape_reve_dev` is disabled when `DEBUG=false` unless `KALMIO_ALLOW_REVE_DEV_SCRAPE=1` is explicitly set for an isolated non-production environment. It caches raw REVE pages under `.dev-data/reve-pages`, so a rate-limited run can be repeated later without refetching completed pages. REVE currently accepts up to `--page-size 25`; larger values are rejected by the provider. Use `docker compose run --rm -e KALMIO_CONVERSATION_AGENT_MODE=local backend python manage.py scrape_reve_dev --offline --output .dev-data/reve-chargers.json --page-size 25` to rebuild the import file from cached pages only. The raw cached pages are ignored by git; `.dev-data/reve-chargers.json` can be committed as a development fixture, but is not approved production data.
+
+For repeated local evals, restore the charger PostGIS snapshot instead of reimporting the JSON:
+
+```bash
+make charger-restore
+```
+
+The JSON import remains the source-of-truth path for regenerating data after schema/importer changes. The `.dump` file is a local, regenerable cache of only `charging_*` tables; it must not include auth, session, feedback, route-plan or production data.
 
 ## Product Boundaries
 

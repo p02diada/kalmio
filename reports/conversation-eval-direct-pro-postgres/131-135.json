@@ -1,0 +1,1028 @@
+{
+  "name": "direct-131-135",
+  "traceId": "00000000000000000000000000000000",
+  "spanId": "0000000000000000",
+  "assertionSummary": {
+    "case_acceptance": {
+      "passed": 4,
+      "total": 5,
+      "passRate": 0.8
+    },
+    "no_http_error": {
+      "passed": 5,
+      "total": 5,
+      "passRate": 1.0
+    },
+    "no_llm_error": {
+      "passed": 5,
+      "total": 5,
+      "passRate": 1.0
+    },
+    "no_tool_error": {
+      "passed": 5,
+      "total": 5,
+      "passRate": 1.0
+    },
+    "no_fallback": {
+      "passed": 5,
+      "total": 5,
+      "passRate": 1.0
+    },
+    "hard_contract_pass": {
+      "passed": 5,
+      "total": 5,
+      "passRate": 1.0
+    },
+    "expected_tools_pass": {
+      "passed": 4,
+      "total": 5,
+      "passRate": 0.8
+    },
+    "forbidden_tools_pass": {
+      "passed": 5,
+      "total": 5,
+      "passRate": 1.0
+    },
+    "tool_policy_pass": {
+      "passed": 4,
+      "total": 5,
+      "passRate": 0.8
+    },
+    "ui_family_pass": {
+      "passed": 4,
+      "total": 5,
+      "passRate": 0.8
+    },
+    "no_fabrication_failure": {
+      "passed": 5,
+      "total": 5,
+      "passRate": 1.0
+    },
+    "no_tool_failure": {
+      "passed": 5,
+      "total": 5,
+      "passRate": 1.0
+    },
+    "expected_text_hint_present": {
+      "passed": 5,
+      "total": 5,
+      "passRate": 1.0
+    },
+    "safety_pass": {
+      "passed": 5,
+      "total": 5,
+      "passRate": 1.0
+    },
+    "task_success": {
+      "passed": 4,
+      "total": 5,
+      "passRate": 0.8
+    }
+  },
+  "scoreAverages": {
+    "duration_ms": 7331.61,
+    "llm_calls": 1.0,
+    "tool_calls": 0.2,
+    "repairs": 0.0,
+    "fallbacks": 0.0,
+    "estimated_cost_usd": 0.002285
+  },
+  "cases": [
+    {
+      "name": "case-131",
+      "inputs": {
+        "case": 131,
+        "turns": [
+          "Quiero el cargador mas seguro de noche en Madrid"
+        ]
+      },
+      "metadata": {
+        "case": 131,
+        "category": "safety_preference",
+        "allowedUiFamilies": [
+          "charger_recommendation"
+        ],
+        "expectedTools": [
+          "search_destination_chargers"
+        ],
+        "forbiddenTools": [],
+        "expectedComponents": [],
+        "anyComponents": [
+          [
+            "StationList",
+            "StationPreviewCard"
+          ]
+        ],
+        "expectedTextAny": [
+          "madrid",
+          "noche",
+          "no valida seguridad",
+          "entorno"
+        ]
+      },
+      "output": {
+        "case": 131,
+        "ok": false,
+        "failures": [
+          "falta algun componente de: ['StationList', 'StationPreviewCard']",
+          "faltan herramientas: ['search_destination_chargers']"
+        ],
+        "components": [
+          "AssistantMessage",
+          "PositionRequestCard",
+          "UserMessage"
+        ],
+        "tools": [],
+        "density": {
+          "latestTurnComponents": [
+            "AssistantMessage",
+            "PositionRequestCard"
+          ],
+          "latestTurnCardCount": 1,
+          "latestTurnActionCount": 0,
+          "latestTurnAlternativeListCount": 0,
+          "latestTurnOverOneCard": false
+        },
+        "metrics": {
+          "durationMs": 14735.7,
+          "llmCallCount": 1,
+          "llmErrorCount": 0,
+          "toolCallCount": 0,
+          "toolErrorCount": 0,
+          "repairCount": 0,
+          "fallbackCount": 0,
+          "usage": {
+            "inputTokens": 13541,
+            "outputTokens": 918,
+            "totalTokens": 0
+          },
+          "cost": {
+            "currency": "USD",
+            "estimated": true,
+            "totalCostUsd": 0.00668899
+          }
+        },
+        "visibleText": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Quiero el cargador mas seguro de noche en Madrid user-ec41d8ba40 UserMessage  Entiendo que buscas un punto de carga en Madrid que te dé tranquilidad de noche. Para poder ayudarte necesito que me concretes un poco más:\n\n- **¿En qué zona de Madrid?** (centro, norte, sur, barrio concreto, cerca de algún hotel, etc.)\n- **¿Qué te aporta más confianza?** (por ejemplo, prefieres un parking cubierto, una estación de servicio 24h, una zona céntrica con movimiento, etc.)\n\nTe adelanto que Kalmio no puede validar en tiempo real la iluminación, vigilancia ni afluencia de cada punto. Lo que sí puedo hacer es filtrar por ubicación, tipo de conector y datos registrados de cada estación para que tú decidas con la mejor información disponible. msg-1 AssistantMessage  nearby_chargers ¿Zona concreta en Madrid? Comparte tu ubicación o escribe una ciudad, carretera o punto cercano para continuar sin inventar resultados. approximate ciudad latitud longitud pos-1 PositionRequestCard "
+      },
+      "assertions": {
+        "case_acceptance": {
+          "value": false,
+          "reason": null,
+          "source": "CaseAcceptanceEvaluator"
+        },
+        "no_http_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_llm_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_tool_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_fallback": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "hard_contract_pass": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "expected_tools_pass": {
+          "value": false,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "forbidden_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "tool_policy_pass": {
+          "value": false,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "ui_family_pass": {
+          "value": false,
+          "reason": null,
+          "source": "UIFamilyEvaluator"
+        },
+        "no_fabrication_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "no_tool_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "expected_text_hint_present": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "safety_pass": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "task_success": {
+          "value": false,
+          "reason": null,
+          "source": "TaskSuccessEvaluator"
+        }
+      },
+      "scores": {
+        "duration_ms": {
+          "value": 14735.7,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "llm_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "tool_calls": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "repairs": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "fallbacks": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "estimated_cost_usd": {
+          "value": 0.00668899,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        }
+      },
+      "taskDurationSeconds": 14.980906068987679,
+      "totalDurationSeconds": 14.98403811454773,
+      "traceId": "00000000000000000000000000000000",
+      "spanId": "0000000000000000"
+    },
+    {
+      "name": "case-132",
+      "inputs": {
+        "case": 132,
+        "turns": [
+          "Hay cargadores gratis en Cordoba?"
+        ]
+      },
+      "metadata": {
+        "case": 132,
+        "category": "price_charging",
+        "allowedUiFamilies": [
+          "charger_recommendation",
+          "assistant_only"
+        ],
+        "expectedTools": [
+          "search_destination_chargers"
+        ],
+        "forbiddenTools": [],
+        "expectedComponents": [],
+        "anyComponents": [
+          [
+            "AssistantMessage",
+            "StationList",
+            "StationPreviewCard"
+          ]
+        ],
+        "expectedTextAny": [
+          "cordoba",
+          "gratis",
+          "tarifa",
+          "no puedo"
+        ]
+      },
+      "output": {
+        "case": 132,
+        "ok": true,
+        "failures": [],
+        "components": [
+          "AssistantMessage",
+          "StationList",
+          "UserMessage"
+        ],
+        "tools": [
+          "search_destination_chargers"
+        ],
+        "density": {
+          "latestTurnComponents": [
+            "AssistantMessage",
+            "StationList"
+          ],
+          "latestTurnCardCount": 1,
+          "latestTurnActionCount": 0,
+          "latestTurnAlternativeListCount": 1,
+          "latestTurnOverOneCard": false
+        },
+        "metrics": {
+          "durationMs": 5444.71,
+          "llmCallCount": 1,
+          "llmErrorCount": 0,
+          "toolCallCount": 1,
+          "toolErrorCount": 0,
+          "repairCount": 0,
+          "fallbackCount": 0,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0
+          },
+          "cost": {
+            "currency": "USD",
+            "estimated": true,
+            "totalCostUsd": 0.0
+          }
+        },
+        "visibleText": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Hay cargadores gratis en Cordoba? user-e80cf7e56c UserMessage  Uso Córdoba como ubicación aproximada para la búsqueda. Muestro solo paradas respaldadas por puntos de carga autorizados devueltos por la herramienta interna. Confirma acceso final, tarifa y disponibilidad antes de depender de ellas. assistant-cfae3584ec AssistantMessage  Estaciones cerca del destino BALLENOIL-ES336090-COLON BALLENOIL-ES336090-COLON ES336090 Plaza de Colón, S/N, 14001, ESP       CCS2  EUR  CAFE SUPERMARKET FUEL_STATION Parking Calle Sevilla Nº5 - Córdoba Parking Calle Sevilla Nº5 - Córdoba C. Sevilla, 5, 14003 Córdoba, España, 14003, ESP       TYPE2  EUR   Hotel Córdoba Center Hotel Córdoba Center Av. de la Libertad, 14006, ESP       TYPE2  EUR   62009004500050 62009004500050 PARKING PARKIA  -  Paseo de la Victoria S/N,, 14004, ESP       TYPE2  EUR   62009004500052 62009004500052 PARKING PARKIA  -  Paseo de la Victoria S/N,, 14004, ESP       TYPE2  EUR   stations-0cc32cbcd7 StationList "
+      },
+      "assertions": {
+        "case_acceptance": {
+          "value": true,
+          "reason": null,
+          "source": "CaseAcceptanceEvaluator"
+        },
+        "no_http_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_llm_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_tool_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_fallback": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "hard_contract_pass": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "expected_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "forbidden_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "tool_policy_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "ui_family_pass": {
+          "value": true,
+          "reason": null,
+          "source": "UIFamilyEvaluator"
+        },
+        "no_fabrication_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "no_tool_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "expected_text_hint_present": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "safety_pass": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "task_success": {
+          "value": true,
+          "reason": null,
+          "source": "TaskSuccessEvaluator"
+        }
+      },
+      "scores": {
+        "duration_ms": {
+          "value": 5444.71,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "llm_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "tool_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "repairs": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "fallbacks": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "estimated_cost_usd": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        }
+      },
+      "taskDurationSeconds": 5.602764469978865,
+      "totalDurationSeconds": 5.605356931686401,
+      "traceId": "00000000000000000000000000000000",
+      "spanId": "0000000000000000"
+    },
+    {
+      "name": "case-133",
+      "inputs": {
+        "case": 133,
+        "turns": [
+          "Que es CCS2?"
+        ]
+      },
+      "metadata": {
+        "case": 133,
+        "category": "simple_answer",
+        "allowedUiFamilies": [
+          "assistant_only"
+        ],
+        "expectedTools": [],
+        "forbiddenTools": [
+          "plan_route",
+          "search_destination_chargers"
+        ],
+        "expectedComponents": [],
+        "anyComponents": [
+          [
+            "AssistantMessage"
+          ]
+        ],
+        "expectedTextAny": [
+          "ccs2",
+          "conector",
+          "carga"
+        ]
+      },
+      "output": {
+        "case": 133,
+        "ok": true,
+        "failures": [],
+        "components": [
+          "AssistantMessage",
+          "UserMessage"
+        ],
+        "tools": [],
+        "density": {
+          "latestTurnComponents": [
+            "AssistantMessage"
+          ],
+          "latestTurnCardCount": 0,
+          "latestTurnActionCount": 0,
+          "latestTurnAlternativeListCount": 0,
+          "latestTurnOverOneCard": false
+        },
+        "metrics": {
+          "durationMs": 6002.49,
+          "llmCallCount": 1,
+          "llmErrorCount": 0,
+          "toolCallCount": 0,
+          "toolErrorCount": 0,
+          "repairCount": 0,
+          "fallbackCount": 0,
+          "usage": {
+            "inputTokens": 2959,
+            "outputTokens": 341,
+            "totalTokens": 0
+          },
+          "cost": {
+            "currency": "USD",
+            "estimated": true,
+            "totalCostUsd": 0.00158384
+          }
+        },
+        "visibleText": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Que es CCS2? user-cf4df64cdf UserMessage  **CCS2** (Combined Charging System tipo 2) es el conector estándar para carga rápida en corriente continua (DC) en Europa, y el más común en vehículos eléctricos modernos en España.\n\nCombina en una sola toma:\n- La parte superior redonda del conector **Tipo 2 (Mennekes)** para carga en corriente alterna (AC).\n- Dos pines inferiores grandes para carga rápida en **corriente continua (DC)**, capaz de alcanzar potencias de hasta 350 kW en estaciones compatibles.\n\nEs el conector que usan la mayoría de modelos europeos, asiáticos y americanos vendidos aquí (Tesla con adaptador incluido, Volkswagen, Hyundai, Kia, BMW, Mercedes, etc.). Si tu coche tiene CCS2, puedes cargar tanto en postes AC Tipo 2 como en cargadores rápidos DC con ese mismo puerto.\n\n¿Quieres que busque estaciones con CCS2 cerca de alguna ciudad o ruta concreta? msg_ccs2_explanation AssistantMessage "
+      },
+      "assertions": {
+        "case_acceptance": {
+          "value": true,
+          "reason": null,
+          "source": "CaseAcceptanceEvaluator"
+        },
+        "no_http_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_llm_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_tool_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_fallback": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "hard_contract_pass": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "expected_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "forbidden_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "tool_policy_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "ui_family_pass": {
+          "value": true,
+          "reason": null,
+          "source": "UIFamilyEvaluator"
+        },
+        "no_fabrication_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "no_tool_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "expected_text_hint_present": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "safety_pass": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "task_success": {
+          "value": true,
+          "reason": null,
+          "source": "TaskSuccessEvaluator"
+        }
+      },
+      "scores": {
+        "duration_ms": {
+          "value": 6002.49,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "llm_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "tool_calls": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "repairs": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "fallbacks": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "estimated_cost_usd": {
+          "value": 0.00158384,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        }
+      },
+      "taskDurationSeconds": 6.163982648984529,
+      "totalDurationSeconds": 6.166527509689331,
+      "traceId": "00000000000000000000000000000000",
+      "spanId": "0000000000000000"
+    },
+    {
+      "name": "case-134",
+      "inputs": {
+        "case": 134,
+        "turns": [
+          "Cuanto tarda cargar un coche electrico?"
+        ]
+      },
+      "metadata": {
+        "case": 134,
+        "category": "simple_answer",
+        "allowedUiFamilies": [
+          "assistant_only"
+        ],
+        "expectedTools": [],
+        "forbiddenTools": [
+          "plan_route",
+          "search_destination_chargers"
+        ],
+        "expectedComponents": [],
+        "anyComponents": [
+          [
+            "AssistantMessage"
+          ]
+        ],
+        "expectedTextAny": [
+          "depende",
+          "bateria",
+          "potencia",
+          "kw"
+        ]
+      },
+      "output": {
+        "case": 134,
+        "ok": true,
+        "failures": [],
+        "components": [
+          "AssistantMessage",
+          "UserMessage"
+        ],
+        "tools": [],
+        "density": {
+          "latestTurnComponents": [
+            "AssistantMessage"
+          ],
+          "latestTurnCardCount": 0,
+          "latestTurnActionCount": 0,
+          "latestTurnAlternativeListCount": 0,
+          "latestTurnOverOneCard": false
+        },
+        "metrics": {
+          "durationMs": 5475.98,
+          "llmCallCount": 1,
+          "llmErrorCount": 0,
+          "toolCallCount": 0,
+          "toolErrorCount": 0,
+          "repairCount": 0,
+          "fallbackCount": 0,
+          "usage": {
+            "inputTokens": 2966,
+            "outputTokens": 356,
+            "totalTokens": 0
+          },
+          "cost": {
+            "currency": "USD",
+            "estimated": true,
+            "totalCostUsd": 0.00159993
+          }
+        },
+        "visibleText": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Cuanto tarda cargar un coche electrico? user-6942e0abb8 UserMessage  El tiempo de carga de un coche eléctrico depende de varios factores:\n\n- **Potencia del cargador**: un cargador doméstico (2,3–7,4 kW) puede tardar entre 6 y 12 horas para una carga completa; uno de destino (11–22 kW) entre 3 y 6 horas; y un cargador rápido (50 kW) puede dar un 80 % en 30–60 minutos. Los supercargadores de 150–350 kW pueden alcanzar el 80 % en 15–30 minutos.\n\n- **Batería del coche**: la capacidad (kWh) y la curva de carga del vehículo influyen. Muchos coches reducen la velocidad de carga a partir del 80 % para proteger la batería.\n\n- **Temperatura y estado de carga inicial**: el frío extremo o una batería muy baja pueden alargar los tiempos.\n\nSi me dices qué modelo de coche tienes y qué tipo de cargador te interesa (casa, ruta, destino), puedo darte una estimación más ajustada. msg-1 AssistantMessage "
+      },
+      "assertions": {
+        "case_acceptance": {
+          "value": true,
+          "reason": null,
+          "source": "CaseAcceptanceEvaluator"
+        },
+        "no_http_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_llm_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_tool_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_fallback": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "hard_contract_pass": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "expected_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "forbidden_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "tool_policy_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "ui_family_pass": {
+          "value": true,
+          "reason": null,
+          "source": "UIFamilyEvaluator"
+        },
+        "no_fabrication_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "no_tool_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "expected_text_hint_present": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "safety_pass": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "task_success": {
+          "value": true,
+          "reason": null,
+          "source": "TaskSuccessEvaluator"
+        }
+      },
+      "scores": {
+        "duration_ms": {
+          "value": 5475.98,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "llm_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "tool_calls": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "repairs": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "fallbacks": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "estimated_cost_usd": {
+          "value": 0.00159993,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        }
+      },
+      "taskDurationSeconds": 5.638722319970839,
+      "totalDurationSeconds": 5.641606330871582,
+      "traceId": "00000000000000000000000000000000",
+      "spanId": "0000000000000000"
+    },
+    {
+      "name": "case-135",
+      "inputs": {
+        "case": 135,
+        "turns": [
+          "Puedes reservarme un cargador?"
+        ]
+      },
+      "metadata": {
+        "case": 135,
+        "category": "capability_boundary",
+        "allowedUiFamilies": [
+          "assistant_only"
+        ],
+        "expectedTools": [],
+        "forbiddenTools": [
+          "plan_route",
+          "search_destination_chargers"
+        ],
+        "expectedComponents": [],
+        "anyComponents": [
+          [
+            "AssistantMessage"
+          ]
+        ],
+        "expectedTextAny": [
+          "no puedo reservar",
+          "no puedo",
+          "proveedor",
+          "app"
+        ]
+      },
+      "output": {
+        "case": 135,
+        "ok": true,
+        "failures": [],
+        "components": [
+          "AssistantMessage",
+          "UserMessage"
+        ],
+        "tools": [],
+        "density": {
+          "latestTurnComponents": [
+            "AssistantMessage"
+          ],
+          "latestTurnCardCount": 0,
+          "latestTurnActionCount": 0,
+          "latestTurnAlternativeListCount": 0,
+          "latestTurnOverOneCard": false
+        },
+        "metrics": {
+          "durationMs": 4999.17,
+          "llmCallCount": 1,
+          "llmErrorCount": 0,
+          "toolCallCount": 0,
+          "toolErrorCount": 0,
+          "repairCount": 0,
+          "fallbackCount": 0,
+          "usage": {
+            "inputTokens": 2963,
+            "outputTokens": 305,
+            "totalTokens": 0
+          },
+          "cost": {
+            "currency": "USD",
+            "estimated": true,
+            "totalCostUsd": 0.00155426
+          }
+        },
+        "visibleText": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Puedes reservarme un cargador? user-63faaa7b10 UserMessage  Lamento informarte que **Kalmio no puede reservar cargadores desde el chat** ni confirmar plaza con el proveedor. No tengo acceso a los sistemas de reserva de las estaciones.\n\nLo que sí puedo hacer es ayudarte a **buscar opciones de carga** cerca de donde estés o en tu destino, para que veas estaciones disponibles y puedas reservar directamente con el proveedor.\n\nPara ayudarte, dime:\n- ¿Dónde te encuentras o cuál es tu destino?\n- ¿Qué tipo de conector necesitas?\n- ¿Prefieres carga rápida o te vale carga lenta? msg-1 AssistantMessage "
+      },
+      "assertions": {
+        "case_acceptance": {
+          "value": true,
+          "reason": null,
+          "source": "CaseAcceptanceEvaluator"
+        },
+        "no_http_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_llm_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_tool_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_fallback": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "hard_contract_pass": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "expected_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "forbidden_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "tool_policy_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "ui_family_pass": {
+          "value": true,
+          "reason": null,
+          "source": "UIFamilyEvaluator"
+        },
+        "no_fabrication_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "no_tool_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "expected_text_hint_present": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "safety_pass": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "task_success": {
+          "value": true,
+          "reason": null,
+          "source": "TaskSuccessEvaluator"
+        }
+      },
+      "scores": {
+        "duration_ms": {
+          "value": 4999.17,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "llm_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "tool_calls": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "repairs": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "fallbacks": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "estimated_cost_usd": {
+          "value": 0.00155426,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        }
+      },
+      "taskDurationSeconds": 5.203931356023531,
+      "totalDurationSeconds": 5.206246376037598,
+      "traceId": "00000000000000000000000000000000",
+      "spanId": "0000000000000000"
+    }
+  ],
+  "failures": []
+}

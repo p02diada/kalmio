@@ -157,6 +157,26 @@ def test_log_level_must_be_supported():
     assert "KALMIO_LOG_LEVEL must be one of" in result.stderr
 
 
+def test_database_engine_only_supports_sqlite_or_postgis():
+    result = import_settings({
+        "KALMIO_DB_ENGINE": "mysql",
+        "KALMIO_OSRM_BASE_URL": "https://routes.kalmio.example",
+    })
+
+    assert result.returncode != 0
+    assert "KALMIO_DB_ENGINE must be either 'sqlite' for unit tests or 'postgis'" in result.stderr
+
+
+def test_conversation_agent_runtime_must_be_supported():
+    result = import_settings({
+        "KALMIO_OSRM_BASE_URL": "https://routes.kalmio.example",
+        "KALMIO_CONVERSATION_AGENT_RUNTIME": "custom",
+    })
+
+    assert result.returncode != 0
+    assert "KALMIO_CONVERSATION_AGENT_RUNTIME must be legacy or pydantic_ai" in result.stderr
+
+
 def test_production_admin_url_is_disabled_by_default():
     patterns = url_patterns_for_admin_setting(enabled=False)
 

@@ -6,7 +6,7 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends binutils gdal-bin libgdal-dev libgeos-dev libpq-dev \
+    && apt-get install -y --no-install-recommends binutils gdal-bin libgdal-dev libgeos-dev libpq-dev postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

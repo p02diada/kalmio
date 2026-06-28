@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 from math import asin, cos, radians, sin, sqrt
 
 from django.db.models import Count, Max, Prefetch, QuerySet
@@ -39,7 +40,13 @@ def get_nearby_stations(
     min_power_kw: int | None = None,
     available_only: bool = False,
 ) -> list[NearbyStation]:
-    queryset = stations_queryset()
+    min_lat, max_lat, min_lon, max_lon = geographic_bounding_box(lat, lon, radius_km)
+    queryset = stations_queryset().filter(
+        latitude__gte=min_lat,
+        latitude__lte=max_lat,
+        longitude__gte=min_lon,
+        longitude__lte=max_lon,
+    )
 
     if connector:
         queryset = queryset.filter(evses__connectors__connector_type__iexact=connector)
@@ -76,6 +83,18 @@ def get_nearby_stations(
             )
 
     return sorted(results, key=lambda item: item.distance_km)
+
+
+def geographic_bounding_box(lat: float, lon: float, radius_km: float) -> tuple[Decimal, Decimal, Decimal, Decimal]:
+    lat_delta = radius_km / 111.32
+    lon_scale = max(abs(cos(radians(lat))), 0.01)
+    lon_delta = radius_km / (111.32 * lon_scale)
+    return (
+        Decimal(str(lat - lat_delta)),
+        Decimal(str(lat + lat_delta)),
+        Decimal(str(lon - lon_delta)),
+        Decimal(str(lon + lon_delta)),
+    )
 
 
 def haversine_km(origin_lat: float, origin_lon: float, dest_lat: float, dest_lon: float) -> float:

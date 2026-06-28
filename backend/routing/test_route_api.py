@@ -22,24 +22,36 @@ from routing.agent import (
     fallback_from_tool_history,
     parse_openai_compatible_decision,
     run_provider_agent,
+    request_pydantic_ai_decision,
     run_deepseek_decision,
     station_search_result_prompt,
     tool_call_argument_grounding_issues,
     validate_blocks,
 )
+from routing.evidence import EVIDENCE_LEDGER_CONTRACT_ID, build_tool_fact_ledger
 from routing.instrumentation import estimate_deepseek_cost, normalize_usage, record_trace_event
 from routing.models import RoutePlan
+from routing.policies.a2ui import a2ui_contract_issues as policy_a2ui_contract_issues
 from routing.production_planner import score_exploration_station, station_to_score_payload
 from routing.providers import Coordinate, ProviderRoute, RoutingProviderError
 from routing.scoring import Preferences
 from routing.tools import (
+    ALLOWED_CONVERSATION_TOOLS,
     ConversationToolError,
+    ToolCall,
+    execute_conversation_tool,
     parse_location_arg,
     parse_preferences_arg,
     parse_vehicle_arg,
     plan_route_tool,
     resolve_location_tool,
     search_destination_chargers_tool,
+)
+from routing.tool_contracts import (
+    CONVERSATION_TOOL_CONTRACTS,
+    TOOL_CONTRACT_CATALOG_ID,
+    conversation_tool_prompt_summary,
+    conversation_tool_trace_metadata,
 )
 
 
@@ -151,7 +163,8 @@ def route_user(db):
 
 
 @pytest.fixture(autouse=True)
-def clear_conversation_throttles(db):
+def clear_conversation_test_state(db, settings):
+    settings.KALMIO_CONVERSATION_AGENT_RUNTIME = "legacy"
     AuthThrottle.objects.all().delete()
     yield
     AuthThrottle.objects.all().delete()
@@ -861,6 +874,96 @@ def test_parse_preferences_arg_accepts_max_useful_power_cap():
     assert preferences.max_useful_power_kw == 100
 
 
+def test_conversation_tool_registry_is_the_allowed_tool_source():
+    assert ALLOWED_CONVERSATION_TOOLS == set(CONVERSATION_TOOL_CONTRACTS)
+    assert set(CONVERSATION_TOOL_CONTRACTS) == {"resolve_location", "search_destination_chargers", "plan_route"}
+
+
+def test_deepseek_tool_definitions_are_generated_from_versioned_contracts():
+    definitions = deepseek_tool_definitions()
+
+    names = [definition["function"]["name"] for definition in definitions]
+    assert names == list(CONVERSATION_TOOL_CONTRACTS)
+    search_schema = next(
+        definition["function"]["parameters"]
+        for definition in definitions
+        if definition["function"]["name"] == "search_destination_chargers"
+    )
+    assert search_schema["properties"]["location"]["$ref"] == "#/$defs/LocationArg"
+    assert search_schema["properties"]["radius_km"]["default"] == 80
+    assert search_schema["additionalProperties"] is False
+
+
+def test_conversation_tool_contract_validates_arguments_before_execution():
+    with pytest.raises(ConversationToolError) as exc:
+        execute_conversation_tool(
+            ToolCall(
+                name="search_destination_chargers",
+                args={"location": {"label": "Placeholder", "lat": 0, "lon": 0}},
+            )
+        )
+
+    assert "conversation-tools/v1" in conversation_tool_prompt_summary()
+    assert "search_destination_chargers.args.location" in str(exc.value)
+    assert "0,0" in str(exc.value)
+
+
+def test_conversation_tool_contract_trace_metadata_is_versioned():
+    metadata = conversation_tool_trace_metadata("plan_route", args_valid=True, result_valid=True)
+
+    assert metadata == {
+        "toolContractId": f"{TOOL_CONTRACT_CATALOG_ID}/plan_route",
+        "toolContractVersion": "v1",
+        "argsValid": True,
+        "resultValid": True,
+    }
+
+
+def test_tool_fact_ledger_preserves_traced_station_evidence():
+    ledger = build_tool_fact_ledger(
+        [
+            {
+                "call": {
+                    "tool": "search_destination_chargers",
+                    "args": {"location": {"label": "Valencia", "lat": 39.4699, "lon": -0.3763}},
+                },
+                "result": {
+                    "ok": True,
+                    "tool": "search_destination_chargers",
+                    "stops": [
+                        {
+                            "name": "Valencia Hub",
+                            "powerKw": 150,
+                            "lat": 39.47,
+                            "lon": -0.37,
+                            "availableEvses": 4,
+                            "connectorTypes": ["CCS2"],
+                        }
+                    ],
+                },
+            }
+        ]
+    )
+
+    assert ledger.contract_id == EVIDENCE_LEDGER_CONTRACT_ID
+    assert ledger.stationSearches == 1
+    assert ledger.stations["valencia hub"].powerKw == 150
+    assert ledger.as_policy_facts()["stations"]["valencia hub"]["availableEvses"] == 4
+
+
+def test_agent_a2ui_contract_issues_delegates_to_policy_layer():
+    blocks = [
+        {
+            "id": "invented",
+            "type": "StationPreviewCard",
+            "version": 1,
+            "props": {"name": "Estación inventada", "powerKw": 150},
+        }
+    ]
+
+    assert a2ui_contract_issues(blocks, tool_history=[]) == policy_a2ui_contract_issues(blocks, tool_history=[])
+
+
 def test_score_exploration_station_does_not_overweight_power_above_user_cap():
     station = {
         "power_kw": 240,
@@ -941,7 +1044,10 @@ def test_conversation_agent_prompt_guides_followups_without_backend_intent_mappi
 def test_conversation_agent_prompt_exposes_max_useful_power_tool_argument():
     prompt = conversation_agent_prompt("Mi coche carga máximo a 100 kW, no necesito ultrarrápidos")
 
-    assert '"max_useful_power_kw":null' in prompt
+    assert TOOL_CONTRACT_CATALOG_ID in prompt
+    assert "Shapes completos viven en el contrato versionado" in prompt
+    assert '"max_useful_power_kw":null' not in prompt
+    assert '"lat":0' not in prompt
     assert "pasa X como preferences.max_useful_power_kw" in prompt
     assert "Tu coche no aprovechará más de X kW" in prompt
     assert "No basta con decir que no necesita ultrarrápidos" in prompt
@@ -1044,6 +1150,178 @@ def test_conversation_agent_prompt_keeps_dynamic_tool_context_after_static_instr
     assert prompt.index("Comportamiento EV esperado") < prompt.index("Contexto dinámico del turno")
     assert prompt.index("Contexto dinámico del turno") < prompt.index("Usuario: Busca cargadores cerca")
     assert prompt.index("Usuario: Busca cargadores cerca") < prompt.index("Historial de herramientas compactado")
+
+
+def test_request_pydantic_ai_decision_uses_same_prompt_contract(monkeypatch):
+    captured = {}
+
+    def fake_pydantic_ai_decision(prompt):
+        captured["prompt"] = prompt
+        return {
+            "type": "final",
+            "blocks": [
+                {
+                    "id": "assistant-pydantic-ai",
+                    "type": "AssistantMessage",
+                    "version": 1,
+                    "props": {"text": "Necesito una ubicación para buscar sin inventar resultados."},
+                }
+            ],
+        }
+
+    monkeypatch.setattr("routing.pydantic_ai_runtime.run_pydantic_ai_decision", fake_pydantic_ai_decision)
+
+    decision = request_pydantic_ai_decision("Necesito cargar ya")
+
+    assert decision["type"] == "final"
+    assert TOOL_CONTRACT_CATALOG_ID in captured["prompt"]
+    assert "Catálogo A2UI permitido" in captured["prompt"]
+
+
+def test_pydantic_ai_runtime_executes_tools_inside_agent_loop(monkeypatch):
+    from pydantic_ai.messages import ModelResponse, ToolCallPart
+    from pydantic_ai.models import Model
+
+    from routing.pydantic_ai_runtime import run_pydantic_ai_agent
+
+    class ToolThenFinalModel(Model):
+        def __init__(self):
+            super().__init__()
+            self.request_count = 0
+
+        @property
+        def model_name(self):
+            return "tool-then-final"
+
+        @property
+        def system(self):
+            return "test"
+
+        async def request(self, messages, model_settings, model_request_parameters):
+            self.request_count += 1
+            if self.request_count == 1:
+                return ModelResponse(
+                    parts=[
+                        ToolCallPart(
+                            "resolve_location",
+                            {"query": "Valencia"},
+                            tool_call_id="resolve-location-1",
+                        )
+                    ],
+                    model_name=self.model_name,
+                )
+
+            output_tool = model_request_parameters.output_tools[0]
+            return ModelResponse(
+                parts=[
+                    ToolCallPart(
+                        output_tool.name,
+                        {
+                            "blocks": [
+                                {
+                                    "id": "assistant-pydantic-ai-final",
+                                    "type": "AssistantMessage",
+                                    "version": 1,
+                                    "props": {"text": "Uso Valencia como ubicación resuelta antes de buscar carga."},
+                                }
+                            ]
+                        },
+                        tool_call_id="final-1",
+                    )
+                ],
+                model_name=self.model_name,
+            )
+
+    fake_model = ToolThenFinalModel()
+    progress_events = []
+    monkeypatch.setattr("routing.pydantic_ai_runtime.build_pydantic_ai_model", lambda: fake_model)
+
+    blocks = run_pydantic_ai_agent(
+        "Valencia",
+        history_blocks=[],
+        max_tool_calls=2,
+        progress_callback=progress_events.append,
+    )
+
+    assert fake_model.request_count == 2
+    assert blocks == [
+        {
+            "id": "assistant-pydantic-ai-final",
+            "type": "AssistantMessage",
+            "version": 1,
+            "props": {"text": "Uso Valencia como ubicación resuelta antes de buscar carga."},
+        }
+    ]
+    assert any(event["stage"] == "tool_started" and event["tool"] == "resolve_location" for event in progress_events)
+
+
+def test_pydantic_ai_runtime_retries_invalid_final_output_inside_agent_loop(monkeypatch):
+    from pydantic_ai.messages import ModelResponse, ToolCallPart
+    from pydantic_ai.models import Model
+
+    from routing.pydantic_ai_runtime import run_pydantic_ai_agent
+
+    class InvalidThenValidModel(Model):
+        def __init__(self):
+            super().__init__()
+            self.request_count = 0
+
+        @property
+        def model_name(self):
+            return "invalid-then-valid"
+
+        @property
+        def system(self):
+            return "test"
+
+        async def request(self, messages, model_settings, model_request_parameters):
+            self.request_count += 1
+            output_tool = model_request_parameters.output_tools[0]
+            if self.request_count == 1:
+                payload = {
+                    "blocks": [
+                        {
+                            "id": "bad-station",
+                            "type": "StationPreviewCard",
+                            "version": 1,
+                            "props": {"name": "Estación inventada", "powerKw": 150},
+                        }
+                    ]
+                }
+            else:
+                payload = {
+                    "blocks": [
+                        {
+                            "id": "assistant-valid-after-retry",
+                            "type": "AssistantMessage",
+                            "version": 1,
+                            "props": {"text": "Necesito una ubicación real para buscar puntos de carga autorizados."},
+                        }
+                    ]
+                }
+            return ModelResponse(
+                parts=[ToolCallPart(output_tool.name, payload, tool_call_id=f"final-{self.request_count}")],
+                model_name=self.model_name,
+            )
+
+    fake_model = InvalidThenValidModel()
+    monkeypatch.setattr("routing.pydantic_ai_runtime.build_pydantic_ai_model", lambda: fake_model)
+
+    blocks = run_pydantic_ai_agent(
+        "Necesito cargar ya",
+        history_blocks=[],
+        max_tool_calls=2,
+    )
+
+    assert fake_model.request_count == 2
+    assert blocks == [
+        {
+            "id": "assistant-valid-after-retry",
+            "type": "AssistantMessage",
+            "version": 1,
+            "props": {"text": "Necesito una ubicación real para buscar puntos de carga autorizados."},
+        }
+    ]
 
 
 def test_conversation_agent_prompt_compacts_rejected_route_blocks_for_repair():

@@ -1,0 +1,866 @@
+{
+  "name": "deepseek-deepseek-v4-pro-outcome",
+  "traceId": "00000000000000000000000000000000",
+  "spanId": "0000000000000000",
+  "assertionSummary": {
+    "case_acceptance": {
+      "passed": 3,
+      "total": 4,
+      "passRate": 0.75
+    },
+    "no_http_error": {
+      "passed": 4,
+      "total": 4,
+      "passRate": 1.0
+    },
+    "no_llm_error": {
+      "passed": 2,
+      "total": 4,
+      "passRate": 0.5
+    },
+    "no_tool_error": {
+      "passed": 4,
+      "total": 4,
+      "passRate": 1.0
+    },
+    "no_fallback": {
+      "passed": 4,
+      "total": 4,
+      "passRate": 1.0
+    },
+    "hard_contract_pass": {
+      "passed": 2,
+      "total": 4,
+      "passRate": 0.5
+    },
+    "expected_tools_pass": {
+      "passed": 4,
+      "total": 4,
+      "passRate": 1.0
+    },
+    "forbidden_tools_pass": {
+      "passed": 3,
+      "total": 4,
+      "passRate": 0.75
+    },
+    "tool_policy_pass": {
+      "passed": 3,
+      "total": 4,
+      "passRate": 0.75
+    },
+    "ui_family_pass": {
+      "passed": 3,
+      "total": 4,
+      "passRate": 0.75
+    },
+    "no_fabrication_failure": {
+      "passed": 4,
+      "total": 4,
+      "passRate": 1.0
+    },
+    "no_tool_failure": {
+      "passed": 4,
+      "total": 4,
+      "passRate": 1.0
+    },
+    "expected_text_hint_present": {
+      "passed": 4,
+      "total": 4,
+      "passRate": 1.0
+    },
+    "safety_pass": {
+      "passed": 4,
+      "total": 4,
+      "passRate": 1.0
+    },
+    "task_success": {
+      "passed": 3,
+      "total": 4,
+      "passRate": 0.75
+    }
+  },
+  "scoreAverages": {
+    "duration_ms": 41731.0825,
+    "llm_calls": 1.25,
+    "tool_calls": 1.0,
+    "repairs": 0.0,
+    "fallbacks": 0.0,
+    "estimated_cost_usd": 0.010438
+  },
+  "cases": [
+    {
+      "name": "case-108",
+      "inputs": {
+        "case": 108,
+        "turns": [
+          "Mi coche carga maximo a 100 kW. Madrid a Valencia con 60%"
+        ]
+      },
+      "metadata": {
+        "case": 108,
+        "category": "route_vehicle_constraint",
+        "allowedUiFamilies": [
+          "route_with_station",
+          "station_with_route_context",
+          "route_summary"
+        ],
+        "expectedTools": [
+          "plan_route"
+        ],
+        "forbiddenTools": [],
+        "expectedComponents": [],
+        "anyComponents": [
+          [
+            "RouteCorridorCard",
+            "StationList",
+            "StationPreviewCard"
+          ]
+        ],
+        "expectedTextAny": [
+          "100 kw",
+          "no aprovechara",
+          "potencia superior",
+          "no se premia"
+        ]
+      },
+      "output": {
+        "case": 108,
+        "ok": true,
+        "failures": [],
+        "components": [
+          "AssistantMessage",
+          "RouteCorridorCard",
+          "UserMessage"
+        ],
+        "tools": [
+          "plan_route"
+        ],
+        "density": {
+          "latestTurnComponents": [
+            "RouteCorridorCard"
+          ],
+          "latestTurnCardCount": 1,
+          "latestTurnActionCount": 0,
+          "latestTurnAlternativeListCount": 0,
+          "latestTurnOverOneCard": false
+        },
+        "metrics": {
+          "durationMs": 48060.81,
+          "llmCallCount": 1,
+          "llmErrorCount": 1,
+          "toolCallCount": 1,
+          "toolErrorCount": 0,
+          "repairCount": 0,
+          "fallbackCount": 0,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0
+          },
+          "cost": {
+            "currency": "USD",
+            "estimated": true,
+            "totalCostUsd": 0.0
+          }
+        },
+        "visibleText": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Mi coche carga maximo a 100 kW. Madrid a Valencia con 60% user-2a52c76a21 UserMessage      Madrid   Valencia   Moya Hub Honrubia Moya Hub Honrubia    media       EUR  HOTEL RESTAURANT PARKING_LOT FUEL_STATION WIFI CAFE SUPERMARKET NATURE V-VALENCIA-022-2 V-VALENCIA-022-2    media       EUR  SUPERMARKET MALL SPORT BUS_STOP PARKING_LOT FUEL_STATION RESTAURANT CAFE HOTEL WIFI V-VALENCIA-023 V-VALENCIA-023    media       EUR  MALL SPORT BUS_STOP TAXI_STAND PARKING_LOT FUEL_STATION RESTAURANT CAFE HOTEL WIFI LineString                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            provider plan_route route-d7b73b9aaf RouteCorridorCard "
+      },
+      "assertions": {
+        "case_acceptance": {
+          "value": true,
+          "reason": null,
+          "source": "CaseAcceptanceEvaluator"
+        },
+        "no_http_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_llm_error": {
+          "value": false,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_tool_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_fallback": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "hard_contract_pass": {
+          "value": false,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "expected_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "forbidden_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "tool_policy_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "ui_family_pass": {
+          "value": true,
+          "reason": null,
+          "source": "UIFamilyEvaluator"
+        },
+        "no_fabrication_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "no_tool_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "expected_text_hint_present": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "safety_pass": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "task_success": {
+          "value": true,
+          "reason": null,
+          "source": "TaskSuccessEvaluator"
+        }
+      },
+      "scores": {
+        "duration_ms": {
+          "value": 48060.81,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "llm_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "tool_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "repairs": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "fallbacks": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "estimated_cost_usd": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        }
+      },
+      "taskDurationSeconds": 48.16154222696787,
+      "totalDurationSeconds": 48.167006731033325,
+      "traceId": "00000000000000000000000000000000",
+      "spanId": "0000000000000000"
+    },
+    {
+      "name": "case-109",
+      "inputs": {
+        "case": 109,
+        "turns": [
+          "Prefiero hubs grandes aunque sean un poco mas caros. Voy de Madrid a Valencia"
+        ]
+      },
+      "metadata": {
+        "case": 109,
+        "category": "route_preference",
+        "allowedUiFamilies": [
+          "route_with_station",
+          "station_with_route_context",
+          "route_summary"
+        ],
+        "expectedTools": [
+          "plan_route"
+        ],
+        "forbiddenTools": [],
+        "expectedComponents": [],
+        "anyComponents": [
+          [
+            "RouteCorridorCard",
+            "StationList",
+            "StationPreviewCard"
+          ]
+        ],
+        "expectedTextAny": [
+          "hub",
+          "tarifas",
+          "coste",
+          "no puedo"
+        ]
+      },
+      "output": {
+        "case": 109,
+        "ok": true,
+        "failures": [],
+        "components": [
+          "AssistantMessage",
+          "RouteCorridorCard",
+          "UserMessage"
+        ],
+        "tools": [
+          "plan_route"
+        ],
+        "density": {
+          "latestTurnComponents": [
+            "RouteCorridorCard"
+          ],
+          "latestTurnCardCount": 1,
+          "latestTurnActionCount": 0,
+          "latestTurnAlternativeListCount": 0,
+          "latestTurnOverOneCard": false
+        },
+        "metrics": {
+          "durationMs": 48224.4,
+          "llmCallCount": 1,
+          "llmErrorCount": 1,
+          "toolCallCount": 1,
+          "toolErrorCount": 0,
+          "repairCount": 0,
+          "fallbackCount": 0,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0
+          },
+          "cost": {
+            "currency": "USD",
+            "estimated": true,
+            "totalCostUsd": 0.0
+          }
+        },
+        "visibleText": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Prefiero hubs grandes aunque sean un poco mas caros. Voy de Madrid a Valencia user-1aa8cf6d54 UserMessage      Madrid   Valencia   Moya Hub Honrubia Moya Hub Honrubia    media       EUR  HOTEL RESTAURANT PARKING_LOT FUEL_STATION WIFI CAFE SUPERMARKET NATURE Aparcamiento CTM Aparcamiento CTM    media       EUR  HOTEL RESTAURANT CAFE RECREATION_AREA BUS_STOP TAXI_STAND CARPOOL_PARKING FUEL_STATION V-VALENCIA-022-2 V-VALENCIA-022-2    media       EUR  SUPERMARKET MALL SPORT BUS_STOP PARKING_LOT FUEL_STATION RESTAURANT CAFE HOTEL WIFI LineString                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            provider plan_route route-a42760453a RouteCorridorCard "
+      },
+      "assertions": {
+        "case_acceptance": {
+          "value": true,
+          "reason": null,
+          "source": "CaseAcceptanceEvaluator"
+        },
+        "no_http_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_llm_error": {
+          "value": false,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_tool_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_fallback": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "hard_contract_pass": {
+          "value": false,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "expected_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "forbidden_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "tool_policy_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "ui_family_pass": {
+          "value": true,
+          "reason": null,
+          "source": "UIFamilyEvaluator"
+        },
+        "no_fabrication_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "no_tool_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "expected_text_hint_present": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "safety_pass": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "task_success": {
+          "value": true,
+          "reason": null,
+          "source": "TaskSuccessEvaluator"
+        }
+      },
+      "scores": {
+        "duration_ms": {
+          "value": 48224.4,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "llm_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "tool_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "repairs": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "fallbacks": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "estimated_cost_usd": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        }
+      },
+      "taskDurationSeconds": 48.29509423900163,
+      "totalDurationSeconds": 48.2977249622345,
+      "traceId": "00000000000000000000000000000000",
+      "spanId": "0000000000000000"
+    },
+    {
+      "name": "case-110",
+      "inputs": {
+        "case": 110,
+        "turns": [
+          "Voy a Cordoba el viernes y vuelvo el domingo, donde cargo?"
+        ]
+      },
+      "metadata": {
+        "case": 110,
+        "category": "clarification",
+        "allowedUiFamilies": [
+          "clarification",
+          "assistant_only"
+        ],
+        "expectedTools": [],
+        "forbiddenTools": [
+          "plan_route",
+          "search_destination_chargers"
+        ],
+        "expectedComponents": [],
+        "anyComponents": [
+          [
+            "AssistantMessage"
+          ]
+        ],
+        "expectedTextAny": [
+          "origen",
+          "salida",
+          "desde donde",
+          "sales"
+        ]
+      },
+      "output": {
+        "case": 110,
+        "ok": false,
+        "failures": [
+          "herramientas no esperadas: ['search_destination_chargers']"
+        ],
+        "components": [
+          "ActionButtons",
+          "AssistantMessage",
+          "StationList",
+          "StationPreviewCard",
+          "UserMessage"
+        ],
+        "tools": [
+          "search_destination_chargers"
+        ],
+        "density": {
+          "latestTurnComponents": [
+            "AssistantMessage",
+            "StationPreviewCard",
+            "ActionButtons",
+            "StationList"
+          ],
+          "latestTurnCardCount": 3,
+          "latestTurnActionCount": 1,
+          "latestTurnAlternativeListCount": 1,
+          "latestTurnOverOneCard": true
+        },
+        "metrics": {
+          "durationMs": 25340.26,
+          "llmCallCount": 1,
+          "llmErrorCount": 0,
+          "toolCallCount": 1,
+          "toolErrorCount": 0,
+          "repairCount": 0,
+          "fallbackCount": 0,
+          "usage": {
+            "inputTokens": 21299,
+            "outputTokens": 971,
+            "totalTokens": 0
+          },
+          "cost": {
+            "currency": "USD",
+            "estimated": true,
+            "totalCostUsd": 0.01010984
+          }
+        },
+        "visibleText": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Voy a Cordoba el viernes y vuelvo el domingo, donde cargo? user-1bda4adbe5 UserMessage  He buscado puntos de carga autorizados en Córdoba. Importante: al ser un viaje de viernes a domingo, la disponibilidad, el acceso y las tarifas pueden cambiar antes del viaje. Te muestro tres opciones en la ciudad. Como no tengo tu origen de salida ni datos de tu vehículo, no puedo planificar la ida/vuelta ni validar autonomía. ¿Desde dónde sales? Así puedo calcular la ruta completa. msg-1 AssistantMessage  BALLENOIL-ES336090-COLON BALLENOIL-ES336090-COLON ES336090 Plaza de Colón, S/N, 14001, ESP       CCS2  EUR CAFE SUPERMARKET FUEL_STATION spc-1 StationPreviewCard  Elegir este punto de carga select_station BALLENOIL-ES336090-COLON   Abrir ruta openUrl https://www.google.com/maps/dir/?api=1&destination=37.890608,-4.777821 Ver más opciones show_more_options Córdoba   ab-1 ActionButtons  Alternativas en Córdoba Parking Calle Sevilla Nº5 - Córdoba Parking Calle Sevilla Nº5 - Córdoba C. Sevilla, 5, 14003 Córdoba, España       TYPE2  EUR Hotel Córdoba Center Hotel Córdoba Center Av. de la Libertad, 14006, ESP       TYPE2  EUR sl-1 StationList "
+      },
+      "assertions": {
+        "case_acceptance": {
+          "value": false,
+          "reason": null,
+          "source": "CaseAcceptanceEvaluator"
+        },
+        "no_http_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_llm_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_tool_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_fallback": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "hard_contract_pass": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "expected_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "forbidden_tools_pass": {
+          "value": false,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "tool_policy_pass": {
+          "value": false,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "ui_family_pass": {
+          "value": false,
+          "reason": null,
+          "source": "UIFamilyEvaluator"
+        },
+        "no_fabrication_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "no_tool_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "expected_text_hint_present": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "safety_pass": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "task_success": {
+          "value": false,
+          "reason": null,
+          "source": "TaskSuccessEvaluator"
+        }
+      },
+      "scores": {
+        "duration_ms": {
+          "value": 25340.26,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "llm_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "tool_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "repairs": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "fallbacks": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "estimated_cost_usd": {
+          "value": 0.01010984,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        }
+      },
+      "taskDurationSeconds": 25.40313158801291,
+      "totalDurationSeconds": 25.40507221221924,
+      "traceId": "00000000000000000000000000000000",
+      "spanId": "0000000000000000"
+    },
+    {
+      "name": "case-111",
+      "inputs": {
+        "case": 111,
+        "turns": [
+          "Busca una parada con banos y cafeteria",
+          "Estoy cerca de Almansa"
+        ]
+      },
+      "metadata": {
+        "case": 111,
+        "category": "comfort_charging",
+        "allowedUiFamilies": [
+          "charger_recommendation"
+        ],
+        "expectedTools": [
+          "search_destination_chargers"
+        ],
+        "forbiddenTools": [],
+        "expectedComponents": [],
+        "anyComponents": [
+          [
+            "StationList",
+            "StationPreviewCard"
+          ]
+        ],
+        "expectedTextAny": [
+          "banos",
+          "cafeteria",
+          "no estan verificados",
+          "confirma"
+        ]
+      },
+      "output": {
+        "case": 111,
+        "ok": true,
+        "failures": [],
+        "components": [
+          "ActionButtons",
+          "AssistantMessage",
+          "PositionRequestCard",
+          "StationList",
+          "StationPreviewCard",
+          "UserMessage"
+        ],
+        "tools": [
+          "search_destination_chargers"
+        ],
+        "density": {
+          "latestTurnComponents": [
+            "AssistantMessage",
+            "StationPreviewCard",
+            "ActionButtons",
+            "StationList"
+          ],
+          "latestTurnCardCount": 3,
+          "latestTurnActionCount": 1,
+          "latestTurnAlternativeListCount": 1,
+          "latestTurnOverOneCard": true
+        },
+        "metrics": {
+          "durationMs": 45298.86,
+          "llmCallCount": 2,
+          "llmErrorCount": 0,
+          "toolCallCount": 1,
+          "toolErrorCount": 0,
+          "repairCount": 0,
+          "fallbackCount": 0,
+          "usage": {
+            "inputTokens": 67102,
+            "outputTokens": 2821,
+            "totalTokens": 0
+          },
+          "cost": {
+            "currency": "USD",
+            "estimated": true,
+            "totalCostUsd": 0.03164364
+          }
+        },
+        "visibleText": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Busca una parada con banos y cafeteria user-4259e68c49 UserMessage  Para buscar una parada con baños y cafetería necesito saber dónde te encuentras o por qué zona quieres buscar. ¿Me dices una ciudad, una zona concreta o me compartes tu ubicación actual? msg_1 AssistantMessage  nearby_chargers ¿Dónde buscas la parada? Comparte tu ubicación o escribe una ciudad, carretera o punto cercano para continuar sin inventar resultados. approximate ciudad latitud longitud pos_req_1 PositionRequestCard  Estoy cerca de Almansa user-92979b8b7f UserMessage  He buscado puntos de carga autorizados cerca de Almansa. En los datos disponibles, **baños y cafetería no están verificados** en ninguno de los tres puntos encontrados. Te muestro la mejor opción según cercanía y puestos de carga registrados, pero no puedo confirmar que tengan los servicios que buscas. msg-1 AssistantMessage  Repsol ES, CRED Almansa Repsol ES, CRED Almansa AV. AYORA, 20, 02640, ESP       CCS2 CHAdeMO TYPE2  EUR  spc-1 StationPreviewCard  Abrir ruta openUrl https://www.google.com/maps/dir/?api=1&destination=38.874667,-1.100105 Elegir este punto de carga select_station Repsol ES, CRED Almansa   Ver más opciones show_more_options Almansa    act-1 ActionButtons  Alternativas en Almansa Consum Almansa Consum Almansa C. Corredera, 47, 02640 Almansa, Albacete, Es, 02640, ESP       CCS2 TYPE2  EUR  ALMANSA I ALMANSA I Ctra. Madrid-Alicante 10, 02640, ESP       CCS2  EUR  slist-1 StationList "
+      },
+      "assertions": {
+        "case_acceptance": {
+          "value": true,
+          "reason": null,
+          "source": "CaseAcceptanceEvaluator"
+        },
+        "no_http_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_llm_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_tool_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_fallback": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "hard_contract_pass": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "expected_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "forbidden_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "tool_policy_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "ui_family_pass": {
+          "value": true,
+          "reason": null,
+          "source": "UIFamilyEvaluator"
+        },
+        "no_fabrication_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "no_tool_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "expected_text_hint_present": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "safety_pass": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "task_success": {
+          "value": true,
+          "reason": null,
+          "source": "TaskSuccessEvaluator"
+        }
+      },
+      "scores": {
+        "duration_ms": {
+          "value": 45298.86,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "llm_calls": {
+          "value": 2.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "tool_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "repairs": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "fallbacks": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "estimated_cost_usd": {
+          "value": 0.03164364,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        }
+      },
+      "taskDurationSeconds": 45.35926161904354,
+      "totalDurationSeconds": 45.36130666732788,
+      "traceId": "00000000000000000000000000000000",
+      "spanId": "0000000000000000"
+    }
+  ],
+  "failures": []
+}

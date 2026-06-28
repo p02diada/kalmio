@@ -1,0 +1,280 @@
+{
+  "name": "deepseek-deepseek-v4-pro-outcome",
+  "traceId": "00000000000000000000000000000000",
+  "spanId": "0000000000000000",
+  "assertionSummary": {
+    "case_acceptance": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "no_http_error": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "no_llm_error": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "no_tool_error": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "no_fallback": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "hard_contract_pass": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "expected_tools_pass": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "forbidden_tools_pass": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "tool_policy_pass": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "ui_family_pass": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "no_fabrication_failure": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "no_tool_failure": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "expected_text_hint_present": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "safety_pass": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "task_success": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    }
+  },
+  "scoreAverages": {
+    "duration_ms": 6504.68,
+    "llm_calls": 1.0,
+    "tool_calls": 0.0,
+    "repairs": 0.0,
+    "fallbacks": 0.0,
+    "estimated_cost_usd": 0.004558
+  },
+  "cases": [
+    {
+      "name": "case-122",
+      "inputs": {
+        "case": 122,
+        "turns": [
+          "Quiero llegar con al menos 30% de bateria"
+        ]
+      },
+      "metadata": {
+        "case": 122,
+        "category": "clarification",
+        "allowedUiFamilies": [
+          "clarification",
+          "assistant_only"
+        ],
+        "expectedTools": [],
+        "forbiddenTools": [
+          "plan_route",
+          "search_destination_chargers"
+        ],
+        "expectedComponents": [],
+        "anyComponents": [
+          [
+            "AssistantMessage"
+          ]
+        ],
+        "expectedTextAny": [
+          "origen",
+          "destino",
+          "bateria",
+          "consumo",
+          "vehiculo"
+        ]
+      },
+      "output": {
+        "case": 122,
+        "ok": true,
+        "failures": [],
+        "components": [
+          "AssistantMessage",
+          "UserMessage"
+        ],
+        "tools": [],
+        "density": {
+          "latestTurnComponents": [
+            "AssistantMessage"
+          ],
+          "latestTurnCardCount": 0,
+          "latestTurnActionCount": 0,
+          "latestTurnAlternativeListCount": 0,
+          "latestTurnOverOneCard": false
+        },
+        "metrics": {
+          "durationMs": 6504.68,
+          "llmCallCount": 1,
+          "llmErrorCount": 0,
+          "toolCallCount": 0,
+          "toolErrorCount": 0,
+          "repairCount": 0,
+          "fallbackCount": 0,
+          "usage": {
+            "inputTokens": 9953,
+            "outputTokens": 263,
+            "totalTokens": 0
+          },
+          "cost": {
+            "currency": "USD",
+            "estimated": true,
+            "totalCostUsd": 0.00455837
+          }
+        },
+        "visibleText": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Quiero llegar con al menos 30% de bateria user-28d2fa5a2e UserMessage  Para planificar una ruta y asegurar que llegas con al menos un 30% de batería, necesito algunos datos clave:\n\n- **Origen y destino** concretos (ciudades, direcciones o puntos de interés).\n- **Perfil de tu vehículo**: modelo, consumo (kWh/100km), capacidad útil de batería (kWh) y potencia máxima de carga (kW).\n- **Batería de salida**: ¿con qué porcentaje planeas salir?\n\nSin estos datos no puedo validar la llegada ni calcular cuánta energía necesitarás. Dime origen, destino y lo que sepas de tu coche, y te ayudo a planificarlo. msg-1 AssistantMessage "
+      },
+      "assertions": {
+        "case_acceptance": {
+          "value": true,
+          "reason": null,
+          "source": "CaseAcceptanceEvaluator"
+        },
+        "no_http_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_llm_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_tool_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_fallback": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "hard_contract_pass": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "expected_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "forbidden_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "tool_policy_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "ui_family_pass": {
+          "value": true,
+          "reason": null,
+          "source": "UIFamilyEvaluator"
+        },
+        "no_fabrication_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "no_tool_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "expected_text_hint_present": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "safety_pass": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "task_success": {
+          "value": true,
+          "reason": null,
+          "source": "TaskSuccessEvaluator"
+        }
+      },
+      "scores": {
+        "duration_ms": {
+          "value": 6504.68,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "llm_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "tool_calls": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "repairs": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "fallbacks": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "estimated_cost_usd": {
+          "value": 0.00455837,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        }
+      },
+      "taskDurationSeconds": 6.594880556978751,
+      "totalDurationSeconds": 6.600612163543701,
+      "traceId": "00000000000000000000000000000000",
+      "spanId": "0000000000000000"
+    }
+  ],
+  "failures": []
+}

@@ -1,0 +1,289 @@
+{
+  "name": "deepseek-deepseek-v4-pro-outcome",
+  "traceId": "00000000000000000000000000000000",
+  "spanId": "0000000000000000",
+  "assertionSummary": {
+    "case_acceptance": {
+      "passed": 0,
+      "total": 1,
+      "passRate": 0.0
+    },
+    "no_http_error": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "no_llm_error": {
+      "passed": 0,
+      "total": 1,
+      "passRate": 0.0
+    },
+    "no_tool_error": {
+      "passed": 0,
+      "total": 1,
+      "passRate": 0.0
+    },
+    "no_fallback": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "hard_contract_pass": {
+      "passed": 0,
+      "total": 1,
+      "passRate": 0.0
+    },
+    "expected_tools_pass": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "forbidden_tools_pass": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "tool_policy_pass": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "ui_family_pass": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "no_fabrication_failure": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "no_tool_failure": {
+      "passed": 0,
+      "total": 1,
+      "passRate": 0.0
+    },
+    "expected_text_hint_present": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "safety_pass": {
+      "passed": 0,
+      "total": 1,
+      "passRate": 0.0
+    },
+    "task_success": {
+      "passed": 0,
+      "total": 1,
+      "passRate": 0.0
+    }
+  },
+  "scoreAverages": {
+    "duration_ms": 43279.99,
+    "llm_calls": 2.0,
+    "tool_calls": 3.0,
+    "repairs": 0.0,
+    "fallbacks": 0.0,
+    "estimated_cost_usd": 0.0
+  },
+  "cases": [
+    {
+      "name": "case-137",
+      "inputs": {
+        "case": 137,
+        "turns": [
+          "Voy de Madrid a Valencia con 60%",
+          "Mejor salgo de Toledo"
+        ]
+      },
+      "metadata": {
+        "case": 137,
+        "category": "route_followup_correction",
+        "allowedUiFamilies": [
+          "route_with_station",
+          "station_with_route_context",
+          "route_summary"
+        ],
+        "expectedTools": [
+          "plan_route"
+        ],
+        "forbiddenTools": [],
+        "expectedComponents": [],
+        "anyComponents": [
+          [
+            "RouteCorridorCard",
+            "StationList",
+            "StationPreviewCard"
+          ]
+        ],
+        "expectedTextAny": [
+          "toledo",
+          "valencia",
+          "no puedo",
+          "consumo"
+        ]
+      },
+      "output": {
+        "case": 137,
+        "ok": false,
+        "failures": [
+          "herramientas con error: [{'tool': 'resolve_location', 'status': 'error', 'metadata': {'argsValid': True, 'error': 'No conozco esa ubicación. Pide ciudad o coordenadas exactas.', 'ok': False, 'resultValid': True, 'toolContractId': 'https://kalmio.app/agent/contracts/conversation-tools/v1/resolve_location', 'toolContractVersion': 'v1'}}]"
+        ],
+        "components": [
+          "AssistantMessage",
+          "RouteCorridorCard",
+          "UserMessage"
+        ],
+        "tools": [
+          "plan_route",
+          "resolve_location"
+        ],
+        "density": {
+          "latestTurnComponents": [
+            "AssistantMessage",
+            "AssistantMessage"
+          ],
+          "latestTurnCardCount": 0,
+          "latestTurnActionCount": 0,
+          "latestTurnAlternativeListCount": 0,
+          "latestTurnOverOneCard": false
+        },
+        "metrics": {
+          "durationMs": 43279.99,
+          "llmCallCount": 2,
+          "llmErrorCount": 2,
+          "toolCallCount": 3,
+          "toolErrorCount": 1,
+          "repairCount": 0,
+          "fallbackCount": 0,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0
+          },
+          "cost": {
+            "currency": "USD",
+            "estimated": true,
+            "totalCostUsd": 0.0
+          }
+        },
+        "visibleText": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Voy de Madrid a Valencia con 60% user-d7e03c480d UserMessage      Madrid   Valencia   Moya Hub Honrubia Moya Hub Honrubia    media       EUR  HOTEL RESTAURANT PARKING_LOT FUEL_STATION WIFI CAFE SUPERMARKET NATURE Aparcamiento CTM Aparcamiento CTM    media       EUR  HOTEL RESTAURANT CAFE RECREATION_AREA BUS_STOP TAXI_STAND CARPOOL_PARKING FUEL_STATION V-VALENCIA-022-2 V-VALENCIA-022-2    media       EUR  SUPERMARKET MALL SPORT BUS_STOP PARKING_LOT FUEL_STATION RESTAURANT CAFE HOTEL WIFI LineString                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            provider plan_route route-2153b80483 RouteCorridorCard  Mejor salgo de Toledo user-fa60fafc8d UserMessage  Muestro solo datos validados por las herramientas disponibles y marco lo que no puedo confirmar. No he podido completar esta respuesta con fiabilidad. Reintenta con menos datos ambiguos o corrige origen, destino, batería y conector. assistant-5f298348da AssistantMessage  Herramienta ejecutada. assistant-88ac84adbe AssistantMessage "
+      },
+      "assertions": {
+        "case_acceptance": {
+          "value": false,
+          "reason": null,
+          "source": "CaseAcceptanceEvaluator"
+        },
+        "no_http_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_llm_error": {
+          "value": false,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_tool_error": {
+          "value": false,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_fallback": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "hard_contract_pass": {
+          "value": false,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "expected_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "forbidden_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "tool_policy_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "ui_family_pass": {
+          "value": true,
+          "reason": null,
+          "source": "UIFamilyEvaluator"
+        },
+        "no_fabrication_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "no_tool_failure": {
+          "value": false,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "expected_text_hint_present": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "safety_pass": {
+          "value": false,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "task_success": {
+          "value": false,
+          "reason": null,
+          "source": "TaskSuccessEvaluator"
+        }
+      },
+      "scores": {
+        "duration_ms": {
+          "value": 43279.99,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "llm_calls": {
+          "value": 2.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "tool_calls": {
+          "value": 3.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "repairs": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "fallbacks": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "estimated_cost_usd": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        }
+      },
+      "taskDurationSeconds": 43.363671981031075,
+      "totalDurationSeconds": 43.36755847930908,
+      "traceId": "00000000000000000000000000000000",
+      "spanId": "0000000000000000"
+    }
+  ],
+  "failures": []
+}

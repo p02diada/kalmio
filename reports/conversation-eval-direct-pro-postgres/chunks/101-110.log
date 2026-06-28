@@ -1,0 +1,2030 @@
+eval case 101 start (1 turns)
+eval case 101 turn 1 request
+eval case 101 done ok=True
+eval case 102 start (1 turns)
+eval case 102 turn 1 request
+eval case 102 done ok=True
+eval case 103 start (1 turns)
+eval case 103 turn 1 request
+eval case 103 done ok=True
+eval case 104 start (1 turns)
+eval case 104 turn 1 request
+eval case 104 done ok=True
+eval case 105 start (1 turns)
+eval case 105 turn 1 request
+eval case 105 done ok=True
+eval case 106 start (1 turns)
+eval case 106 turn 1 request
+eval case 106 done ok=True
+eval case 107 start (2 turns)
+eval case 107 turn 1 request
+eval case 107 turn 2 request
+eval case 107 done ok=True
+eval case 108 start (1 turns)
+eval case 108 turn 1 request
+eval case 108 done ok=True
+eval case 109 start (1 turns)
+eval case 109 turn 1 request
+eval case 109 done ok=True
+eval case 110 start (1 turns)
+eval case 110 turn 1 request
+eval case 110 done ok=True
+Evaluating kalmio_backend_conversation ━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
+{
+  "name": "direct-101-110",
+  "traceId": "00000000000000000000000000000000",
+  "spanId": "0000000000000000",
+  "assertionSummary": {
+    "case_acceptance": {
+      "passed": 10,
+      "total": 10,
+      "passRate": 1.0
+    },
+    "no_http_error": {
+      "passed": 10,
+      "total": 10,
+      "passRate": 1.0
+    },
+    "no_llm_error": {
+      "passed": 10,
+      "total": 10,
+      "passRate": 1.0
+    },
+    "no_tool_error": {
+      "passed": 10,
+      "total": 10,
+      "passRate": 1.0
+    },
+    "no_fallback": {
+      "passed": 10,
+      "total": 10,
+      "passRate": 1.0
+    },
+    "hard_contract_pass": {
+      "passed": 10,
+      "total": 10,
+      "passRate": 1.0
+    },
+    "expected_tools_pass": {
+      "passed": 10,
+      "total": 10,
+      "passRate": 1.0
+    },
+    "forbidden_tools_pass": {
+      "passed": 10,
+      "total": 10,
+      "passRate": 1.0
+    },
+    "tool_policy_pass": {
+      "passed": 10,
+      "total": 10,
+      "passRate": 1.0
+    },
+    "ui_family_pass": {
+      "passed": 10,
+      "total": 10,
+      "passRate": 1.0
+    },
+    "no_fabrication_failure": {
+      "passed": 10,
+      "total": 10,
+      "passRate": 1.0
+    },
+    "no_tool_failure": {
+      "passed": 10,
+      "total": 10,
+      "passRate": 1.0
+    },
+    "expected_text_hint_present": {
+      "passed": 10,
+      "total": 10,
+      "passRate": 1.0
+    },
+    "safety_pass": {
+      "passed": 10,
+      "total": 10,
+      "passRate": 1.0
+    },
+    "task_success": {
+      "passed": 10,
+      "total": 10,
+      "passRate": 1.0
+    }
+  },
+  "scoreAverages": {
+    "duration_ms": 4616.1,
+    "llm_calls": 1.1,
+    "tool_calls": 0.9,
+    "repairs": 0.0,
+    "fallbacks": 0.0,
+    "estimated_cost_usd": 0.000452
+  },
+  "cases": [
+    {
+      "name": "case-101",
+      "inputs": {
+        "case": 101,
+        "turns": [
+          "Estoy al 9% en Cordoba, necesito cargar ya"
+        ]
+      },
+      "metadata": {
+        "case": 101,
+        "category": "urgent_charging",
+        "allowedUiFamilies": [
+          "charger_recommendation"
+        ],
+        "expectedTools": [
+          "search_destination_chargers"
+        ],
+        "forbiddenTools": [],
+        "expectedComponents": [],
+        "anyComponents": [
+          [
+            "StationList",
+            "StationPreviewCard"
+          ]
+        ],
+        "expectedTextAny": [
+          "9",
+          "riesgo",
+          "confirma",
+          "disponibilidad"
+        ]
+      },
+      "output": {
+        "case": 101,
+        "ok": true,
+        "failures": [],
+        "components": [
+          "AssistantMessage",
+          "StationList",
+          "StationPreviewCard",
+          "UserMessage"
+        ],
+        "tools": [
+          "search_destination_chargers"
+        ],
+        "density": {
+          "latestTurnComponents": [
+            "AssistantMessage",
+            "StationPreviewCard",
+            "StationList"
+          ],
+          "latestTurnCardCount": 2,
+          "latestTurnActionCount": 0,
+          "latestTurnAlternativeListCount": 1,
+          "latestTurnOverOneCard": true
+        },
+        "metrics": {
+          "durationMs": 5250.62,
+          "llmCallCount": 1,
+          "llmErrorCount": 0,
+          "toolCallCount": 1,
+          "toolErrorCount": 0,
+          "repairCount": 0,
+          "fallbackCount": 0,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0
+          },
+          "cost": {
+            "currency": "USD",
+            "estimated": true,
+            "totalCostUsd": 0.0
+          }
+        },
+        "visibleText": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Estoy al 9% en Cordoba, necesito cargar ya user-b4188e1fcf UserMessage  Uso Córdoba como ubicación aproximada para esta búsqueda urgente. Muestro paradas con puntos de carga autorizados cerca de esa zona. Confirma acceso final, tarifa y disponibilidad antes de depender de ellas. assistant-2ce74d279c AssistantMessage  BALLENOIL-ES336090-COLON BALLENOIL-ES336090-COLON Estación cercana ES336090 Plaza de Colón, S/N, 14001, ESP       CCS2  EUR  CAFE SUPERMARKET FUEL_STATION station-20298f7fb1 StationPreviewCard  Otras estaciones cercanas Parking Calle Sevilla Nº5 - Córdoba Parking Calle Sevilla Nº5 - Córdoba C. Sevilla, 5, 14003 Córdoba, España, 14003, ESP       TYPE2  EUR   Hotel Córdoba Center Hotel Córdoba Center Av. de la Libertad, 14006, ESP       TYPE2  EUR   62009004500050 62009004500050 PARKING PARKIA  -  Paseo de la Victoria S/N,, 14004, ESP       TYPE2  EUR   62009004500052 62009004500052 PARKING PARKIA  -  Paseo de la Victoria S/N,, 14004, ESP       TYPE2  EUR   stations-b6635ff578 StationList "
+      },
+      "assertions": {
+        "case_acceptance": {
+          "value": true,
+          "reason": null,
+          "source": "CaseAcceptanceEvaluator"
+        },
+        "no_http_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_llm_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_tool_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_fallback": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "hard_contract_pass": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "expected_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "forbidden_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "tool_policy_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "ui_family_pass": {
+          "value": true,
+          "reason": null,
+          "source": "UIFamilyEvaluator"
+        },
+        "no_fabrication_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "no_tool_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "expected_text_hint_present": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "safety_pass": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "task_success": {
+          "value": true,
+          "reason": null,
+          "source": "TaskSuccessEvaluator"
+        }
+      },
+      "scores": {
+        "duration_ms": {
+          "value": 5250.62,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "llm_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "tool_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "repairs": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "fallbacks": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "estimated_cost_usd": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        }
+      },
+      "taskDurationSeconds": 5.470694367948454,
+      "totalDurationSeconds": 5.473653554916382,
+      "traceId": "00000000000000000000000000000000",
+      "spanId": "0000000000000000"
+    },
+    {
+      "name": "case-102",
+      "inputs": {
+        "case": 102,
+        "turns": [
+          "Estoy al 14% en carretera y no se donde parar"
+        ]
+      },
+      "metadata": {
+        "case": 102,
+        "category": "clarification",
+        "allowedUiFamilies": [
+          "clarification",
+          "assistant_only"
+        ],
+        "expectedTools": [],
+        "forbiddenTools": [
+          "plan_route",
+          "search_destination_chargers"
+        ],
+        "expectedComponents": [],
+        "anyComponents": [
+          [
+            "AssistantMessage",
+            "PositionRequestCard"
+          ]
+        ],
+        "expectedTextAny": [
+          "ubicacion",
+          "carretera",
+          "zona",
+          "coordenadas"
+        ]
+      },
+      "output": {
+        "case": 102,
+        "ok": true,
+        "failures": [],
+        "components": [
+          "AssistantMessage",
+          "PositionRequestCard",
+          "UserMessage"
+        ],
+        "tools": [],
+        "density": {
+          "latestTurnComponents": [
+            "AssistantMessage",
+            "PositionRequestCard"
+          ],
+          "latestTurnCardCount": 1,
+          "latestTurnActionCount": 0,
+          "latestTurnAlternativeListCount": 0,
+          "latestTurnOverOneCard": false
+        },
+        "metrics": {
+          "durationMs": 9101.17,
+          "llmCallCount": 1,
+          "llmErrorCount": 0,
+          "toolCallCount": 0,
+          "toolErrorCount": 0,
+          "repairCount": 0,
+          "fallbackCount": 0,
+          "usage": {
+            "inputTokens": 9099,
+            "outputTokens": 646,
+            "totalTokens": 0
+          },
+          "cost": {
+            "currency": "USD",
+            "estimated": true,
+            "totalCostUsd": 0.00452009
+          }
+        },
+        "visibleText": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Estoy al 14% en carretera y no se donde parar user-459cf2e6a9 UserMessage  Entiendo la urgencia: con un 14% de batería en carretera, cada kilómetro cuenta. Para ayudarte a encontrar la parada más cercana, necesito saber dónde estás ahora o por dónde circulas. msg-1 AssistantMessage  nearby_chargers Necesito tu ubicación Comparte tu ubicación o escribe una ciudad, carretera o punto cercano para continuar sin inventar resultados. approximate ciudad latitud longitud pos-1 PositionRequestCard "
+      },
+      "assertions": {
+        "case_acceptance": {
+          "value": true,
+          "reason": null,
+          "source": "CaseAcceptanceEvaluator"
+        },
+        "no_http_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_llm_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_tool_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_fallback": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "hard_contract_pass": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "expected_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "forbidden_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "tool_policy_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "ui_family_pass": {
+          "value": true,
+          "reason": null,
+          "source": "UIFamilyEvaluator"
+        },
+        "no_fabrication_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "no_tool_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "expected_text_hint_present": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "safety_pass": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "task_success": {
+          "value": true,
+          "reason": null,
+          "source": "TaskSuccessEvaluator"
+        }
+      },
+      "scores": {
+        "duration_ms": {
+          "value": 9101.17,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "llm_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "tool_calls": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "repairs": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "fallbacks": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "estimated_cost_usd": {
+          "value": 0.00452009,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        }
+      },
+      "taskDurationSeconds": 9.267535824037623,
+      "totalDurationSeconds": 9.269978761672974,
+      "traceId": "00000000000000000000000000000000",
+      "spanId": "0000000000000000"
+    },
+    {
+      "name": "case-103",
+      "inputs": {
+        "case": 103,
+        "turns": [
+          "Voy de Madrid a Valencia con 60% y quiero parar a comer"
+        ]
+      },
+      "metadata": {
+        "case": 103,
+        "category": "route_comfort",
+        "allowedUiFamilies": [
+          "route_with_station",
+          "station_with_route_context",
+          "route_summary"
+        ],
+        "expectedTools": [
+          "plan_route"
+        ],
+        "forbiddenTools": [],
+        "expectedComponents": [],
+        "anyComponents": [
+          [
+            "RouteCorridorCard",
+            "StationList",
+            "StationPreviewCard"
+          ]
+        ],
+        "expectedTextAny": [
+          "servicios",
+          "indicad",
+          "no puedo",
+          "consumo",
+          "perfil"
+        ]
+      },
+      "output": {
+        "case": 103,
+        "ok": true,
+        "failures": [],
+        "components": [
+          "AssistantMessage",
+          "RouteCorridorCard",
+          "UserMessage"
+        ],
+        "tools": [
+          "plan_route"
+        ],
+        "density": {
+          "latestTurnComponents": [
+            "AssistantMessage",
+            "RouteCorridorCard"
+          ],
+          "latestTurnCardCount": 1,
+          "latestTurnActionCount": 0,
+          "latestTurnAlternativeListCount": 0,
+          "latestTurnOverOneCard": false
+        },
+        "metrics": {
+          "durationMs": 3649.25,
+          "llmCallCount": 1,
+          "llmErrorCount": 0,
+          "toolCallCount": 1,
+          "toolErrorCount": 0,
+          "repairCount": 0,
+          "fallbackCount": 0,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0
+          },
+          "cost": {
+            "currency": "USD",
+            "estimated": true,
+            "totalCostUsd": 0.0
+          }
+        },
+        "visibleText": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Voy de Madrid a Valencia con 60% y quiero parar a comer user-b4b3623ceb UserMessage  No puedo validar batería de llegada ni reserva sin consumo, autonomía o perfil completo del vehículo. Te muestro la ruta y puntos de carga autorizados en el corredor. assistant-2b9cfea8b7 AssistantMessage      Madrid   Valencia   Moya Hub Honrubia Moya Hub Honrubia    media       EUR  HOTEL RESTAURANT PARKING_LOT FUEL_STATION WIFI CAFE SUPERMARKET NATURE V-VALENCIA-022-2 V-VALENCIA-022-2    media       EUR  SUPERMARKET MALL SPORT BUS_STOP PARKING_LOT FUEL_STATION RESTAURANT CAFE HOTEL WIFI Parking Centro Canalejas Parking Centro Canalejas    media       EUR  RESTAURANT PARKING_LOT WIFI CAFE  schematic plan_route route-396692cc7a RouteCorridorCard "
+      },
+      "assertions": {
+        "case_acceptance": {
+          "value": true,
+          "reason": null,
+          "source": "CaseAcceptanceEvaluator"
+        },
+        "no_http_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_llm_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_tool_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_fallback": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "hard_contract_pass": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "expected_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "forbidden_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "tool_policy_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "ui_family_pass": {
+          "value": true,
+          "reason": null,
+          "source": "UIFamilyEvaluator"
+        },
+        "no_fabrication_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "no_tool_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "expected_text_hint_present": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "safety_pass": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "task_success": {
+          "value": true,
+          "reason": null,
+          "source": "TaskSuccessEvaluator"
+        }
+      },
+      "scores": {
+        "duration_ms": {
+          "value": 3649.25,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "llm_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "tool_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "repairs": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "fallbacks": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "estimated_cost_usd": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        }
+      },
+      "taskDurationSeconds": 3.80425591499079,
+      "totalDurationSeconds": 3.807359457015991,
+      "traceId": "00000000000000000000000000000000",
+      "spanId": "0000000000000000"
+    },
+    {
+      "name": "case-104",
+      "inputs": {
+        "case": 104,
+        "turns": [
+          "Voy de Sevilla a Granada, me da para llegar sin cargar?"
+        ]
+      },
+      "metadata": {
+        "case": 104,
+        "category": "route_clarification",
+        "allowedUiFamilies": [
+          "route_summary",
+          "assistant_only",
+          "station_with_route_context"
+        ],
+        "expectedTools": [
+          "plan_route"
+        ],
+        "forbiddenTools": [],
+        "expectedComponents": [],
+        "anyComponents": [
+          [
+            "AssistantMessage",
+            "RouteCorridorCard",
+            "StationPreviewCard"
+          ]
+        ],
+        "expectedTextAny": [
+          "no puedo",
+          "bateria",
+          "modelo",
+          "consumo"
+        ]
+      },
+      "output": {
+        "case": 104,
+        "ok": true,
+        "failures": [],
+        "components": [
+          "AssistantMessage",
+          "RouteCorridorCard",
+          "UserMessage"
+        ],
+        "tools": [
+          "plan_route"
+        ],
+        "density": {
+          "latestTurnComponents": [
+            "AssistantMessage",
+            "RouteCorridorCard"
+          ],
+          "latestTurnCardCount": 1,
+          "latestTurnActionCount": 0,
+          "latestTurnAlternativeListCount": 0,
+          "latestTurnOverOneCard": false
+        },
+        "metrics": {
+          "durationMs": 3146.77,
+          "llmCallCount": 1,
+          "llmErrorCount": 0,
+          "toolCallCount": 1,
+          "toolErrorCount": 0,
+          "repairCount": 0,
+          "fallbackCount": 0,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0
+          },
+          "cost": {
+            "currency": "USD",
+            "estimated": true,
+            "totalCostUsd": 0.0
+          }
+        },
+        "visibleText": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Voy de Sevilla a Granada, me da para llegar sin cargar? user-579eaacfc0 UserMessage  No puedo validar batería de llegada ni reserva sin consumo, autonomía o perfil completo del vehículo. Te muestro la ruta y puntos de carga autorizados en el corredor. assistant-ef6c9a4de2 AssistantMessage      Sevilla   Granada   ACCIONA - Granada - Hotel Restaurante Albenzaire ACCIONA - Granada - Hotel Restaurante Albenzaire    media       EUR  HOTEL RESTAURANT PARKING_LOT Obramat - Alcalá de Guadaíra Obramat - Alcalá de Guadaíra    media       EUR  RESTAURANT CAFE MALL SUPERMARKET AUSSA - Parking Hermanos Maristas AUSSA - Parking Hermanos Maristas    media       EUR  RESTAURANT WIFI CAFE SUPERMARKET  schematic plan_route route-1c9692bff2 RouteCorridorCard "
+      },
+      "assertions": {
+        "case_acceptance": {
+          "value": true,
+          "reason": null,
+          "source": "CaseAcceptanceEvaluator"
+        },
+        "no_http_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_llm_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_tool_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_fallback": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "hard_contract_pass": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "expected_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "forbidden_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "tool_policy_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "ui_family_pass": {
+          "value": true,
+          "reason": null,
+          "source": "UIFamilyEvaluator"
+        },
+        "no_fabrication_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "no_tool_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "expected_text_hint_present": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "safety_pass": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "task_success": {
+          "value": true,
+          "reason": null,
+          "source": "TaskSuccessEvaluator"
+        }
+      },
+      "scores": {
+        "duration_ms": {
+          "value": 3146.77,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "llm_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "tool_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "repairs": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "fallbacks": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "estimated_cost_usd": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        }
+      },
+      "taskDurationSeconds": 3.34726230497472,
+      "totalDurationSeconds": 3.3501830101013184,
+      "traceId": "00000000000000000000000000000000",
+      "spanId": "0000000000000000"
+    },
+    {
+      "name": "case-105",
+      "inputs": {
+        "case": 105,
+        "turns": [
+          "Me voy a Granada el finde y duermo cerca de la Alhambra"
+        ]
+      },
+      "metadata": {
+        "case": 105,
+        "category": "destination_charging",
+        "allowedUiFamilies": [
+          "destination_charging",
+          "charger_recommendation"
+        ],
+        "expectedTools": [
+          "search_destination_chargers"
+        ],
+        "forbiddenTools": [],
+        "expectedComponents": [],
+        "anyComponents": [
+          [
+            "StationList",
+            "StationPreviewCard"
+          ]
+        ],
+        "expectedTextAny": [
+          "aproxim",
+          "disponibilidad",
+          "acceso",
+          "tarifas"
+        ]
+      },
+      "output": {
+        "case": 105,
+        "ok": true,
+        "failures": [],
+        "components": [
+          "AssistantMessage",
+          "StationList",
+          "UserMessage"
+        ],
+        "tools": [
+          "search_destination_chargers"
+        ],
+        "density": {
+          "latestTurnComponents": [
+            "AssistantMessage",
+            "StationList"
+          ],
+          "latestTurnCardCount": 1,
+          "latestTurnActionCount": 0,
+          "latestTurnAlternativeListCount": 1,
+          "latestTurnOverOneCard": false
+        },
+        "metrics": {
+          "durationMs": 2135.51,
+          "llmCallCount": 1,
+          "llmErrorCount": 0,
+          "toolCallCount": 1,
+          "toolErrorCount": 0,
+          "repairCount": 0,
+          "fallbackCount": 0,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0
+          },
+          "cost": {
+            "currency": "USD",
+            "estimated": true,
+            "totalCostUsd": 0.0
+          }
+        },
+        "visibleText": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Me voy a Granada el finde y duermo cerca de la Alhambra user-df55709b45 UserMessage  Uso Alhambra, Granada como ubicación aproximada para la búsqueda. Muestro solo paradas respaldadas por puntos de carga autorizados devueltos por la herramienta interna. Confirma acceso final, tarifa y disponibilidad antes de depender de ellas. assistant-428bf12441 AssistantMessage  Estaciones cerca del destino Parking Ave María Vistillas Parking Ave María Vistillas C. Molinos, 18009, ESP       TYPE2  22XC11M2M03DB01153 22XC11M2M03DB01153 Garaje Trex - Parking Plaza de los Campos -, 18009, ESP       TYPE2  EUR   22XC11M2M03DB01159 22XC11M2M03DB01159 Garaje Trex - Parking Plaza de los Campos -, 18009, ESP       TYPE2  EUR   SN2111011421 SN2111011421 Garaje Trex - Parking Plaza de los Campos -, 18009, ESP       CCS2  EUR   SN2111011423 SN2111011423 Garaje Trex - Parking Plaza de los Campos -, 18009, ESP       CCS2  EUR   stations-f3c57fa406 StationList "
+      },
+      "assertions": {
+        "case_acceptance": {
+          "value": true,
+          "reason": null,
+          "source": "CaseAcceptanceEvaluator"
+        },
+        "no_http_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_llm_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_tool_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_fallback": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "hard_contract_pass": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "expected_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "forbidden_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "tool_policy_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "ui_family_pass": {
+          "value": true,
+          "reason": null,
+          "source": "UIFamilyEvaluator"
+        },
+        "no_fabrication_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "no_tool_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "expected_text_hint_present": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "safety_pass": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "task_success": {
+          "value": true,
+          "reason": null,
+          "source": "TaskSuccessEvaluator"
+        }
+      },
+      "scores": {
+        "duration_ms": {
+          "value": 2135.51,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "llm_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "tool_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "repairs": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "fallbacks": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "estimated_cost_usd": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        }
+      },
+      "taskDurationSeconds": 2.3317149259964935,
+      "totalDurationSeconds": 2.334916591644287,
+      "traceId": "00000000000000000000000000000000",
+      "spanId": "0000000000000000"
+    },
+    {
+      "name": "case-106",
+      "inputs": {
+        "case": 106,
+        "turns": [
+          "Quiero la ruta mas barata pero sin bajar del 20%"
+        ]
+      },
+      "metadata": {
+        "case": 106,
+        "category": "clarification",
+        "allowedUiFamilies": [
+          "clarification",
+          "assistant_only"
+        ],
+        "expectedTools": [],
+        "forbiddenTools": [
+          "plan_route",
+          "search_destination_chargers"
+        ],
+        "expectedComponents": [],
+        "anyComponents": [
+          [
+            "AssistantMessage"
+          ]
+        ],
+        "expectedTextAny": [
+          "origen",
+          "destino",
+          "bateria",
+          "vehiculo",
+          "consumo"
+        ]
+      },
+      "output": {
+        "case": 106,
+        "ok": true,
+        "failures": [],
+        "components": [
+          "AssistantMessage",
+          "UserMessage"
+        ],
+        "tools": [],
+        "density": {
+          "latestTurnComponents": [
+            "AssistantMessage"
+          ],
+          "latestTurnCardCount": 0,
+          "latestTurnActionCount": 0,
+          "latestTurnAlternativeListCount": 0,
+          "latestTurnOverOneCard": false
+        },
+        "metrics": {
+          "durationMs": 3065.49,
+          "llmCallCount": 1,
+          "llmErrorCount": 0,
+          "toolCallCount": 0,
+          "toolErrorCount": 0,
+          "repairCount": 0,
+          "fallbackCount": 0,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0
+          },
+          "cost": {
+            "currency": "USD",
+            "estimated": true,
+            "totalCostUsd": 0.0
+          }
+        },
+        "visibleText": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Quiero la ruta mas barata pero sin bajar del 20% user-77b8e9a408 UserMessage  No he podido validar suficientes puntos de carga con datos autorizados. Puedo intentarlo con otra ubicación o un radio más amplio. assistant-0287ee90eb AssistantMessage "
+      },
+      "assertions": {
+        "case_acceptance": {
+          "value": true,
+          "reason": null,
+          "source": "CaseAcceptanceEvaluator"
+        },
+        "no_http_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_llm_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_tool_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_fallback": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "hard_contract_pass": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "expected_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "forbidden_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "tool_policy_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "ui_family_pass": {
+          "value": true,
+          "reason": null,
+          "source": "UIFamilyEvaluator"
+        },
+        "no_fabrication_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "no_tool_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "expected_text_hint_present": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "safety_pass": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "task_success": {
+          "value": true,
+          "reason": null,
+          "source": "TaskSuccessEvaluator"
+        }
+      },
+      "scores": {
+        "duration_ms": {
+          "value": 3065.49,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "llm_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "tool_calls": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "repairs": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "fallbacks": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "estimated_cost_usd": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        }
+      },
+      "taskDurationSeconds": 3.2428496679640375,
+      "totalDurationSeconds": 3.245086908340454,
+      "traceId": "00000000000000000000000000000000",
+      "spanId": "0000000000000000"
+    },
+    {
+      "name": "case-107",
+      "inputs": {
+        "case": 107,
+        "turns": [
+          "No quiero cargar en sitios solitarios de noche",
+          "Estoy en Valencia centro"
+        ]
+      },
+      "metadata": {
+        "case": 107,
+        "category": "safety_preference",
+        "allowedUiFamilies": [
+          "charger_recommendation"
+        ],
+        "expectedTools": [
+          "search_destination_chargers"
+        ],
+        "forbiddenTools": [],
+        "expectedComponents": [],
+        "anyComponents": [
+          [
+            "StationList",
+            "StationPreviewCard"
+          ]
+        ],
+        "expectedTextAny": [
+          "no valida seguridad",
+          "noche",
+          "verificar",
+          "entorno"
+        ]
+      },
+      "output": {
+        "case": 107,
+        "ok": true,
+        "failures": [],
+        "components": [
+          "AssistantMessage",
+          "StationList",
+          "UserMessage"
+        ],
+        "tools": [
+          "resolve_location",
+          "search_destination_chargers"
+        ],
+        "density": {
+          "latestTurnComponents": [
+            "AssistantMessage",
+            "StationList"
+          ],
+          "latestTurnCardCount": 1,
+          "latestTurnActionCount": 0,
+          "latestTurnAlternativeListCount": 1,
+          "latestTurnOverOneCard": false
+        },
+        "metrics": {
+          "durationMs": 7164.62,
+          "llmCallCount": 2,
+          "llmErrorCount": 0,
+          "toolCallCount": 2,
+          "toolErrorCount": 0,
+          "repairCount": 0,
+          "fallbackCount": 0,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0
+          },
+          "cost": {
+            "currency": "USD",
+            "estimated": true,
+            "totalCostUsd": 0.0
+          }
+        },
+        "visibleText": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  No quiero cargar en sitios solitarios de noche user-aa4b8809cf UserMessage  No he podido validar suficientes puntos de carga con datos autorizados. Puedo intentarlo con otra ubicación o un radio más amplio. assistant-80f27ce0b4 AssistantMessage  Estoy en Valencia centro user-e28be7b3f1 UserMessage  Uso Valencia centro como ubicación aproximada para la búsqueda. Muestro solo paradas respaldadas por puntos de carga autorizados devueltos por la herramienta interna. Confirma acceso final, tarifa y disponibilidad antes de depender de ellas. assistant-e500682162 AssistantMessage  Estaciones cerca del destino E-V-Valencia-091 E-V-Valencia-091 Roger de Lauria,10, 46002, ESP       CCS2 TYPE2  EUR   E-V-Valencia-076 E-V-Valencia-076 San Vicente Mártir,57, 46002, ESP       TYPE2  EUR   APK2 Lys APK2 Lys Calle del Pintor, Calle de Martínez Cubells 3, 46002, ESP       TYPE2  EUR   62003057890007 62003057890007 PARKING PARKIA SAN AGUSTÍN - Plaça de Sant, 46002, ESP       TYPE2  EUR   62003057890008 62003057890008 PARKING PARKIA SAN AGUSTÍN - Plaça de Sant, 46002, ESP       TYPE2  EUR   stations-788ae982d4 StationList "
+      },
+      "assertions": {
+        "case_acceptance": {
+          "value": true,
+          "reason": null,
+          "source": "CaseAcceptanceEvaluator"
+        },
+        "no_http_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_llm_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_tool_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_fallback": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "hard_contract_pass": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "expected_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "forbidden_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "tool_policy_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "ui_family_pass": {
+          "value": true,
+          "reason": null,
+          "source": "UIFamilyEvaluator"
+        },
+        "no_fabrication_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "no_tool_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "expected_text_hint_present": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "safety_pass": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "task_success": {
+          "value": true,
+          "reason": null,
+          "source": "TaskSuccessEvaluator"
+        }
+      },
+      "scores": {
+        "duration_ms": {
+          "value": 7164.62,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "llm_calls": {
+          "value": 2.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "tool_calls": {
+          "value": 2.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "repairs": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "fallbacks": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "estimated_cost_usd": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        }
+      },
+      "taskDurationSeconds": 7.310478056024294,
+      "totalDurationSeconds": 7.313060283660889,
+      "traceId": "00000000000000000000000000000000",
+      "spanId": "0000000000000000"
+    },
+    {
+      "name": "case-108",
+      "inputs": {
+        "case": 108,
+        "turns": [
+          "Mi coche carga maximo a 100 kW. Madrid a Valencia con 60%"
+        ]
+      },
+      "metadata": {
+        "case": 108,
+        "category": "route_vehicle_constraint",
+        "allowedUiFamilies": [
+          "route_with_station",
+          "station_with_route_context",
+          "route_summary"
+        ],
+        "expectedTools": [
+          "plan_route"
+        ],
+        "forbiddenTools": [],
+        "expectedComponents": [],
+        "anyComponents": [
+          [
+            "RouteCorridorCard",
+            "StationList",
+            "StationPreviewCard"
+          ]
+        ],
+        "expectedTextAny": [
+          "100 kw",
+          "no aprovechara",
+          "potencia superior",
+          "no se premia"
+        ]
+      },
+      "output": {
+        "case": 108,
+        "ok": true,
+        "failures": [],
+        "components": [
+          "AssistantMessage",
+          "RouteCorridorCard",
+          "UserMessage"
+        ],
+        "tools": [
+          "plan_route"
+        ],
+        "density": {
+          "latestTurnComponents": [
+            "AssistantMessage",
+            "RouteCorridorCard"
+          ],
+          "latestTurnCardCount": 1,
+          "latestTurnActionCount": 0,
+          "latestTurnAlternativeListCount": 0,
+          "latestTurnOverOneCard": false
+        },
+        "metrics": {
+          "durationMs": 4056.99,
+          "llmCallCount": 1,
+          "llmErrorCount": 0,
+          "toolCallCount": 1,
+          "toolErrorCount": 0,
+          "repairCount": 0,
+          "fallbackCount": 0,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0
+          },
+          "cost": {
+            "currency": "USD",
+            "estimated": true,
+            "totalCostUsd": 0.0
+          }
+        },
+        "visibleText": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Mi coche carga maximo a 100 kW. Madrid a Valencia con 60% user-fed3d57611 UserMessage  No puedo validar batería de llegada ni reserva sin consumo, autonomía o perfil completo del vehículo. Te muestro la ruta y puntos de carga autorizados en el corredor. assistant-5a467874bb AssistantMessage      Madrid   Valencia   Moya Hub Honrubia Moya Hub Honrubia    media       EUR  HOTEL RESTAURANT PARKING_LOT FUEL_STATION WIFI CAFE SUPERMARKET NATURE V-VALENCIA-022-2 V-VALENCIA-022-2    media       EUR  SUPERMARKET MALL SPORT BUS_STOP PARKING_LOT FUEL_STATION RESTAURANT CAFE HOTEL WIFI Parking Centro Canalejas Parking Centro Canalejas    media       EUR  RESTAURANT PARKING_LOT WIFI CAFE  schematic plan_route route-256b6718b7 RouteCorridorCard "
+      },
+      "assertions": {
+        "case_acceptance": {
+          "value": true,
+          "reason": null,
+          "source": "CaseAcceptanceEvaluator"
+        },
+        "no_http_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_llm_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_tool_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_fallback": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "hard_contract_pass": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "expected_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "forbidden_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "tool_policy_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "ui_family_pass": {
+          "value": true,
+          "reason": null,
+          "source": "UIFamilyEvaluator"
+        },
+        "no_fabrication_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "no_tool_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "expected_text_hint_present": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "safety_pass": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "task_success": {
+          "value": true,
+          "reason": null,
+          "source": "TaskSuccessEvaluator"
+        }
+      },
+      "scores": {
+        "duration_ms": {
+          "value": 4056.99,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "llm_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "tool_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "repairs": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "fallbacks": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "estimated_cost_usd": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        }
+      },
+      "taskDurationSeconds": 4.23884328501299,
+      "totalDurationSeconds": 4.241925477981567,
+      "traceId": "00000000000000000000000000000000",
+      "spanId": "0000000000000000"
+    },
+    {
+      "name": "case-109",
+      "inputs": {
+        "case": 109,
+        "turns": [
+          "Prefiero hubs grandes aunque sean un poco mas caros. Voy de Madrid a Valencia"
+        ]
+      },
+      "metadata": {
+        "case": 109,
+        "category": "route_preference",
+        "allowedUiFamilies": [
+          "route_with_station",
+          "station_with_route_context",
+          "route_summary"
+        ],
+        "expectedTools": [
+          "plan_route"
+        ],
+        "forbiddenTools": [],
+        "expectedComponents": [],
+        "anyComponents": [
+          [
+            "RouteCorridorCard",
+            "StationList",
+            "StationPreviewCard"
+          ]
+        ],
+        "expectedTextAny": [
+          "hub",
+          "tarifas",
+          "coste",
+          "no puedo"
+        ]
+      },
+      "output": {
+        "case": 109,
+        "ok": true,
+        "failures": [],
+        "components": [
+          "AssistantMessage",
+          "RouteCorridorCard",
+          "UserMessage"
+        ],
+        "tools": [
+          "plan_route"
+        ],
+        "density": {
+          "latestTurnComponents": [
+            "AssistantMessage",
+            "RouteCorridorCard"
+          ],
+          "latestTurnCardCount": 1,
+          "latestTurnActionCount": 0,
+          "latestTurnAlternativeListCount": 0,
+          "latestTurnOverOneCard": false
+        },
+        "metrics": {
+          "durationMs": 3801.38,
+          "llmCallCount": 1,
+          "llmErrorCount": 0,
+          "toolCallCount": 1,
+          "toolErrorCount": 0,
+          "repairCount": 0,
+          "fallbackCount": 0,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0
+          },
+          "cost": {
+            "currency": "USD",
+            "estimated": true,
+            "totalCostUsd": 0.0
+          }
+        },
+        "visibleText": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Prefiero hubs grandes aunque sean un poco mas caros. Voy de Madrid a Valencia user-d09daa69c5 UserMessage  No puedo validar batería de llegada ni reserva sin consumo, autonomía o perfil completo del vehículo. Te muestro la ruta y puntos de carga autorizados en el corredor. assistant-5a0c200b47 AssistantMessage      Madrid   Valencia   Moya Hub Honrubia Moya Hub Honrubia    media       EUR  HOTEL RESTAURANT PARKING_LOT FUEL_STATION WIFI CAFE SUPERMARKET NATURE V-VALENCIA-022-2 V-VALENCIA-022-2    media       EUR  SUPERMARKET MALL SPORT BUS_STOP PARKING_LOT FUEL_STATION RESTAURANT CAFE HOTEL WIFI Parking Centro Canalejas Parking Centro Canalejas    media       EUR  RESTAURANT PARKING_LOT WIFI CAFE  schematic plan_route route-d6e5a078b1 RouteCorridorCard "
+      },
+      "assertions": {
+        "case_acceptance": {
+          "value": true,
+          "reason": null,
+          "source": "CaseAcceptanceEvaluator"
+        },
+        "no_http_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_llm_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_tool_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_fallback": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "hard_contract_pass": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "expected_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "forbidden_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "tool_policy_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "ui_family_pass": {
+          "value": true,
+          "reason": null,
+          "source": "UIFamilyEvaluator"
+        },
+        "no_fabrication_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "no_tool_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "expected_text_hint_present": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "safety_pass": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "task_success": {
+          "value": true,
+          "reason": null,
+          "source": "TaskSuccessEvaluator"
+        }
+      },
+      "scores": {
+        "duration_ms": {
+          "value": 3801.38,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "llm_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "tool_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "repairs": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "fallbacks": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "estimated_cost_usd": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        }
+      },
+      "taskDurationSeconds": 3.9896942960331216,
+      "totalDurationSeconds": 3.9938161373138428,
+      "traceId": "00000000000000000000000000000000",
+      "spanId": "0000000000000000"
+    },
+    {
+      "name": "case-110",
+      "inputs": {
+        "case": 110,
+        "turns": [
+          "Voy a Cordoba el viernes y vuelvo el domingo, donde cargo?"
+        ]
+      },
+      "metadata": {
+        "case": 110,
+        "category": "clarification",
+        "allowedUiFamilies": [
+          "clarification",
+          "assistant_only"
+        ],
+        "expectedTools": [],
+        "forbiddenTools": [
+          "plan_route",
+          "search_destination_chargers"
+        ],
+        "expectedComponents": [],
+        "anyComponents": [
+          [
+            "AssistantMessage"
+          ]
+        ],
+        "expectedTextAny": [
+          "origen",
+          "salida",
+          "desde donde",
+          "sales"
+        ]
+      },
+      "output": {
+        "case": 110,
+        "ok": true,
+        "failures": [],
+        "components": [
+          "AssistantMessage",
+          "UserMessage"
+        ],
+        "tools": [
+          "resolve_location"
+        ],
+        "density": {
+          "latestTurnComponents": [
+            "AssistantMessage"
+          ],
+          "latestTurnCardCount": 0,
+          "latestTurnActionCount": 0,
+          "latestTurnAlternativeListCount": 0,
+          "latestTurnOverOneCard": false
+        },
+        "metrics": {
+          "durationMs": 4789.2,
+          "llmCallCount": 1,
+          "llmErrorCount": 0,
+          "toolCallCount": 1,
+          "toolErrorCount": 0,
+          "repairCount": 0,
+          "fallbackCount": 0,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0
+          },
+          "cost": {
+            "currency": "USD",
+            "estimated": true,
+            "totalCostUsd": 0.0
+          }
+        },
+        "visibleText": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Voy a Cordoba el viernes y vuelvo el domingo, donde cargo? user-e21e283137 UserMessage  Para planificar ida y vuelta necesito el origen de salida. Dime desde dónde sales y mantengo el destino y fechas que ya has dado. assistant-366f0d034f AssistantMessage "
+      },
+      "assertions": {
+        "case_acceptance": {
+          "value": true,
+          "reason": null,
+          "source": "CaseAcceptanceEvaluator"
+        },
+        "no_http_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_llm_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_tool_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_fallback": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "hard_contract_pass": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "expected_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "forbidden_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "tool_policy_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "ui_family_pass": {
+          "value": true,
+          "reason": null,
+          "source": "UIFamilyEvaluator"
+        },
+        "no_fabrication_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "no_tool_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "expected_text_hint_present": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "safety_pass": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "task_success": {
+          "value": true,
+          "reason": null,
+          "source": "TaskSuccessEvaluator"
+        }
+      },
+      "scores": {
+        "duration_ms": {
+          "value": 4789.2,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "llm_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "tool_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "repairs": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "fallbacks": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "estimated_cost_usd": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        }
+      },
+      "taskDurationSeconds": 4.980945830990095,
+      "totalDurationSeconds": 4.985037565231323,
+      "traceId": "00000000000000000000000000000000",
+      "spanId": "0000000000000000"
+    }
+  ],
+  "failures": []
+}

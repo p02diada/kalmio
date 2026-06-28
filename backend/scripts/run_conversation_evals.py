@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import json
+import multiprocessing as mp
 import os
 import sys
 import urllib.error
@@ -833,6 +834,69 @@ def configure_eval_logfire(enable: bool, label: str) -> None:
     except Exception:
         pass
 
+def run_case_worker(
+    queue: Any,
+    api_base: str,
+    case_id: int,
+    spec: CaseSpec,
+    trace_file: Path | None,
+    request_timeout: int,
+) -> None:
+    try:
+        queue.put(("ok", run_case(api_base, case_id, spec, trace_file, request_timeout=request_timeout)))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else ""
+        queue.put(("ok", {"case": case_id, "ok": False, "failures": [f"HTTP {exc.code}: {detail[:500]}"]}))
+    except Exception as exc:
+        queue.put(("ok", {"case": case_id, "ok": False, "failures": [repr(exc)]}))
+
+
+def run_case_with_timeout(
+    api_base: str,
+    case_id: int,
+    spec: CaseSpec,
+    trace_file: Path | None,
+    *,
+    request_timeout: int,
+    case_timeout: int,
+) -> dict[str, Any]:
+    ctx = mp.get_context("fork")
+    queue = ctx.Queue()
+    process = ctx.Process(
+        target=run_case_worker,
+        args=(queue, api_base, case_id, spec, trace_file, request_timeout),
+    )
+    process.start()
+    process.join(case_timeout)
+    if process.is_alive():
+        process.terminate()
+        process.join(10)
+        if process.is_alive():
+            process.kill()
+            process.join(10)
+        return {
+            "case": case_id,
+            "ok": False,
+            "failures": [f"case timeout after {case_timeout}s"],
+            "components": [],
+            "tools": [],
+            "metrics": {
+                "durationMs": float(case_timeout * 1000),
+                "llmCallCount": 0,
+                "llmErrorCount": 1,
+                "toolCallCount": 0,
+                "toolErrorCount": 0,
+                "repairCount": 0,
+                "fallbackCount": 0,
+                "usage": {"inputTokens": 0, "outputTokens": 0, "totalTokens": 0},
+                "cost": {"currency": "USD", "estimated": True, "totalCostUsd": 0.0},
+            },
+        }
+    if queue.empty():
+        return {"case": case_id, "ok": False, "failures": [f"case worker exited with code {process.exitcode}"]}
+    _status, result = queue.get()
+    return result
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run Pydantic Evals for Kalmio conversation cases.")
@@ -844,6 +908,8 @@ def main() -> int:
     parser.add_argument("--label", default="conversation-evals")
     parser.add_argument("--repeat", type=int, default=1)
     parser.add_argument("--max-concurrency", type=int, default=1)
+    parser.add_argument("--request-timeout", type=int, default=180)
+    parser.add_argument("--case-timeout", type=int, default=300)
     parser.add_argument("--output", type=Path, help="Write eval summary JSON.")
     parser.add_argument("--markdown-output", type=Path, help="Write eval summary Markdown.")
     parser.add_argument("--logfire", action="store_true", help="Enable Logfire for this eval run.")
@@ -867,13 +933,14 @@ def main() -> int:
 
     def task(inputs: dict[str, Any]) -> dict[str, Any]:
         case_id = int(inputs["case"])
-        try:
-            return run_case(api_base, case_id, specs[case_id], trace_file)
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else ""
-            return {"case": case_id, "ok": False, "failures": [f"HTTP {exc.code}: {detail[:500]}"]}
-        except Exception as exc:
-            return {"case": case_id, "ok": False, "failures": [repr(exc)]}
+        return run_case_with_timeout(
+            api_base,
+            case_id,
+            specs[case_id],
+            trace_file,
+            request_timeout=args.request_timeout,
+            case_timeout=args.case_timeout,
+        )
 
     report = dataset.evaluate_sync(
         task,

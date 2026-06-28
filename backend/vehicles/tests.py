@@ -99,3 +99,34 @@ def test_import_iternio_vehicles_dry_run_fetches_without_writing(db, monkeypatch
 
     assert "Validated 1 vehicle profiles" in output.getvalue()
     assert VehicleProfile.objects.count() == 0
+
+
+def test_sync_vehicle_profiles_imports_with_replace(db, monkeypatch, iternio_payload):
+    def fake_fetch(**kwargs):
+        assert kwargs["api_key"] == "issued-key"
+        assert kwargs["country_code3"] == "ESP"
+        return iternio_payload
+
+    monkeypatch.setattr("vehicles.management.commands.sync_vehicle_profiles.fetch_iternio_vehicle_catalog", fake_fetch)
+
+    output = StringIO()
+    call_command("sync_vehicle_profiles", "--api-key", "issued-key", "--min-profiles", "1", stdout=output)
+
+    assert "Synced 1 vehicle profiles" in output.getvalue()
+    assert VehicleProfile.objects.count() == 1
+    assert VehicleProfile.objects.get().typecode == "tesla:my:25:lr:awd"
+
+
+def test_sync_vehicle_profiles_refuses_small_catalog_without_replacing(db, monkeypatch, iternio_payload):
+    import_iternio_vehicle_catalog(iternio_payload)
+
+    def fake_fetch(**kwargs):
+        return {"vehicles": [], "options": [], "display": []}
+
+    monkeypatch.setattr("vehicles.management.commands.sync_vehicle_profiles.fetch_iternio_vehicle_catalog", fake_fetch)
+
+    with pytest.raises(CommandError, match="below minimum 1"):
+        call_command("sync_vehicle_profiles", "--api-key", "issued-key", "--min-profiles", "1", verbosity=0)
+
+    assert VehicleProfile.objects.count() == 1
+    assert VehicleProfile.objects.get().typecode == "tesla:my:25:lr:awd"
