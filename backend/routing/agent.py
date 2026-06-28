@@ -5,7 +5,6 @@ import re
 import time
 from dataclasses import dataclass
 from typing import Any, Callable
-from urllib.parse import unquote
 from uuid import uuid4
 
 from charging.selectors import get_nearby_stations
@@ -20,6 +19,11 @@ from routing.tools import (
     ToolCall,
     execute_conversation_tool,
     route_geometry_payload,
+)
+from routing.tool_contracts import (
+    conversation_tool_definitions,
+    conversation_tool_prompt_summary,
+    conversation_tool_trace_metadata,
 )
 from routing.instrumentation import (
     agent_trace_turn,
@@ -201,7 +205,17 @@ def run_deepseek_agent(
     history_blocks: list[dict] | None = None,
     progress_callback: ProgressCallback | None = None,
 ) -> list[dict]:
+    runtime = getattr(settings, "KALMIO_CONVERSATION_AGENT_RUNTIME", "legacy")
     with agent_trace_turn("deepseek"):
+        if runtime == "pydantic_ai":
+            from routing.pydantic_ai_runtime import run_pydantic_ai_agent
+
+            return run_pydantic_ai_agent(
+                message,
+                history_blocks=history_blocks,
+                max_tool_calls=getattr(settings, "KALMIO_DEEPSEEK_MAX_TOOL_CALLS", 3),
+                progress_callback=progress_callback,
+            )
         return run_provider_agent(
             message,
             history_blocks=history_blocks,
@@ -299,8 +313,12 @@ def run_provider_agent(
         )
         try:
             result = execute_conversation_tool(ToolCall(name=decision["tool"], args=decision["args"]))
+            tool_args_valid = True
+            tool_result_valid = True
         except ConversationToolError as exc:
             result = {"ok": False, "tool": decision["tool"], "error": str(exc)}
+            tool_args_valid = False
+            tool_result_valid = False
         finally:
             tool_duration_ms = elapsed_ms(tool_started)
         emit_progress(
@@ -315,7 +333,14 @@ def run_provider_agent(
             name=decision["tool"],
             status="ok" if result.get("ok") else "error",
             duration_ms=tool_duration_ms,
-            metadata=tool_result_summary(result),
+            metadata={
+                **tool_result_summary(result),
+                **conversation_tool_trace_metadata(
+                    decision["tool"],
+                    args_valid=tool_args_valid,
+                    result_valid=tool_result_valid,
+                ),
+            },
             request_payload=decision["args"],
             response_payload=result,
         )
@@ -484,6 +509,28 @@ def request_deepseek_decision(
     return run_deepseek_decision(message, **kwargs)
 
 
+def request_pydantic_ai_decision(
+    message: str,
+    tool_history: list[dict[str, Any]] | None = None,
+    repair_issues: list[str] | None = None,
+    candidate_blocks: list[dict] | None = None,
+) -> dict[str, Any]:
+    prompt = conversation_agent_prompt(
+        message,
+        tool_history=tool_history or [],
+        repair_issues=repair_issues or [],
+        candidate_blocks=candidate_blocks or [],
+    )
+    try:
+        from routing.pydantic_ai_runtime import run_pydantic_ai_decision
+    except ImportError as exc:
+        raise AgentResponseError("No se pudo cargar el runtime Pydantic AI.") from exc
+    try:
+        return run_pydantic_ai_decision(prompt)
+    except RuntimeError as exc:
+        raise AgentResponseError(str(exc)) from exc
+
+
 def call_deepseek_decision(prompt: str, *, allow_tools: bool = True) -> dict[str, Any]:
     message = call_deepseek_chat_completion(prompt, allow_tools=allow_tools)
     return parse_openai_compatible_decision(message)
@@ -504,7 +551,7 @@ def call_deepseek_chat_completion(prompt: str, *, allow_tools: bool) -> Any:
         base_url=getattr(settings, "KALMIO_DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
         timeout=getattr(settings, "KALMIO_DEEPSEEK_TIMEOUT_SECONDS", 30),
     )
-    model = getattr(settings, "KALMIO_DEEPSEEK_MODEL", "deepseek-v4-flash")
+    model = getattr(settings, "KALMIO_DEEPSEEK_MODEL", "deepseek-v4-pro")
     request: dict[str, Any] = {
         "model": model,
         "messages": [
@@ -624,96 +671,7 @@ def deepseek_request_metadata(request: dict[str, Any]) -> dict[str, Any]:
 
 
 def deepseek_tool_definitions() -> list[dict[str, Any]]:
-    location_schema = {
-        "type": "object",
-        "properties": {
-            "label": {"type": "string", "description": "Etiqueta visible de la ubicación."},
-            "lat": {"type": "number", "description": "Latitud validable, -90 a 90."},
-            "lon": {"type": "number", "description": "Longitud validable, -180 a 180."},
-        },
-        "required": ["label", "lat", "lon"],
-        "additionalProperties": False,
-    }
-    return [
-        {
-            "type": "function",
-            "function": {
-                "name": "resolve_location",
-                "description": "Resuelve una ciudad, zona o POI conocido antes de buscar paradas de carga o calcular ruta.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {"query": {"type": "string", "description": "Ciudad, zona, hotel o POI textual."}},
-                    "required": ["query"],
-                    "additionalProperties": False,
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "search_destination_chargers",
-                "description": "Busca puntos de carga autorizados cerca de una ubicación ya resuelta o coordenadas explícitas.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "location": location_schema,
-                        "connector": {"type": "string", "description": "Conector si el usuario lo ha indicado."},
-                        "radius_km": {"type": "number", "description": "Radio entre 1 y 100 km."},
-                        "limit": {"type": "integer", "description": "Número de estaciones, entre 1 y 6."},
-                    },
-                    "required": ["location"],
-                    "additionalProperties": False,
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "plan_route",
-                "description": "Calcula ruta EV con proveedor de rutas y puntos de carga autorizados cuando hay origen y destino.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "origin": location_schema,
-                        "destination": location_schema,
-                        "vehicle": {
-                            "type": "object",
-                            "description": (
-                                "Datos del vehículo solo si el usuario ha dado perfil completo: batería, capacidad útil, "
-                                "consumo, conector y potencia máxima. Con solo modelo comercial o batería de salida, omite vehicle."
-                            ),
-                            "properties": {
-                                "model": {"type": "string"},
-                                "battery": {"type": "number"},
-                                "usable_battery_kwh": {"type": "number"},
-                                "consumption_kwh_per_100km": {"type": "number"},
-                                "connector": {"type": "string"},
-                                "max_charge_kw": {"type": "number"},
-                            },
-                            "additionalProperties": False,
-                        },
-                        "preferences": {
-                            "type": "object",
-                            "properties": {
-                                "reserve_min_percent": {"type": "number"},
-                                "prefer_fast": {"type": "boolean"},
-                                "prefer_cheap": {"type": "boolean"},
-                                "prefer_low_stress": {"type": "boolean"},
-                                "prefer_services": {"type": "boolean"},
-                                "prefer_large_hubs": {"type": "boolean"},
-                                "avoid_single_connector": {"type": "boolean"},
-                                "max_useful_power_kw": {"type": "number"},
-                            },
-                            "additionalProperties": False,
-                        },
-                        "corridor_radius_km": {"type": "number", "description": "Radio de corredor entre 1 y 100 km."},
-                    },
-                    "required": ["origin", "destination"],
-                    "additionalProperties": False,
-                },
-            },
-        },
-    ]
+    return conversation_tool_definitions()
 
 
 def parse_openai_compatible_decision(message: Any) -> dict[str, Any]:
@@ -759,6 +717,16 @@ def tool_call_argument_grounding_issues(
     checks: list[tuple[str, Any]] = []
     issues: list[str] = []
     if tool == "search_destination_chargers":
+        if mentions_round_trip_without_origin(current_message, history_blocks):
+            issues.append(
+                "El usuario plantea ida/vuelta o regreso y falta el origen/salida real. "
+                "Pregunta desde dónde sale antes de buscar carga de destino; no uses solo la ciudad destino."
+            )
+        if mentions_departure_without_destination(current_message, history_blocks):
+            issues.append(
+                "El usuario solo indica origen/salida y pregunta dónde cargar, pero falta el destino. "
+                "Pregunta hacia dónde va antes de buscar carga; no uses el origen como destino."
+            )
         checks.append(("location", args.get("location")))
     elif tool == "plan_route":
         origin = args.get("origin")
@@ -814,6 +782,26 @@ def location_query_is_generic(normalized_query: str) -> bool:
     if normalized_query in generic_terms:
         return True
     return bool(re.search(r"\bestoy\s+al\s+\d{1,3}\s*%?\b", normalized_query))
+
+
+def mentions_round_trip_without_origin(current_message: str, history_blocks: list[dict]) -> bool:
+    text = user_conversation_text(current_message, history_blocks)
+    if not any(term in text for term in ("vuelvo", "volver", "regreso", "ida y vuelta")):
+        return False
+    return not bool(
+        re.search(
+            r"\b(salgo|salimos|salida|saldr[eé]|parto|partimos)\s+(?:de|desde)\b|\bdesde\s+[a-z]",
+            text,
+        )
+    )
+
+
+def mentions_departure_without_destination(current_message: str, history_blocks: list[dict]) -> bool:
+    text = user_conversation_text(current_message, history_blocks)
+    has_departure = bool(re.search(r"\b(salgo|salimos|salida|saldr[eé]|parto|partimos)\s+(?:de|desde)\b", text))
+    asks_where_to_charge = "donde cargo" in text or "donde cargar" in text or "dónde cargo" in text
+    has_destination = bool(re.search(r"\b(voy|vamos|viajo|viajamos|llego|llegamos)\s+a\b|\b[a-z]+\s+a\s+[a-z]+\b", text))
+    return has_departure and asks_where_to_charge and not has_destination
 
 
 def location_query_is_grounded(normalized_query: str, grounded_text: str) -> bool:
@@ -1117,14 +1105,8 @@ def conversation_agent_prompt(
         f"{label}({lat:.4f},{lon:.4f})" for label, lat, lon in KNOWN_LOCATIONS.values()
     )
     tool_instructions = (
-        "Herramientas permitidas. Puedes llamar solo una por respuesta tool_call:\n"
-        '- resolve_location: resuelve una ciudad o texto conocido. Args: {"query":"ciudad o texto"}\n'
-        "- search_destination_chargers: busca puntos de carga autorizados alrededor de una ubicación ya resuelta o "
-        'coordenadas dadas por el usuario. Args: {"location":{"label":"...","lat":0,"lon":0},"connector":null,'
-        '"radius_km":80,"limit":3}\n'
-        "- plan_route: calcula ruta y paradas con proveedor y datos autorizados. Args: "
-        '{"origin":{"label":"...","lat":0,"lon":0},"destination":{"label":"...","lat":0,"lon":0},'
-        '"vehicle":null,"preferences":{"reserve_min_percent":20,"max_useful_power_kw":null},"corridor_radius_km":25}\n'
+        "Herramientas permitidas. "
+        f"{conversation_tool_prompt_summary()}"
         "Si el mensaje trae origen y destino concretos y pide ruta, paradas, pocas paradas, parada rápida/barata/cómoda "
         "o comparación de paradas, la primera decisión debe ser plan_route con vehicle:null cuando falte perfil completo; "
         "pide autonomía/consumo/modelo después como límite de validación, no antes de llamar la herramienta.\n"
@@ -1582,7 +1564,26 @@ def blocks_from_tool_result(tool_result: dict[str, Any], message: str = "") -> l
     if tool == "plan_route":
         recommendation = tool_result.get("recommendation") if isinstance(tool_result.get("recommendation"), dict) else {}
         alternatives = tool_result.get("alternatives") if isinstance(tool_result.get("alternatives"), list) else []
-        return [
+        warning_parts: list[str] = []
+        if user_message_mentions_future_trip(normalize(message)):
+            warning_parts.append("Disponibilidad, acceso y tarifas pueden cambiar antes del viaje.")
+        blocks = []
+        if route_requires_unvalidated_arrival_warning(tool_result):
+            warning_parts.append(
+                "No puedo validar batería de llegada ni reserva sin consumo, autonomía o perfil completo del vehículo."
+            )
+        if warning_parts:
+            blocks.append(
+                block(
+                    f"assistant-{uuid4().hex[:10]}",
+                    "AssistantMessage",
+                    {
+                        "text": " ".join(warning_parts)
+                        + " Te muestro la ruta y puntos de carga autorizados en el corredor.",
+                    },
+                )
+            )
+        blocks.append(
             block(
                 f"route-{uuid4().hex[:10]}",
                 "RouteCorridorCard",
@@ -1598,13 +1599,13 @@ def blocks_from_tool_result(tool_result: dict[str, Any], message: str = "") -> l
                         for station in [recommendation, *alternatives]
                         if isinstance(station, dict) and station
                     ],
-                    "routeGeometry": tool_result.get("routeGeometry"),
                     "corridorRadiusKm": tool_result.get("corridorRadiusKm"),
-                    "geometryPrecision": "provider" if tool_result.get("routeGeometry") else "unknown",
+                    "geometryPrecision": "schematic",
                     "source": "plan_route",
                 },
             ),
-        ]
+        )
+        return blocks
     return [block(f"assistant-{uuid4().hex[:10]}", "AssistantMessage", {"text": "Herramienta ejecutada."})]
 
 
@@ -1647,7 +1648,13 @@ def is_renderable_tool_result(tool_result: dict[str, Any]) -> bool:
 
 def user_facing_failure_text(reason: str) -> str:
     normalized = normalize(reason)
-    if "herramienta no permitida" in normalized:
+    if "destino" in normalized or "hacia donde" in normalized:
+        return "Tengo el origen, pero falta el destino. Dime hacia dónde vas y calculo dónde conviene cargar."
+    if "origen" in normalized or "salida" in normalized or "desde donde" in normalized:
+        return "Para planificar ida y vuelta necesito el origen de salida. Dime desde dónde sales y mantengo el destino y fechas que ya has dado."
+    if "ubicacion" in normalized or "ubicación" in normalized or "ciudad/zona" in normalized:
+        return "Necesito una ubicación concreta: ciudad, zona, carretera, punto cercano o coordenadas. No voy a inventar una posición."
+    if "herramienta no permitida" in normalized or "herramienta no registrada" in normalized:
         return "No puedo hacer esa acción desde el chat. Puedo ayudarte a calcular una ruta, buscar paradas con puntos de carga autorizados o pedir los datos que falten."
     if "un solo conector" in normalized or "un solo puesto" in normalized or "multi-puesto" in normalized:
         return (
@@ -1659,6 +1666,20 @@ def user_facing_failure_text(reason: str) -> str:
     if "datos" in normalized or "cargadores" in normalized:
         return "No he podido validar suficientes puntos de carga con datos autorizados. Puedo intentarlo con otra ubicación o un radio más amplio."
     return "No he podido completar esta respuesta con fiabilidad. Reintenta con menos datos ambiguos o corrige origen, destino, batería y conector."
+
+
+def reservation_capability_copy_contract_issues(blocks: list[dict], message: str) -> list[str]:
+    normalized_message = normalize(message)
+    if "reserv" not in normalized_message:
+        return []
+    visible_text = normalize(" ".join(block_visible_text(block) for block in blocks))
+    if "no puedo reservar" in visible_text or "no puede reservar" in visible_text:
+        return []
+    if "proveedor" in visible_text and ("app" in visible_text or "chat" in visible_text):
+        return []
+    return [
+        "La respuesta a una petición de reserva debe decir que Kalmio no puede reservar desde el chat/app ni confirmar plaza con el proveedor."
+    ]
 
 
 def latest_tool_result(tool_history: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -1683,68 +1704,21 @@ def a2ui_contract_issues(
     message: str = "",
     history_blocks: list[dict] | None = None,
 ) -> list[str]:
-    facts = tool_fact_index(tool_history, history_blocks=history_blocks or [])
-    user_context = user_conversation_text(message, history_blocks or [])
-    facts["vehicle"].update(parse_vehicle_fields(user_context))
-    explicit_coordinates = coordinates_from_text(user_context)
-    issues: list[str] = []
+    # Compatibility facade: new A2UI/factual guardrails belong in routing.policies.
+    from routing.policies.a2ui import a2ui_contract_issues as policy_a2ui_contract_issues
 
-    for item in blocks:
-        if not isinstance(item, dict):
-            issues.append("Todos los bloques A2UI deben ser objetos.")
-            continue
-        block_type = item.get("type")
-        props = item.get("props") if isinstance(item.get("props"), dict) else {}
-
-        if block_type == "StationList":
-            issues.extend(station_list_contract_issues(props, facts))
-        elif block_type == "AssistantMessage":
-            issues.extend(assistant_message_contract_issues(props, facts))
-        elif block_type in STATION_CARD_TYPES:
-            station_name = props.get("name") or props.get("stationName")
-            issues.extend(required_station_reference_contract_issues(f"{block_type}.name", station_name, facts))
-            issues.extend(station_reference_contract_issues(f"{block_type}.name", station_name, facts))
-            issues.extend(station_metric_contract_issues(str(block_type), props, facts))
-        elif block_type == "RouteCorridorCard":
-            issues.extend(route_summary_contract_issues(props, facts, "RouteCorridorCard"))
-            issues.extend(map_preview_contract_issues(props, facts, explicit_coordinates, "RouteCorridorCard"))
-        elif block_type == "ActionButtons":
-            issues.extend(action_buttons_contract_issues(props, facts, explicit_coordinates))
-    issues.extend(factual_charger_copy_contract_issues(blocks, facts))
-    issues.extend(destination_city_approximation_contract_issues(blocks, tool_history, user_context, facts))
-    issues.extend(approximate_location_contract_issues(blocks, facts))
-    issues.extend(comfort_copy_contract_issues(blocks))
-    issues.extend(night_safety_copy_contract_issues(blocks, user_context))
-    issues.extend(night_safety_warning_order_contract_issues(blocks, user_context))
-    issues.extend(requested_service_data_contract_issues(blocks, tool_history, user_context, facts))
-    issues.extend(default_reserve_copy_contract_issues(blocks, tool_history, user_context, facts))
-    issues.extend(unvalidated_route_margin_copy_contract_issues(blocks, tool_history, facts))
-    issues.extend(chargers_only_warning_order_contract_issues(blocks, tool_history, facts))
-    issues.extend(max_useful_power_copy_contract_issues(blocks, tool_history, facts))
-    issues.extend(few_stops_copy_context_contract_issues(blocks, user_context))
-    issues.extend(departure_battery_copy_contract_issues(blocks, user_context))
-    issues.extend(future_trip_volatility_copy_contract_issues(blocks, user_context))
-    issues.extend(cheap_route_reserve_context_contract_issues(blocks, user_context))
-    issues.extend(price_preference_context_contract_issues(blocks, user_context, tool_history, facts))
-    issues.extend(minimum_charge_context_contract_issues(blocks, user_context))
-    issues.extend(single_connector_preference_contract_issues(blocks, tool_history, user_context, facts))
-    issues.extend(action_button_sequence_contract_issues(blocks))
-    return dedupe_preserve_order(issues)
+    return policy_a2ui_contract_issues(
+        blocks,
+        tool_history,
+        message=message,
+        history_blocks=history_blocks or [],
+    )
 
 
 def action_button_sequence_contract_issues(blocks: list[dict]) -> list[str]:
-    issues: list[str] = []
-    for index, block in enumerate(blocks[:-1]):
-        if not isinstance(block, dict) or block.get("type") != "StationList":
-            continue
-        next_block = blocks[index + 1]
-        if isinstance(next_block, dict) and next_block.get("type") == "ActionButtons":
-            issues.append(
-                "ActionButtons no debe ir inmediatamente después de StationList: en móvil queda ambiguo "
-                "si los botones pertenecen a toda la lista o a una estación concreta. Usa StationPreviewCard "
-                "con acciones para una estación primaria, o muestra StationList sin botones globales."
-            )
-    return issues
+    from routing.policies.actions import action_button_sequence_contract_issues as policy_issues
+
+    return policy_issues(blocks)
 
 
 def tool_fact_index(tool_history: list[dict[str, Any]], history_blocks: list[dict] | None = None) -> dict[str, Any]:
@@ -2954,24 +2928,9 @@ def visible_text_from_value(value: Any, *, include_strings: bool = False) -> str
 
 
 def assistant_message_contract_issues(props: dict, facts: dict[str, Any]) -> list[str]:
-    text = display_text(props.get("text"), "")
-    if not text:
-        return []
-    normalized_text = normalize(text)
-    if has_approximation_disclaimer(normalized_text):
-        return []
+    from routing.policies.messages import assistant_message_contract_issues as policy_issues
 
-    issues = []
-    for location in facts.get("approximateLocations", []):
-        query = display_text(location.get("query"), "")
-        resolved_label = display_text(location.get("resolvedLabel"), "")
-        if query and normalize(query) in normalized_text:
-            issues.append(
-                "AssistantMessage.text sugiere ubicación exacta para "
-                f"'{query}', pero la herramienta solo resolvió '{resolved_label}'. "
-                "Debe decir que usa la ciudad/zona como aproximación o pedir coordenadas/dirección exacta."
-            )
-    return issues
+    return policy_issues(props, facts)
 
 
 def has_approximation_disclaimer(normalized_text: str) -> bool:
@@ -2995,23 +2954,9 @@ def has_approximation_disclaimer(normalized_text: str) -> bool:
 
 
 def station_list_contract_issues(props: dict, facts: dict[str, Any]) -> list[str]:
-    stations = props.get("stations")
-    if not isinstance(stations, list):
-        return ["StationList.props.stations debe ser una lista."]
-    if not stations and not facts.get("stationSearches"):
-        return ["StationList.stations está vacío sin una búsqueda o ruta de herramienta trazable."]
-    issues: list[str] = []
-    for index, station in enumerate(stations):
-        if not isinstance(station, dict):
-            issues.append(f"StationList.stations[{index}] debe ser un objeto.")
-            continue
-        name = display_text(station.get("name") or station.get("stationName"), "")
-        if not name:
-            issues.append(f"StationList.stations[{index}] necesita name.")
-            continue
-        issues.extend(station_reference_contract_issues(f"StationList.stations[{index}].name", name, facts))
-        issues.extend(station_metric_contract_issues(f"StationList.stations[{index}]", station, facts))
-    return issues
+    from routing.policies.stations import station_list_contract_issues as policy_issues
+
+    return policy_issues(props, facts)
 
 
 def factual_charger_copy_contract_issues(blocks: list[dict], facts: dict[str, Any]) -> list[str]:
@@ -3179,71 +3124,27 @@ def negates_found_chargers(normalized_text: str) -> bool:
 
 
 def station_reference_contract_issues(label: str, value: Any, facts: dict[str, Any]) -> list[str]:
-    name = display_text(value, "")
-    if not name or generic_station_label(name):
-        return []
-    if not facts["stations"]:
-        return [f"{label} menciona una estación sin resultado de herramienta trazable."]
-    if station_key(name) not in facts["stations"]:
-        return [f"{label} no coincide con ninguna estación devuelta por las herramientas: {name}."]
-    return []
+    from routing.policies.traceability import station_reference_contract_issues as policy_issues
+
+    return policy_issues(label, value, facts)
 
 
 def required_station_reference_contract_issues(label: str, value: Any, facts: dict[str, Any]) -> list[str]:
-    name = display_text(value, "")
-    if facts["stations"] and generic_station_label(name):
-        return [f"{label} debe usar una estación trazable cuando hay resultados de herramienta."]
-    return []
+    from routing.policies.traceability import required_station_reference_contract_issues as policy_issues
+
+    return policy_issues(label, value, facts)
 
 
 def station_metric_contract_issues(label: str, props: dict, facts: dict[str, Any]) -> list[str]:
-    name = display_text(props.get("name") or props.get("stationName"), "")
-    if not name or generic_station_label(name):
-        return []
-    source = facts["stations"].get(station_key(name))
-    if not source:
-        return []
+    from routing.policies.traceability import station_metric_contract_issues as policy_issues
 
-    issues: list[str] = []
-    rendered_values = station_value_aliases(props)
-    for field in ("powerKw", "distanceKm", "detourMin", "lat", "lon", "availableEvses", "totalEvses", "pricePerKwhEur"):
-        if field not in rendered_values:
-            continue
-        rendered = rendered_values.get(field)
-        expected = source.get(field)
-        if rendered is None:
-            continue
-        if field == "pricePerKwhEur" and (
-            props.get("priceIsEstimated") is True or source.get("priceIsEstimated") is True
-        ):
-            issues.append(f"{label}.pricePerKwhEur no debe mostrarse porque la tarifa para {name} está marcada como estimada.")
-            continue
-        if expected is None:
-            issues.append(f"{label}.{field} no está en el resultado de herramienta para {name}.")
-        elif field in {"lat", "lon"} and not coordinate_value_matches(rendered, expected):
-            issues.append(f"{label}.{field} no coincide con el dato de herramienta para {name}.")
-        elif not values_match(rendered, expected):
-            issues.append(f"{label}.{field} no coincide con el dato de herramienta para {name}.")
-    return issues
+    return policy_issues(label, props, facts)
 
 
 def route_summary_contract_issues(props: dict, facts: dict[str, Any], label: str) -> list[str]:
-    if not facts["routes"]:
-        return [f"{label} necesita un resultado plan_route trazable."]
-    route = facts["routes"][-1]
-    issues: list[str] = []
-    for field in ("distanceKm", "durationMin", "energyKwh", "arrivalBattery"):
-        rendered = props.get(field)
-        expected = route.get(field)
-        if rendered is None and expected is None:
-            continue
-        if rendered is None:
-            continue
-        if expected is None:
-            issues.append(f"{label}.{field} no está en el resultado plan_route.")
-        elif not values_match(rendered, expected):
-            issues.append(f"{label}.{field} no coincide con plan_route.")
-    return issues
+    from routing.policies.traceability import route_summary_contract_issues as policy_issues
+
+    return policy_issues(props, facts, label)
 
 
 def map_preview_contract_issues(
@@ -3252,84 +3153,21 @@ def map_preview_contract_issues(
     explicit_coordinates: list[tuple[float, float]],
     label: str,
 ) -> list[str]:
-    issues: list[str] = []
-    route_geometry = props.get("routeGeometry")
-    geometry_precision = props.get("geometryPrecision")
-    if geometry_precision == "provider":
-        if not facts["routes"]:
-            issues.append(f"{label} necesita un resultado plan_route trazable.")
-        if not isinstance(route_geometry, dict):
-            issues.append(f"{label}.routeGeometry debe venir de plan_route cuando geometryPrecision='provider'.")
+    from routing.policies.traceability import map_preview_contract_issues as policy_issues
 
-    if isinstance(route_geometry, dict):
-        expected_geometry = facts["routes"][-1].get("routeGeometry") if facts["routes"] else None
-        if expected_geometry is None:
-            issues.append(f"{label}.routeGeometry no está en el resultado plan_route.")
-        elif not line_string_geometry_matches(route_geometry, expected_geometry):
-            issues.append(f"{label}.routeGeometry no coincide con plan_route.")
-
-    for field in ("origin", "destination"):
-        point = props.get(field)
-        if not isinstance(point, dict):
-            continue
-        lat = optional_float(point.get("lat"))
-        lon = optional_float(point.get("lon"))
-        if lat is None and lon is None:
-            continue
-        if lat is None or lon is None:
-            issues.append(f"{label}.{field} necesita lat y lon juntos.")
-        elif not coordinate_traced(lat, lon, facts["locations"], explicit_coordinates):
-            issues.append(f"{label}.{field} no coincide con una ubicación de herramienta.")
-
-    primary_station = props.get("primaryStation")
-    if isinstance(primary_station, dict):
-        station_name = primary_station.get("name") or primary_station.get("stationName")
-        issues.extend(required_station_reference_contract_issues(f"{label}.primaryStation.name", station_name, facts))
-        issues.extend(station_reference_contract_issues(f"{label}.primaryStation.name", station_name, facts))
-        issues.extend(station_metric_contract_issues(f"{label}.primaryStation", primary_station, facts))
-
-    stations = props.get("stations")
-    if isinstance(stations, list):
-        for index, station in enumerate(stations):
-            if not isinstance(station, dict):
-                issues.append(f"{label}.stations[{index}] debe ser un objeto.")
-                continue
-            station_name = station.get("name") or station.get("stationName")
-            issues.extend(required_station_reference_contract_issues(f"{label}.stations[{index}].name", station_name, facts))
-            issues.extend(station_reference_contract_issues(f"{label}.stations[{index}].name", station_name, facts))
-            issues.extend(station_metric_contract_issues(f"{label}.stations[{index}]", station, facts))
-    return issues
+    return policy_issues(props, facts, explicit_coordinates, label)
 
 
 def line_string_geometry_matches(rendered: dict[str, Any], expected: Any) -> bool:
-    if not isinstance(expected, dict):
-        return False
-    if rendered.get("type") != "LineString" or expected.get("type") != "LineString":
-        return False
-    rendered_coordinates = rendered.get("coordinates")
-    expected_coordinates = expected.get("coordinates")
-    if not isinstance(rendered_coordinates, list) or not isinstance(expected_coordinates, list):
-        return False
-    if len(rendered_coordinates) != len(expected_coordinates):
-        return False
-    for rendered_pair, expected_pair in zip(rendered_coordinates, expected_coordinates):
-        if not coordinate_pair_matches(rendered_pair, expected_pair):
-            return False
-    return True
+    from routing.policies.traceability import line_string_geometry_matches as policy_matches
+
+    return policy_matches(rendered, expected)
 
 
 def coordinate_pair_matches(rendered: Any, expected: Any) -> bool:
-    if not isinstance(rendered, list) or not isinstance(expected, list):
-        return False
-    if len(rendered) != 2 or len(expected) != 2:
-        return False
-    rendered_lon = optional_float(rendered[0])
-    rendered_lat = optional_float(rendered[1])
-    expected_lon = optional_float(expected[0])
-    expected_lat = optional_float(expected[1])
-    if rendered_lon is None or rendered_lat is None or expected_lon is None or expected_lat is None:
-        return False
-    return close_coordinates(rendered_lat, rendered_lon, expected_lat, expected_lon)
+    from routing.policies.traceability import coordinate_pair_matches as policy_matches
+
+    return policy_matches(rendered, expected)
 
 
 def action_buttons_contract_issues(
@@ -3337,82 +3175,9 @@ def action_buttons_contract_issues(
     facts: dict[str, Any] | None = None,
     explicit_coordinates: list[tuple[float, float]] | None = None,
 ) -> list[str]:
-    facts = facts or {"stations": {}, "locations": []}
-    explicit_coordinates = explicit_coordinates or []
-    actions = props.get("actions")
-    if not isinstance(actions, list):
-        return ["ActionButtons.props.actions debe ser una lista."]
-    issues: list[str] = []
-    for index, action in enumerate(actions):
-        if not isinstance(action, dict):
-            issues.append(f"ActionButtons.actions[{index}] debe ser un objeto.")
-            continue
-        label = normalize(str(action.get("label") or ""))
-        if any(term in label for term in ("reserv", "pagar", "pago", "booking", "payment", "comprar")):
-            issues.append(f"ActionButtons.actions[{index}] pide una acción no soportada por Kalmio.")
-        if label == "usar este punto":
-            issues.append(
-                f"ActionButtons.actions[{index}] usa un label ambiguo; usa 'Elegir esta parada' o 'Elegir este punto de carga'."
-            )
-        if action.get("action") or action.get("type"):
-            issues.append(f"ActionButtons.actions[{index}] usa un handler que el frontend no soporta.")
+    from routing.policies.actions import action_buttons_contract_issues as policy_issues
 
-        has_supported_action = False
-
-        event = action.get("event")
-        if event is not None:
-            if not isinstance(event, dict) or not str(event.get("name") or "").strip():
-                issues.append(f"ActionButtons.actions[{index}].event necesita name.")
-            else:
-                has_supported_action = True
-
-        function_call = action.get("functionCall")
-        if function_call is not None:
-            if not isinstance(function_call, dict):
-                issues.append(f"ActionButtons.actions[{index}].functionCall debe ser un objeto.")
-            elif function_call.get("call") != "openUrl":
-                issues.append(f"ActionButtons.actions[{index}].functionCall no está registrado.")
-            else:
-                args = function_call.get("args") if isinstance(function_call.get("args"), dict) else {}
-                url = str(args.get("url") or "").strip().lower()
-                if not (url.startswith("https://") or url.startswith("http://")):
-                    issues.append(f"ActionButtons.actions[{index}].functionCall.args.url debe ser http(s).")
-                elif url.startswith("javascript:"):
-                    issues.append(f"ActionButtons.actions[{index}].functionCall.args.url no puede ejecutar scripts.")
-                else:
-                    has_supported_action = True
-                    issues.extend(
-                        action_coordinate_contract_issues(
-                            f"ActionButtons.actions[{index}].functionCall.args.url",
-                            label,
-                            coordinates_from_text(unquote(url)),
-                            facts,
-                            explicit_coordinates,
-                        )
-                    )
-
-        if isinstance(event, dict):
-            context = event.get("context") if isinstance(event.get("context"), dict) else {}
-            lat = optional_float(context.get("lat"))
-            lon = optional_float(context.get("lon"))
-            if lat is not None and lon is not None:
-                issues.extend(
-                    action_coordinate_contract_issues(
-                        f"ActionButtons.actions[{index}].event.context",
-                        label,
-                        [(lat, lon)],
-                        facts,
-                        explicit_coordinates,
-                    )
-                )
-
-        href = action.get("href")
-        if href not in (None, ""):
-            issues.append(f"ActionButtons.actions[{index}].href no forma parte del contrato A2UI de Kalmio.")
-
-        if not has_supported_action and not action.get("disabled"):
-            issues.append(f"ActionButtons.actions[{index}] necesita event, functionCall.openUrl, o estar deshabilitada.")
-    return issues
+    return policy_issues(props, facts, explicit_coordinates)
 
 
 def action_coordinate_contract_issues(
@@ -3422,28 +3187,15 @@ def action_coordinate_contract_issues(
     facts: dict[str, Any],
     explicit_coordinates: list[tuple[float, float]],
 ) -> list[str]:
-    issues: list[str] = []
-    if not coordinates:
-        return issues
-    station = station_referenced_by_action_label(action_label, facts)
-    for lat, lon in coordinates:
-        if station is not None:
-            if not close_station_coordinates(lat, lon, station.get("lat"), station.get("lon")):
-                issues.append(f"{label} usa coordenadas que no coinciden con la estación trazable '{station['name']}'.")
-            continue
-        if not coordinate_traced_by_any_fact(lat, lon, facts, explicit_coordinates):
-            issues.append(f"{label} usa coordenadas que no vienen del usuario, estación, origen, destino ni herramienta.")
-    return issues
+    from routing.policies.actions import action_coordinate_contract_issues as policy_issues
+
+    return policy_issues(label, action_label, coordinates, facts, explicit_coordinates)
 
 
 def station_referenced_by_action_label(action_label: str, facts: dict[str, Any]) -> dict[str, Any] | None:
-    normalized_label = normalize(action_label)
-    for station in facts.get("stations", {}).values():
-        station_name = display_text(station.get("name"), "")
-        normalized_station = station_key(station_name)
-        if normalized_station and normalized_station in normalized_label:
-            return station
-    return None
+    from routing.policies.actions import station_referenced_by_action_label as policy_station
+
+    return policy_station(action_label, facts)
 
 
 def coordinate_traced_by_any_fact(

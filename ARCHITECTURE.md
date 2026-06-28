@@ -22,6 +22,20 @@ Kalmio uses a React/Vite PWA frontend and a Django/Ninja backend. The agent owns
 - `backend/feedback`: authenticated feedback endpoint scoped to saved route plans.
 - `backend/accounts`: Django session authentication endpoints for account creation, login, logout, CSRF cookie setup, and current-user lookup.
 
+### Agent Logic Boundaries
+
+The backend is split by responsibility so agent behavior stays evolvable without turning Django into an intent parser:
+
+- `backend/routing/agent.py` is the conversation adapter and compatibility layer: mode dispatch, prompt assembly, local test mode, validated fallback composition, and shared helper facades.
+- `backend/routing/pydantic_ai_runtime.py` is the canonical DeepSeek runtime: Pydantic AI registered tools, tool-call limits, output validation/retry, trace events, and renderable-tool short-circuit after validated tool execution.
+- `backend/routing/tool_contracts.py` is the tool schema registry. Add tool args/results, generated native definitions, compact prompt summaries, and trace metadata there.
+- `backend/routing/tools.py` and domain services such as `backend/routing/production_planner.py` perform factual work: location resolution, route provider calls, authorized charger lookup, scoring, and explicit data/provider failures.
+- `backend/routing/evidence.py` turns tool and history state into a typed factual ledger.
+- `backend/routing/policies/` contains A2UI, factuality, copy, route, station, and action-safety guardrails. `policies/a2ui.py` aggregates policies; concrete rule groups live in focused modules such as `components.py`, `messages.py`, `stations.py`, `traceability.py`, `copy.py`, and `actions.py`.
+- `backend/routing/a2ui_output_models.py` defines the structured final output contract expected from the model.
+
+New behavior should go to the narrowest layer that can enforce it. Prompts may describe behavior compactly, but tool schemas, factual rules, action safety, and A2UI traceability must be enforced through contracts, tools, evidence, or policies.
+
 ## A2UI Contract
 
 Kalmio targets official A2UI v0.9.1 for production-facing agent-driven UI. The canonical protocol surface is the A2UI envelope stream:
@@ -53,8 +67,8 @@ Official transports can be JSONL/SSE, WebSocket, A2A, AG-UI, or REST for simple 
 3. Invoke the configured conversation agent mode:
    - `local`: deterministic local agent adapter for development and tests.
    - `codex`: local Codex CLI adapter using `KALMIO_CODEX_MODEL`, with an internal Django tool loop.
-   - `deepseek`: DeepSeek Chat Completions adapter using `KALMIO_DEEPSEEK_MODEL`, OpenAI-compatible SDK calls, JSON output, and optional native tool calls.
-4. In provider-backed modes (`codex` and `deepseek`), the model receives the useful conversation transcript, the allowed internal tools, and the Kalmio A2UI catalog described by purpose and data requirements. The model returns final local adapter blocks or an allowlisted tool call; Django converts validated final blocks into protocol envelopes for transport. Django validates and executes each tool, appends the validated result to the turn history, and asks the configured model again until it returns final UI or reaches the provider tool-call budget. The model chooses intent, tool calls, and UI components. Django validates component allowlist, structural props, catalog schema, data traceability, and supported actions; it does not choose components from regex or intent rules. Contract violations get one repair request back to the same provider with concrete safety/data issues. Failed allowlisted tools are returned to the model so it can explain the validated failure in context. Unknown tools, repeated identical calls, exhausted budgets, failed repairs, or missing final UI return minimal fallback A2UI instead of arbitrary behavior.
+   - `deepseek`: DeepSeek through `KALMIO_CONVERSATION_AGENT_RUNTIME=pydantic_ai`, using Pydantic AI registered tools, structured output models, and output-validator retries.
+4. In provider-backed modes (`codex` and `deepseek`), the model receives the useful conversation transcript, the allowed internal tools, and the Kalmio A2UI catalog described by purpose and data requirements. The model chooses intent, tool calls, and UI components. Django executes only versioned Pydantic tool contracts, converts validated final blocks into protocol envelopes for transport, and validates component allowlist, structural props, catalog schema, data traceability, and supported actions through `backend/routing/evidence.py` and `backend/routing/policies/`; it does not choose components from regex or intent rules. In the canonical DeepSeek runtime, Pydantic AI owns the registered function-tool loop and final output validation/retry. Failed allowlisted tools are returned to the model so it can explain the validated failure in context. Unknown tools, repeated identical calls, exhausted budgets, failed repairs, or missing final UI return minimal fallback A2UI instead of arbitrary behavior.
 5. Current internal tools are `resolve_location`, `search_destination_chargers`, and `plan_route`. They are Python functions inside Django, not MCP tools, so they keep session, data-source, provider, and authorization boundaries inside the backend.
 6. Domain facts come only from authorized charger data, route provider responses, internal tool outputs, or explicit user input.
 7. Validate generated A2UI component types against the Kalmio catalog and normalize known Codex prop variants before rendering. Structured station data, route metrics, coordinates, costs, availability, uncertainty, and actions are checked against tool results or previously validated session blocks.

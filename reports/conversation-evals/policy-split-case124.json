@@ -1,0 +1,289 @@
+{
+  "name": "policy-split-case124",
+  "traceId": "00000000000000000000000000000000",
+  "spanId": "0000000000000000",
+  "assertionSummary": {
+    "case_acceptance": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "no_http_error": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "no_llm_error": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "no_tool_error": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "no_fallback": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "hard_contract_pass": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "expected_tools_pass": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "forbidden_tools_pass": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "tool_policy_pass": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "ui_family_pass": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "no_fabrication_failure": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "no_tool_failure": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "expected_text_hint_present": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "safety_pass": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    },
+    "task_success": {
+      "passed": 1,
+      "total": 1,
+      "passRate": 1.0
+    }
+  },
+  "scoreAverages": {
+    "duration_ms": 15768.27,
+    "llm_calls": 2.0,
+    "tool_calls": 1.0,
+    "repairs": 0.0,
+    "fallbacks": 0.0,
+    "estimated_cost_usd": 0.004932
+  },
+  "cases": [
+    {
+      "name": "case-124",
+      "inputs": {
+        "case": 124,
+        "turns": [
+          "Quiero la ruta mas barata sin bajar del 20%",
+          "Madrid a Valencia, salgo con 60%"
+        ]
+      },
+      "metadata": {
+        "case": 124,
+        "category": "route_price",
+        "allowedUiFamilies": [
+          "route_with_station",
+          "station_with_route_context",
+          "route_summary"
+        ],
+        "expectedTools": [
+          "plan_route"
+        ],
+        "forbiddenTools": [],
+        "expectedComponents": [],
+        "anyComponents": [
+          [
+            "AssistantMessage",
+            "RouteCorridorCard",
+            "StationList",
+            "StationPreviewCard"
+          ]
+        ],
+        "expectedTextAny": [
+          "20",
+          "60",
+          "no puedo",
+          "consumo",
+          "precio"
+        ]
+      },
+      "output": {
+        "case": 124,
+        "ok": true,
+        "failures": [],
+        "components": [
+          "AssistantMessage",
+          "PositionRequestCard",
+          "RouteCorridorCard",
+          "UserMessage"
+        ],
+        "tools": [
+          "plan_route"
+        ],
+        "density": {
+          "latestTurnComponents": [
+            "AssistantMessage",
+            "RouteCorridorCard"
+          ],
+          "latestTurnCardCount": 1,
+          "latestTurnActionCount": 0,
+          "latestTurnAlternativeListCount": 0,
+          "latestTurnOverOneCard": false
+        },
+        "metrics": {
+          "durationMs": 15768.27,
+          "llmCallCount": 2,
+          "llmErrorCount": 0,
+          "toolCallCount": 1,
+          "toolErrorCount": 0,
+          "repairCount": 0,
+          "fallbackCount": 0,
+          "usage": {
+            "inputTokens": 9969,
+            "outputTokens": 685,
+            "totalTokens": 0
+          },
+          "cost": {
+            "currency": "USD",
+            "estimated": true,
+            "totalCostUsd": 0.00493247
+          }
+        },
+        "visibleText": "Cuéntame qué necesitas: una ruta completa, cargar cerca de donde estás, o una parada de carga cerca de un hotel o destino. Si falta un dato crítico, te lo pediré. assistant-initial AssistantMessage  Quiero la ruta mas barata sin bajar del 20% user-daa141dd8d UserMessage  Para calcular la **ruta más barata sin bajar del 20 %** necesito que me confirmes varios datos:\n\n1. **Origen y destino** (ciudades o puntos concretos en España).\n2. **Modelo de coche, batería actual (%) y consumo o autonomía real**; sin esto no puedo validar si llegarás con margen suficiente ni qué paradas necesitas.\n3. Ten en cuenta que las **tarifas de carga dependen del proveedor** y pueden cambiar según el día y la hora; yo te mostraré las opciones disponibles, pero no puedo garantizar precios en tiempo real ni reservar plaza. msg-1 AssistantMessage  nearby_chargers Origen y destino Comparte tu ubicación o escribe una ciudad, carretera o punto cercano para continuar sin inventar resultados. approximate ciudad latitud longitud pos-req-1 PositionRequestCard  Madrid a Valencia, salgo con 60% user-ceeee633c9 UserMessage  No puedo validar batería de llegada ni reserva sin consumo, autonomía o perfil completo del vehículo. Te muestro la ruta y puntos de carga autorizados en el corredor. assistant-502982c0a8 AssistantMessage      Madrid   Valencia   Moya Hub Honrubia Moya Hub Honrubia    media       EUR  HOTEL RESTAURANT PARKING_LOT FUEL_STATION WIFI CAFE SUPERMARKET NATURE V-VALENCIA-022-2 V-VALENCIA-022-2    media       EUR  SUPERMARKET MALL SPORT BUS_STOP PARKING_LOT FUEL_STATION RESTAURANT CAFE HOTEL WIFI Parking Centro Canalejas Parking Centro Canalejas    media       EUR  RESTAURANT PARKING_LOT WIFI CAFE  schematic plan_route route-34941960c5 RouteCorridorCard "
+      },
+      "assertions": {
+        "case_acceptance": {
+          "value": true,
+          "reason": null,
+          "source": "CaseAcceptanceEvaluator"
+        },
+        "no_http_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_llm_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_tool_error": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "no_fallback": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "hard_contract_pass": {
+          "value": true,
+          "reason": null,
+          "source": "HardContractEvaluator"
+        },
+        "expected_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "forbidden_tools_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "tool_policy_pass": {
+          "value": true,
+          "reason": null,
+          "source": "ToolPolicyEvaluator"
+        },
+        "ui_family_pass": {
+          "value": true,
+          "reason": null,
+          "source": "UIFamilyEvaluator"
+        },
+        "no_fabrication_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "no_tool_failure": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "expected_text_hint_present": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "safety_pass": {
+          "value": true,
+          "reason": null,
+          "source": "SafetyEvaluator"
+        },
+        "task_success": {
+          "value": true,
+          "reason": null,
+          "source": "TaskSuccessEvaluator"
+        }
+      },
+      "scores": {
+        "duration_ms": {
+          "value": 15768.27,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "llm_calls": {
+          "value": 2.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "tool_calls": {
+          "value": 1.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "repairs": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "fallbacks": {
+          "value": 0.0,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        },
+        "estimated_cost_usd": {
+          "value": 0.00493247,
+          "reason": null,
+          "source": "MetricsEvaluator"
+        }
+      },
+      "taskDurationSeconds": 16.01455010101199,
+      "totalDurationSeconds": 16.02001428604126,
+      "traceId": "00000000000000000000000000000000",
+      "spanId": "0000000000000000"
+    }
+  ],
+  "failures": []
+}

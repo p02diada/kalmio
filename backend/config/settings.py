@@ -112,28 +112,30 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 DB_ENGINE = os.getenv("KALMIO_DB_ENGINE", "sqlite")
+if DB_ENGINE not in {"sqlite", "postgis"}:
+    raise ImproperlyConfigured("KALMIO_DB_ENGINE must be either 'sqlite' for unit tests or 'postgis'.")
 if IS_PRODUCTION and DB_ENGINE != "postgis":
     raise ImproperlyConfigured("KALMIO_DB_ENGINE=postgis is required when KALMIO_ENV=production.")
 
 if DB_ENGINE == "postgis":
-    postgres_password = os.getenv("POSTGRES_PASSWORD", "kalmio")
-    unsafe_postgres_passwords = {"", "kalmio", "postgres", "password"}
+    database_password = os.getenv("POSTGRES_PASSWORD", "kalmio")
+    unsafe_database_passwords = {"", "kalmio", "postgres", "password"}
     if IS_PRODUCTION and (
-        postgres_password.lower() in unsafe_postgres_passwords
-        or any(marker in postgres_password.lower() for marker in {"replace-with", "change-me", "dev-only"})
+        database_password.lower() in unsafe_database_passwords
+        or any(marker in database_password.lower() for marker in {"replace-with", "change-me", "dev-only"})
     ):
         raise ImproperlyConfigured("POSTGRES_PASSWORD must be a real production secret.")
     database_options = {}
-    postgres_sslmode = os.getenv("POSTGRES_SSLMODE", "require" if IS_PRODUCTION else "")
-    if postgres_sslmode:
-        database_options["sslmode"] = postgres_sslmode
+    database_sslmode = os.getenv("POSTGRES_SSLMODE", "require" if IS_PRODUCTION else "")
+    if database_sslmode:
+        database_options["sslmode"] = database_sslmode
 
     DATABASES = {
         "default": {
             "ENGINE": "django.contrib.gis.db.backends.postgis",
             "NAME": os.getenv("POSTGRES_DB", "kalmio"),
             "USER": os.getenv("POSTGRES_USER", "kalmio"),
-            "PASSWORD": postgres_password,
+            "PASSWORD": database_password,
             "HOST": os.getenv("POSTGRES_HOST", "localhost"),
             "PORT": os.getenv("POSTGRES_PORT", "5432"),
             "CONN_MAX_AGE": int(os.getenv("POSTGRES_CONN_MAX_AGE", "600" if IS_PRODUCTION else "0")),
@@ -241,6 +243,9 @@ default_agent_mode = "local" if "pytest" in Path(sys.argv[0]).name else "deepsee
 KALMIO_CONVERSATION_AGENT_MODE = os.getenv("KALMIO_CONVERSATION_AGENT_MODE", default_agent_mode).strip().lower()
 if KALMIO_CONVERSATION_AGENT_MODE not in {"local", "deepseek"}:
     raise ImproperlyConfigured("KALMIO_CONVERSATION_AGENT_MODE must be local or deepseek.")
+KALMIO_CONVERSATION_AGENT_RUNTIME = os.getenv("KALMIO_CONVERSATION_AGENT_RUNTIME", "pydantic_ai").strip().lower()
+if KALMIO_CONVERSATION_AGENT_RUNTIME not in {"legacy", "pydantic_ai"}:
+    raise ImproperlyConfigured("KALMIO_CONVERSATION_AGENT_RUNTIME must be legacy or pydantic_ai.")
 
 KALMIO_DEEPSEEK_API_KEY = (
     os.getenv("KALMIO_DEEPSEEK_API_KEY") or os.getenv("DEEPSEEK_API_KEY") or ""
@@ -251,7 +256,7 @@ if KALMIO_CONVERSATION_AGENT_MODE == "deepseek" and not KALMIO_DEEPSEEK_API_KEY:
     )
 KALMIO_DEEPSEEK_BASE_URL = os.getenv("KALMIO_DEEPSEEK_BASE_URL", "https://api.deepseek.com").strip()
 require_http_url("KALMIO_DEEPSEEK_BASE_URL", KALMIO_DEEPSEEK_BASE_URL)
-KALMIO_DEEPSEEK_MODEL = os.getenv("KALMIO_DEEPSEEK_MODEL", "deepseek-v4-flash").strip() or "deepseek-v4-flash"
+KALMIO_DEEPSEEK_MODEL = os.getenv("KALMIO_DEEPSEEK_MODEL", "deepseek-v4-pro").strip() or "deepseek-v4-pro"
 try:
     KALMIO_DEEPSEEK_TIMEOUT_SECONDS = float(os.getenv("KALMIO_DEEPSEEK_TIMEOUT_SECONDS", "30"))
 except ValueError as exc:
@@ -285,7 +290,7 @@ deepseek_default_prices = {
     "deepseek-v4-flash": ("0.0028", "0.14", "0.28"),
     "deepseek-v4-pro": ("0.003625", "0.435", "0.87"),
 }
-deepseek_price_defaults = deepseek_default_prices.get(KALMIO_DEEPSEEK_MODEL, deepseek_default_prices["deepseek-v4-flash"])
+deepseek_price_defaults = deepseek_default_prices.get(KALMIO_DEEPSEEK_MODEL, deepseek_default_prices["deepseek-v4-pro"])
 try:
     KALMIO_DEEPSEEK_PRICE_INPUT_CACHE_HIT_PER_MILLION_USD = float(
         os.getenv("KALMIO_DEEPSEEK_PRICE_INPUT_CACHE_HIT_PER_MILLION_USD", deepseek_price_defaults[0])

@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
+import signal
 import sys
+import threading
 import time
 import urllib.error
 from dataclasses import dataclass, field
@@ -205,6 +208,30 @@ CASE_SPECS: dict[int, CaseSpec] = {
 }
 
 
+class RequestTimeoutError(TimeoutError):
+    pass
+
+
+@contextlib.contextmanager
+def hard_timeout(seconds: int):
+    if seconds <= 0 or threading.current_thread() is not threading.main_thread():
+        yield
+        return
+
+    previous_handler = signal.getsignal(signal.SIGALRM)
+
+    def handle_timeout(signum, frame):
+        raise RequestTimeoutError(f"request exceeded {seconds}s")
+
+    signal.signal(signal.SIGALRM, handle_timeout)
+    signal.setitimer(signal.ITIMER_REAL, seconds)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
+
+
 def request_json(opener, url: str, method: str = "GET", headers=None, body=None, timeout=180):
     payload = None
     if body is not None:
@@ -215,8 +242,9 @@ def request_json(opener, url: str, method: str = "GET", headers=None, body=None,
         method=method,
         headers={"Content-Type": "application/json", **(headers or {})},
     )
-    with opener.open(req, timeout=timeout) as response:
-        return response.getcode(), json.loads(response.read().decode("utf-8") or "{}")
+    with hard_timeout(int(timeout) + 5):
+        with opener.open(req, timeout=timeout) as response:
+            return response.getcode(), json.loads(response.read().decode("utf-8") or "{}")
 
 
 def cookie_header(opener) -> str:
@@ -324,6 +352,36 @@ def internal_tool_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [event for event in events if event.get("event") == "internal_tool_call"]
 
 
+def case_metrics(events: list[dict[str, Any]], duration_ms: float) -> dict[str, Any]:
+    llm_events = [event for event in events if event.get("event") == "llm_api_call"]
+    tool_events = internal_tool_events(events)
+    usage = {"inputTokens": 0, "outputTokens": 0, "totalTokens": 0}
+    total_cost = 0.0
+    for event in llm_events:
+        event_usage = event.get("usage") if isinstance(event.get("usage"), dict) else {}
+        for key in usage:
+            usage[key] += int(event_usage.get(key) or 0)
+        cost = event.get("cost") if isinstance(event.get("cost"), dict) else {}
+        total_cost += float(cost.get("totalCostUsd") or 0)
+
+    return {
+        "durationMs": round(duration_ms, 2),
+        "llmCallCount": len(llm_events),
+        "llmErrorCount": sum(1 for event in llm_events if event.get("status") != "ok"),
+        "toolCallCount": len(tool_events),
+        "toolErrorCount": sum(
+            1
+            for event in tool_events
+            if event.get("status") != "ok"
+            or (isinstance(event.get("metadata"), dict) and event["metadata"].get("ok") is False)
+        ),
+        "repairCount": sum(1 for event in llm_events if str(event.get("name", "")).endswith(".repair")),
+        "fallbackCount": 0,
+        "usage": usage,
+        "cost": {"currency": "USD", "estimated": True, "totalCostUsd": round(total_cost, 8)},
+    }
+
+
 def factual_charger_claim_without_tool(text: str, tools: set[str]) -> bool:
     if tools & {"search_destination_chargers", "plan_route"}:
         return False
@@ -342,7 +400,13 @@ def factual_charger_claim_without_tool(text: str, tools: set[str]) -> bool:
     )
 
 
-def evaluate_case(case_id: int, spec: CaseSpec, payload: dict[str, Any], events: list[dict[str, Any]]) -> dict[str, Any]:
+def evaluate_case(
+    case_id: int,
+    spec: CaseSpec,
+    payload: dict[str, Any],
+    events: list[dict[str, Any]],
+    duration_ms: float,
+) -> dict[str, Any]:
     components = components_from_payload(payload)
     component_types = {str(component.get("component")) for component in components}
     tools = internal_tool_events(events)
@@ -385,10 +449,20 @@ def evaluate_case(case_id: int, spec: CaseSpec, payload: dict[str, Any], events:
         "components": sorted(component_types),
         "tools": sorted(tool_names),
         "density": density_metrics(components),
+        "metrics": case_metrics(events, duration_ms),
+        "visibleText": text,
     }
 
 
-def run_case(api_base: str, case_id: int, spec: CaseSpec, trace_file: Path | None) -> dict[str, Any]:
+def run_case(
+    api_base: str,
+    case_id: int,
+    spec: CaseSpec,
+    trace_file: Path | None,
+    *,
+    request_timeout: int = 180,
+) -> dict[str, Any]:
+    print(f"eval case {case_id} start ({len(spec.turns)} turns)", file=sys.stderr, flush=True)
     opener = build_opener(HTTPCookieProcessor(CookieJar()))
     status, ready_payload = request_json(opener, f"{api_base}/api/ready", timeout=20)
     if status != 200 or ready_payload.get("status") != "ready":
@@ -402,21 +476,27 @@ def run_case(api_base: str, case_id: int, spec: CaseSpec, trace_file: Path | Non
     request_json(opener, f"{api_base}/api/conversation/messages", headers={"Cookie": cookie_header(opener)}, timeout=20)
 
     trace_start = trace_position(trace_file)
+    started = time.perf_counter()
     payload: dict[str, Any] | None = None
-    for turn in spec.turns:
+    for turn_index, turn in enumerate(spec.turns, start=1):
+        print(f"eval case {case_id} turn {turn_index} request", file=sys.stderr, flush=True)
         status, payload = request_json(
             opener,
             f"{api_base}/api/conversation/message",
             method="POST",
             headers=csrf_headers(opener, csrf_token),
             body={"text": turn},
+            timeout=request_timeout,
         )
         if status != 200:
             return {"case": case_id, "ok": False, "failures": [f"HTTP {status}: {payload}"]}
         time.sleep(0.05)
 
     events = read_new_trace_events(trace_file, trace_start)
-    return evaluate_case(case_id, spec, payload or {}, events)
+    duration_ms = (time.perf_counter() - started) * 1000
+    result = evaluate_case(case_id, spec, payload or {}, events, duration_ms)
+    print(f"eval case {case_id} done ok={result['ok']}", file=sys.stderr, flush=True)
+    return result
 
 
 def main() -> int:
@@ -425,6 +505,7 @@ def main() -> int:
     parser.add_argument("--from", dest="case_from", type=int, default=10)
     parser.add_argument("--to", dest="case_to", type=int, default=20)
     parser.add_argument("--trace-file", default="backend/.tmp/agent-traces.jsonl")
+    parser.add_argument("--request-timeout", type=int, default=180)
     parser.add_argument("--json", action="store_true", help="Print only machine-readable JSON.")
     args = parser.parse_args()
 
@@ -439,7 +520,7 @@ def main() -> int:
     results = []
     for case_id in case_ids:
         try:
-            result = run_case(api_base, case_id, CASE_SPECS[case_id], trace_file)
+            result = run_case(api_base, case_id, CASE_SPECS[case_id], trace_file, request_timeout=args.request_timeout)
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else ""
             result = {"case": case_id, "ok": False, "failures": [f"HTTP {exc.code}: {detail[:500]}"]}

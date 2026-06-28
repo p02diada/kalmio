@@ -3,14 +3,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from django.db.models import Q
 from django.utils import timezone
 
 from charging.models import Station
-from charging.selectors import haversine_km, stations_queryset
+from charging.selectors import geographic_bounding_box, haversine_km, stations_queryset
 from routing.providers import Coordinate, ProviderRoute
 from routing.scoring import PlanType, Preferences, StationScore, VehicleContext, estimate_energy, score_station
 
 PlanningLevel = Literal["ev_plan", "chargers_only"]
+MAX_ROUTE_CANDIDATES = 500
 
 
 @dataclass(frozen=True)
@@ -103,19 +105,24 @@ def score_persisted_stations(
     corridor_radius_km: float,
 ) -> list[StationScore]:
     sampled_route = sample_route_points(route.geometry)
-    scored: list[StationScore] = []
-
-    for station in stations_queryset().filter(
+    candidate_queryset = stations_near_route_base_queryset(sampled_route, corridor_radius_km).filter(
         evses__connectors__connector_type__iexact=vehicle.connector,
         evses__max_power_kw__gte=max(1, int(vehicle.max_charge_kw * 0.35)),
-    ):
-        distance_to_route = min(
-            haversine_km(point.lat, point.lon, float(station.latitude), float(station.longitude))
-            for point in sampled_route
-        )
-        if distance_to_route > corridor_radius_km:
-            continue
+    )
+    station_distances = nearest_station_distances(
+        queryset=candidate_queryset,
+        sampled_route=sampled_route,
+        corridor_radius_km=corridor_radius_km,
+    )
+    scored: list[StationScore] = []
 
+    queryset = stations_queryset().filter(
+        id__in=station_distances,
+        evses__connectors__connector_type__iexact=vehicle.connector,
+        evses__max_power_kw__gte=max(1, int(vehicle.max_charge_kw * 0.35)),
+    )
+    for station in queryset:
+        distance_to_route = station_distances[station.id]
         candidate = station_to_score_payload(station, vehicle.connector, distance_to_route)
         scored.append(score_station(candidate, vehicle, preferences, plan_type))
 
@@ -130,20 +137,49 @@ def score_chargers_near_route(
     corridor_radius_km: float,
 ) -> list[StationScore]:
     sampled_route = sample_route_points(route.geometry)
+    station_distances = nearest_station_distances(
+        queryset=stations_near_route_base_queryset(sampled_route, corridor_radius_km),
+        sampled_route=sampled_route,
+        corridor_radius_km=corridor_radius_km,
+    )
     scored: list[StationScore] = []
 
-    for station in stations_queryset():
-        distance_to_route = min(
-            haversine_km(point.lat, point.lon, float(station.latitude), float(station.longitude))
-            for point in sampled_route
-        )
-        if distance_to_route > corridor_radius_km:
-            continue
-
+    for station in stations_queryset().filter(id__in=station_distances):
+        distance_to_route = station_distances[station.id]
         candidate = station_to_exploration_payload(station, distance_to_route)
         scored.append(score_exploration_station(candidate, preferences, plan_type))
 
     return sorted(scored, key=lambda item: item.score, reverse=True)
+
+
+def stations_near_route_base_queryset(sampled_route: list[Coordinate], corridor_radius_km: float):
+    boxes = [geographic_bounding_box(point.lat, point.lon, corridor_radius_km) for point in sampled_route]
+    route_filter = Q()
+    for min_lat, max_lat, min_lon, max_lon in boxes:
+        route_filter |= Q(latitude__gte=min_lat, latitude__lte=max_lat, longitude__gte=min_lon, longitude__lte=max_lon)
+    return Station.objects.filter(is_sample_data=False, data_source__is_authorized=True).filter(route_filter)
+
+
+def nearest_station_distances(
+    *,
+    queryset,
+    sampled_route: list[Coordinate],
+    corridor_radius_km: float,
+    max_candidates: int = MAX_ROUTE_CANDIDATES,
+) -> dict[int, float]:
+    distances: list[tuple[int, float]] = []
+    seen: set[int] = set()
+    for station_id, latitude, longitude in queryset.values_list("id", "latitude", "longitude").iterator(chunk_size=1000):
+        if station_id in seen:
+            continue
+        seen.add(station_id)
+        distance_to_route = min(
+            haversine_km(point.lat, point.lon, float(latitude), float(longitude)) for point in sampled_route
+        )
+        if distance_to_route <= corridor_radius_km:
+            distances.append((station_id, round(distance_to_route, 2)))
+
+    return dict(sorted(distances, key=lambda item: item[1])[:max_candidates])
 
 
 def station_to_exploration_payload(station: Station, distance_to_route_km: float) -> dict:

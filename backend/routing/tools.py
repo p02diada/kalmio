@@ -7,6 +7,11 @@ from charging.selectors import get_nearby_stations
 from routing.production_planner import PlanningDataError, plan_route_with_persisted_stations
 from routing.providers import Coordinate, ProviderRoute, RoutingProviderError, get_route_provider
 from routing.scoring import Preferences, VehicleContext
+from routing.tool_contracts import (
+    ToolContractValidationError,
+    allowed_conversation_tools,
+    conversation_tool_contract,
+)
 
 
 KNOWN_LOCATIONS = {
@@ -21,12 +26,13 @@ KNOWN_LOCATIONS = {
     "bilbao": ("Bilbao", 43.2630, -2.9350),
     "zaragoza": ("Zaragoza", 41.6488, -0.8891),
     "cadiz": ("Cádiz", 36.5271, -6.2886),
+    "toledo": ("Toledo", 39.8628, -4.0273),
     "alhambra": ("Alhambra, Granada", 37.1761, -3.5881),
     "almansa": ("Almansa", 38.8690, -1.0971),
     "alcobendas": ("Alcobendas", 40.5317, -3.6419),
     "alcora": ("Alcora", 39.1230, -0.5025),
 }
-ALLOWED_CONVERSATION_TOOLS = {"resolve_location", "search_destination_chargers", "plan_route"}
+ALLOWED_CONVERSATION_TOOLS = allowed_conversation_tools()
 
 
 class ConversationToolError(RuntimeError):
@@ -40,13 +46,25 @@ class ToolCall:
 
 
 def execute_conversation_tool(call: ToolCall) -> dict[str, Any]:
+    try:
+        contract = conversation_tool_contract(call.name)
+        args = contract.validate_args(call.args)
+    except ToolContractValidationError as exc:
+        raise ConversationToolError(str(exc)) from exc
+
     if call.name == "resolve_location":
-        return resolve_location_tool(call.args)
-    if call.name == "search_destination_chargers":
-        return search_destination_chargers_tool(call.args)
-    if call.name == "plan_route":
-        return plan_route_tool(call.args)
-    raise ConversationToolError(f"Herramienta no permitida: {call.name}")
+        result = resolve_location_tool(args)
+    elif call.name == "search_destination_chargers":
+        result = search_destination_chargers_tool(args)
+    elif call.name == "plan_route":
+        result = plan_route_tool(args)
+    else:
+        raise ConversationToolError(f"Herramienta no permitida: {call.name}")
+
+    try:
+        return contract.validate_result(result)
+    except ToolContractValidationError as exc:
+        raise ConversationToolError(str(exc)) from exc
 
 
 def resolve_location_tool(args: dict[str, Any]) -> dict[str, Any]:

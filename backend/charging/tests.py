@@ -1,4 +1,5 @@
 import json
+import subprocess
 from copy import deepcopy
 from decimal import Decimal
 from io import StringIO
@@ -11,6 +12,16 @@ from django.test import override_settings
 from charging.models import Connector, DataSource, EVSE, Operator, Station
 from charging.reve_dev import normalize_reve_connector, reve_locations_to_charger_records, reve_page_cache_file
 from charging.selectors import get_nearby_stations
+from charging.snapshots import (
+    ChargerSnapshotError,
+    PgCommand,
+    build_pg_dump_command,
+    build_pg_restore_command,
+    charging_table_names,
+    docker_compose_pg_args,
+    dump_charger_snapshot,
+    is_ignorable_pg_restore_transaction_timeout,
+)
 
 
 @pytest.fixture
@@ -192,6 +203,100 @@ def test_manual_charger_records_default_to_untrusted_and_unknown():
 
     assert source.is_authorized is False
     assert evse.status == "unknown"
+
+
+def test_charger_snapshot_tables_are_limited_to_charging_app():
+    tables = charging_table_names()
+
+    assert tables
+    assert all(table.startswith("charging_") for table in tables)
+    assert "auth_user" not in tables
+    assert "django_session" not in tables
+
+
+def test_charger_snapshot_dump_command_uses_pgpassword_env(monkeypatch, tmp_path):
+    from charging import snapshots
+
+    monkeypatch.setitem(snapshots.connection.settings_dict, "NAME", "kalmio")
+    monkeypatch.setitem(snapshots.connection.settings_dict, "USER", "kalmio")
+    monkeypatch.setitem(snapshots.connection.settings_dict, "PASSWORD", "secret-db-password")
+    monkeypatch.setitem(snapshots.connection.settings_dict, "HOST", "localhost")
+    monkeypatch.setitem(snapshots.connection.settings_dict, "PORT", "5432")
+
+    command = build_pg_dump_command(tmp_path / "chargers.dump", ["charging_station", "charging_evse"])
+
+    assert command.args[:4] == ["pg_dump", "--format=custom", "--data-only", "--no-owner"]
+    assert "--table" in command.args
+    assert "charging_station" in command.args
+    assert "charging_evse" in command.args
+    assert "secret-db-password" not in command.args
+    assert command.env["PGPASSWORD"] == "secret-db-password"
+
+
+def test_charger_snapshot_restore_command_uses_custom_dump(monkeypatch, tmp_path):
+    from charging import snapshots
+
+    dump_path = tmp_path / "chargers.dump"
+    monkeypatch.setitem(snapshots.connection.settings_dict, "NAME", "kalmio")
+    monkeypatch.setitem(snapshots.connection.settings_dict, "USER", "kalmio")
+    monkeypatch.setitem(snapshots.connection.settings_dict, "PASSWORD", "secret-db-password")
+    monkeypatch.setitem(snapshots.connection.settings_dict, "HOST", "localhost")
+    monkeypatch.setitem(snapshots.connection.settings_dict, "PORT", "5432")
+
+    command = build_pg_restore_command(dump_path)
+
+    assert command.args[0] == "pg_restore"
+    assert "--data-only" in command.args
+    assert str(dump_path) == command.args[-1]
+    assert "secret-db-password" not in command.args
+    assert command.env["PGPASSWORD"] == "secret-db-password"
+
+
+def test_charger_snapshot_docker_fallback_streams_dump_file(tmp_path):
+    dump_path = tmp_path / "chargers.dump"
+    command = PgCommand(
+        args=[
+            "pg_dump",
+            "--format=custom",
+            "--data-only",
+            "--file",
+            str(dump_path),
+            "--dbname",
+            "kalmio",
+        ],
+        env={"PGPASSWORD": "secret-db-password"},
+    )
+
+    docker_args, stdout_file, stdin_file = docker_compose_pg_args(command, tmp_path / "docker-compose.yml")
+
+    assert docker_args[:5] == ["docker", "compose", "-f", str(tmp_path / "docker-compose.yml"), "exec"]
+    assert "-e" in docker_args
+    assert "PGPASSWORD=secret-db-password" in docker_args
+    assert "pg_dump" in docker_args
+    assert "--file" not in docker_args
+    assert stdout_file == dump_path
+    assert stdin_file is None
+
+
+def test_charger_snapshot_restore_ignores_only_transaction_timeout_warning():
+    detail = """pg_restore: error: could not execute query: ERROR:  unrecognized configuration parameter "transaction_timeout"
+Command was: SET transaction_timeout = 0;
+pg_restore: warning: errors ignored on restore: 1"""
+
+    assert is_ignorable_pg_restore_transaction_timeout(detail) is True
+    assert is_ignorable_pg_restore_transaction_timeout(f"{detail}\npg_restore: error: other failure") is False
+
+
+def test_charger_snapshot_rejects_sqlite(monkeypatch, tmp_path):
+    from charging import snapshots
+
+    monkeypatch.setitem(snapshots.connection.settings_dict, "ENGINE", "django.db.backends.sqlite3")
+
+    with pytest.raises(ChargerSnapshotError, match="requieren PostGIS"):
+        dump_charger_snapshot(
+            tmp_path / "chargers.dump",
+            runner=lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "", ""),
+        )
 
 
 def test_reve_dev_locations_are_converted_to_import_records():

@@ -1,6 +1,9 @@
 # Agentic EV Agent Iteration - 2026-06-15
 
-Manual runs used a now-removed local LLM runtime and authorized charger data from the development SQLite database.
+Historical note: these manual runs used a now-removed local LLM runtime and a
+legacy file-based development database. Current development, manual review, and
+DeepSeek/pro conversation evals use the Docker PostGIS database with charger
+snapshots.
 
 ## Initial Findings
 

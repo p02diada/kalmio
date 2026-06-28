@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: kalmio_ci
       POSTGRES_USER: kalmio
-      POSTGRES_PASSWORD: ci-postgres-password-4f750d65
+      POSTGRES_PASSWORD: ci-postgis-password-4f750d65
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U kalmio -d kalmio_ci"]
       interval: 5s
@@ -16,11 +16,12 @@ services:
       context: ./backend
     environment:
       KALMIO_DB_ENGINE: postgis
+      KALMIO_CONVERSATION_AGENT_MODE: local
       KALMIO_ROUTING_PROVIDER: osrm
       KALMIO_OSRM_BASE_URL: https://routes.kalmio.example
       POSTGRES_DB: kalmio_ci
       POSTGRES_USER: kalmio
-      POSTGRES_PASSWORD: ci-postgres-password-4f750d65
+      POSTGRES_PASSWORD: ci-postgis-password-4f750d65
       POSTGRES_HOST: db
       POSTGRES_PORT: "5432"
       POSTGRES_SSLMODE: disable

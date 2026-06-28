@@ -7,6 +7,8 @@ The backend/API/security/frontend regressions are covered by automated tests. Th
 ## Runtime
 
 - Primary eval mode: `KALMIO_CONVERSATION_AGENT_MODE=deepseek`.
+- Primary DeepSeek runtime: `KALMIO_CONVERSATION_AGENT_RUNTIME=pydantic_ai`.
+- Primary eval model: `KALMIO_DEEPSEEK_MODEL=deepseek-v4-pro`.
 - Comparison mode: `KALMIO_CONVERSATION_AGENT_MODE=codex`.
 - Do not use `local` mode for this matrix except when writing automated unit tests.
 - The model may call only approved backend tools.
@@ -96,12 +98,20 @@ npm run lint
 npm run build
 ```
 
-Manual conversation smoke test:
+Outcome conversation eval matrix:
 
 ```bash
 cd backend
-python scripts/smoke_conversation.py --api-base http://127.0.0.1:8000
+python scripts/run_conversation_eval_matrix.py \
+  --dataset outcome \
+  --agent-modes deepseek \
+  --models deepseek-v4-pro \
+  --repeat 1 \
+  --max-concurrency 1 \
+  --output-dir ../reports/conversation-eval-matrix
 ```
+
+`backend/scripts/run_conversation_cases.py` is the legacy 30-case acceptance runner. Use the `outcome` Pydantic Evals dataset for production-readiness evaluation.
 
 Trace analysis after a DeepSeek or Codex eval run:
 

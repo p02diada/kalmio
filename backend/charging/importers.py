@@ -56,25 +56,167 @@ def import_chargers(path: str | Path, *, replace_source: bool = False) -> Import
             source_names = sorted({str(record["source_name"]) for record in records})
             Station.objects.filter(data_source__name__in=source_names).delete()
 
-        station_ids: set[int] = set()
-        evse_ids: set[int] = set()
-        connector_count = 0
+        return bulk_import_records(records)
 
-        for record in records:
-            source = upsert_source(record)
-            operator = upsert_operator(record)
-            station = upsert_station(record, source, operator)
-            evse = upsert_evse(record, station)
-            upsert_connector(record, evse)
-            upsert_tariff(record, station)
-            upsert_reliability(record, station)
-            upsert_availability(record, evse, source)
 
-            station_ids.add(station.id)
-            evse_ids.add(evse.id)
-            connector_count += 1
+def bulk_import_records(records: list[dict[str, Any]]) -> ImportResult:
+    source_records: dict[str, dict[str, Any]] = {}
+    operator_records: dict[str, dict[str, Any]] = {}
+    station_records: dict[str, dict[str, Any]] = {}
+    evse_records: dict[str, dict[str, Any]] = {}
+    connector_records: dict[tuple[str, str], dict[str, Any]] = {}
+    tariff_records: dict[str, dict[str, Any]] = {}
+    reliability_records: dict[str, dict[str, Any]] = {}
+    availability_records: dict[tuple[str, str], dict[str, Any]] = {}
 
-        return ImportResult(stations=len(station_ids), evses=len(evse_ids), connectors=connector_count)
+    for record in records:
+        source_name = str(record["source_name"]).strip()
+        operator_name = str(record["operator_name"]).strip()
+        station_external_id = str(record["station_external_id"]).strip()
+        evse_uid = str(record["evse_uid"]).strip()
+        connector_type = str(record["connector_type"]).strip()
+
+        source_records.setdefault(source_name, record)
+        operator_records.setdefault(operator_name, record)
+        station_records.setdefault(station_external_id, record)
+        evse_records.setdefault(evse_uid, record)
+        connector_records.setdefault((evse_uid, connector_type.lower()), record)
+        if not is_blank(record.get("price_per_kwh")):
+            tariff_records.setdefault(station_external_id, record)
+        if not is_blank(record.get("reliability_score")):
+            reliability_records.setdefault(station_external_id, record)
+        if parse_datetime(record.get("observed_at")) is not None:
+            availability_records.setdefault((evse_uid, source_name), record)
+
+    DataSource.objects.bulk_create(
+        [
+            DataSource(
+                name=name,
+                kind=value_or_default(record.get("source_kind"), "provider"),
+                license=str(record.get("source_license") or "").strip(),
+                is_authorized=True,
+                notes=str(record.get("source_notes") or "").strip(),
+            )
+            for name, record in source_records.items()
+        ],
+        batch_size=1000,
+        update_conflicts=True,
+        unique_fields=["name"],
+        update_fields=["kind", "license", "is_authorized", "notes"],
+    )
+    Operator.objects.bulk_create(
+        [
+            Operator(
+                name=name,
+                website=str(record.get("operator_website") or "").strip(),
+                support_phone=str(record.get("operator_support_phone") or "").strip(),
+            )
+            for name, record in operator_records.items()
+        ],
+        batch_size=1000,
+        update_conflicts=True,
+        unique_fields=["name"],
+        update_fields=["website", "support_phone"],
+    )
+
+    sources = DataSource.objects.in_bulk(source_records.keys(), field_name="name")
+    operators = Operator.objects.in_bulk(operator_records.keys(), field_name="name")
+
+    Station.objects.bulk_create(
+        [
+            Station(
+                external_id=external_id,
+                operator=operators[str(record["operator_name"]).strip()],
+                data_source=sources[str(record["source_name"]).strip()],
+                name=str(record["station_name"]).strip(),
+                address=str(record.get("address") or "").strip(),
+                latitude=parse_decimal(record["latitude"], "latitude"),
+                longitude=parse_decimal(record["longitude"], "longitude"),
+                amenities=parse_amenities(record.get("amenities")),
+                is_sample_data=False,
+            )
+            for external_id, record in station_records.items()
+        ],
+        batch_size=1000,
+        update_conflicts=True,
+        unique_fields=["external_id"],
+        update_fields=["operator", "data_source", "name", "address", "latitude", "longitude", "amenities", "is_sample_data"],
+    )
+    stations = Station.objects.in_bulk(station_records.keys(), field_name="external_id")
+
+    EVSE.objects.bulk_create(
+        [
+            EVSE(
+                evse_uid=evse_uid,
+                station=stations[str(record["station_external_id"]).strip()],
+                max_power_kw=parse_int(record["max_power_kw"], "max_power_kw"),
+                status=value_or_default(record.get("status"), "unknown"),
+            )
+            for evse_uid, record in evse_records.items()
+        ],
+        batch_size=1000,
+        update_conflicts=True,
+        unique_fields=["evse_uid"],
+        update_fields=["station", "max_power_kw", "status"],
+    )
+    evses = EVSE.objects.in_bulk(evse_records.keys(), field_name="evse_uid")
+
+    touched_station_ids = [station.id for station in stations.values()]
+    touched_evse_ids = [evse.id for evse in evses.values()]
+    Connector.objects.filter(evse_id__in=touched_evse_ids).delete()
+    Tariff.objects.filter(station_id__in=touched_station_ids).delete()
+    ReliabilityScore.objects.filter(station_id__in=touched_station_ids).delete()
+    AvailabilitySnapshot.objects.filter(evse_id__in=touched_evse_ids).delete()
+
+    Connector.objects.bulk_create(
+        [
+            Connector(
+                evse=evses[str(record["evse_uid"]).strip()],
+                connector_type=str(record["connector_type"]).strip(),
+                max_power_kw=parse_int(record["max_power_kw"], "max_power_kw"),
+            )
+            for record in connector_records.values()
+        ],
+        batch_size=1000,
+    )
+    Tariff.objects.bulk_create(
+        [
+            Tariff(
+                station=stations[station_external_id],
+                price_per_kwh=parse_decimal(record["price_per_kwh"], "price_per_kwh"),
+                session_fee=parse_decimal(record.get("session_fee") or "0", "session_fee"),
+                currency=value_or_default(record.get("currency"), "EUR"),
+                is_estimated=bool_from_record(record, "tariff_is_estimated", default=False),
+            )
+            for station_external_id, record in tariff_records.items()
+        ],
+        batch_size=1000,
+    )
+    ReliabilityScore.objects.bulk_create(
+        [
+            ReliabilityScore(
+                station=stations[station_external_id],
+                score=parse_reliability_score(record),
+                reasons=parse_amenities(record.get("reliability_reasons")),
+            )
+            for station_external_id, record in reliability_records.items()
+        ],
+        batch_size=1000,
+    )
+    AvailabilitySnapshot.objects.bulk_create(
+        [
+            AvailabilitySnapshot(
+                evse=evses[evse_uid],
+                source=sources[source_name],
+                status=evses[evse_uid].status,
+                observed_at=parse_datetime(record.get("observed_at")),
+            )
+            for (evse_uid, source_name), record in availability_records.items()
+        ],
+        batch_size=1000,
+    )
+
+    return ImportResult(stations=len(stations), evses=len(evses), connectors=len(records))
 
 
 def validate_charger_file(path: str | Path) -> ImportResult:
@@ -206,12 +348,9 @@ def upsert_reliability(record: dict[str, Any], station: Station) -> None:
     if is_blank(record.get("reliability_score")):
         return
 
-    score = parse_int(record["reliability_score"], "reliability_score")
-    if not 0 <= score <= 100:
-        raise ChargerImportError("reliability_score debe estar entre 0 y 100.")
     ReliabilityScore.objects.update_or_create(
         station=station,
-        defaults={"score": score, "reasons": parse_amenities(record.get("reliability_reasons"))},
+        defaults={"score": parse_reliability_score(record), "reasons": parse_amenities(record.get("reliability_reasons"))},
     )
 
 
@@ -241,6 +380,13 @@ def parse_int(value: Any, field: str, index: int | None = None) -> int:
     except (TypeError, ValueError) as exc:
         prefix = f"Registro {index}: " if index else ""
         raise ChargerImportError(f"{prefix}{field} debe ser entero.") from exc
+
+
+def parse_reliability_score(record: dict[str, Any]) -> int:
+    score = parse_int(record["reliability_score"], "reliability_score")
+    if not 0 <= score <= 100:
+        raise ChargerImportError("reliability_score debe estar entre 0 y 100.")
+    return score
 
 
 def parse_datetime(value: Any) -> datetime | None:

@@ -41,20 +41,43 @@ What must not be done:
 
 Frontend: React, Vite, TypeScript, TanStack Router, TanStack Query, Tailwind CSS, shadcn/ui, PWA, A2UI renderer.
 
-Backend: Django, Django Ninja, Django ORM, GeoDjango, Postgres/PostGIS, provider-backed routing, authorized charger imports.
+Backend: Django, Django Ninja, Django ORM, GeoDjango, Docker PostGIS, provider-backed routing, authorized charger imports.
 
 ## Development Commands
 
 - Frontend: `cd frontend && npm install && npm run dev`.
-- Backend: `cd backend && python -m venv .venv && source .venv/bin/activate && pip install -r requirements-dev.txt && python manage.py migrate && python manage.py runserver`.
+- Backend: `docker compose up --build`. Host-run Django against PostGIS is only for machines with GDAL/GEOS/database client libraries installed; Docker is the supported default.
 - Docker: `docker compose up --build`.
 
 ## Agent Runtime Rules
 
 - Use local mode only for automated unit tests and e2e test runs.
 - When developing, inspecting the app manually, or starting a dev server to review behavior or UI, run through DeepSeek mode.
+- DeepSeek mode should use `KALMIO_CONVERSATION_AGENT_RUNTIME=pydantic_ai` by default. Use `legacy` only as a temporary compatibility comparison path.
+- Run development servers and DeepSeek/pro conversation evaluations against the local Docker PostGIS charger database, not SQLite. SQLite is acceptable only for explicit fast unit-test commands; it is not representative for tool latency or station selection behavior.
+- For repeated DeepSeek/pro eval setup, restore the local charger snapshot with `restore_charger_snapshot` instead of reimporting JSON. Regenerate the snapshot with `import_chargers` + `dump_charger_snapshot` only when charger data, importer behavior, or charging schema changes.
 - Prefer the smallest, lowest-cost DeepSeek model that can handle the task, and minimize token usage by reading, generating, and retaining only relevant context.
 - Do not send full tool payloads to the agent prompt when they are not useful for reasoning. Compact long outputs such as route geometry, coordinate arrays, provider traces, raw station lists, and repeated UI blocks into factual summaries that preserve decisions, uncertainty, traceability, and user-relevant values.
+- For renderable factual tool results such as `plan_route` and `search_destination_chargers`, the Pydantic AI runtime may short-circuit final text generation and return validated A2UI derived from the tool result. This is a latency/safety optimization after the model has decided and called the tool; do not replace it with hardcoded intent routing.
+- Pydantic AI output validators may reject an unhelpful final answer and ask the model to retry when the model had enough structured context to call an allowed tool. Example: a known city plus a charging request is enough for a first approximate `search_destination_chargers`; do not ask for an exact barrio before showing authorized options. Keep these as narrow validator guardrails, not Django intent routing.
+- Do not add new tool arg/result contracts, A2UI output schemas, factuality rules, action-safety rules, or copy guardrails directly to `conversation_agent_prompt()` or the DeepSeek loop. Put them in versioned Pydantic contracts and policy modules, then keep the prompt as compact behavioral guidance.
+- Runtime contract locations:
+  - tool args/results: `backend/routing/tool_contracts.py`
+  - A2UI final output models: `backend/routing/a2ui_output_models.py`
+  - tool/history evidence ledger: `backend/routing/evidence.py`
+  - A2UI/factual policies: `backend/routing/policies/`
+
+## Where Agent Logic Lives
+
+- Conversational choice lives in the model/runtime: whether to ask a clarifying question, call a tool, or return final A2UI. Do not replace this with Django keyword routing.
+- Tool contracts live in `backend/routing/tool_contracts.py`: tool names, argument/result schemas, validation ranges, generated native tool definitions, compact summaries, and trace metadata.
+- Tool execution and factual domain work live in `backend/routing/tools.py` and domain services such as `backend/routing/production_planner.py`: database queries, provider calls, charger scoring, route planning, and explicit provider/data failures.
+- A2UI output shape lives in `backend/routing/a2ui_output_models.py`; factual evidence from tools/history lives in `backend/routing/evidence.py`.
+- A2UI/factual/copy/action guardrails live in `backend/routing/policies/`. Add new rules there, split by concern, and keep `backend/routing/policies/a2ui.py` as an aggregator.
+- `backend/routing/agent.py` may keep compatibility facades, local test mode, prompt construction, fallback composition, and shared low-level helpers, but it must not become the home for new factual, A2UI, copy, or action-safety rules.
+- `backend/routing/pydantic_ai_runtime.py` owns the DeepSeek/Pydantic AI loop, registered tool calls, output-validator retries, duplicate/ungrounded tool-call blocking, and renderable-tool short-circuit. Keep runtime guardrails narrow; move product rules to contracts or policies.
+- The frontend renderer and `frontend/src/lib/a2ui/kalmio-catalog.json` own renderable components, props, actions, safe functions, and styling. The frontend must not make important EV planning decisions locally.
+- Prompts should stay compact behavioral guidance. Do not paste full schemas, long tool outputs, policy rules, or large repair logic into prompts when a typed contract or policy can enforce it.
 
 ## Phase Rules
 
@@ -94,6 +117,7 @@ Backend: Django, Django Ninja, Django ORM, GeoDjango, Postgres/PostGIS, provider
 - The agent should interpret natural conversation and follow-ups from the full useful conversation context; do not add regex/intent parsers as the primary way to understand user phrasing.
 - Backend code may validate structured arguments, enforce safety constraints, and execute approved tools, but should not become the conversational reasoning layer.
 - In DeepSeek mode, the backend must not use parsed intent to force tools or components.
+- Kalmio business guardrails belong in Pydantic schemas, evidence-ledger policies, or Pydantic AI validators. `agent.py` may keep compatibility facades, but it must not become the place where new factual/A2UI rules accumulate.
 - If a response cannot be validated, prefer a minimal honest fallback over backend-authored recommendations.
 
 ## Design Rules
