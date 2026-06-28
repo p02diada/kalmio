@@ -798,6 +798,61 @@ def test_search_destination_chargers_tool_omits_estimated_tariff_value(real_stat
     assert stop["priceIsEstimated"] is True
 
 
+@pytest.mark.django_db
+def test_search_destination_chargers_tool_applies_agent_selected_filters(real_station):
+    EVSE.objects.create(station=real_station, evse_uid="real-almansa-001-2", max_power_kw=90, status="unknown")
+
+    result = search_destination_chargers_tool(
+        {
+            "location": {"label": "Almansa", "lat": 38.87, "lon": -1.09},
+            "purpose": "stay",
+            "connector": "CCS2",
+            "radius_km": 5,
+            "limit": 1,
+            "requested_services": ["restaurant", "bathroom"],
+            "max_useful_power_kw": 100,
+            "require_verified_price": True,
+            "min_total_evses": 2,
+        }
+    )
+
+    assert result["ok"] is True
+    assert result["purpose"] == "stay"
+    assert result["filtersApplied"]["requestedServices"] == ["restaurant", "bathroom"]
+    stop = result["stops"][0]
+    assert stop["name"] == real_station.name
+    assert stop["effectivePowerKw"] == 100
+    assert stop["totalEvses"] == 2
+    assert stop["pricePerKwhEur"] == 0.49
+    assert stop["safetyValidated"] is False
+    assert stop["accessNotesVerified"] is False
+    assert stop["freshness"]["source"] == "authorized_import"
+    assert "purpose:stay" in stop["rankingReasons"]
+    assert "verified_price" in stop["rankingReasons"]
+
+
+@pytest.mark.django_db
+def test_search_destination_chargers_tool_can_require_validated_safety_access_and_freshness(real_station):
+    stale = timezone.now() - timedelta(days=90)
+    Station.objects.filter(pk=real_station.pk).update(updated_at=stale)
+    Tariff.objects.filter(station=real_station).update(updated_at=stale)
+
+    result = search_destination_chargers_tool(
+        {
+            "location": {"label": "Almansa", "lat": 38.87, "lon": -1.09},
+            "purpose": "destination",
+            "radius_km": 5,
+            "allow_unvalidated_safety": False,
+            "require_access_notes": True,
+            "max_data_age_days": 7,
+        }
+    )
+
+    assert result["ok"] is False
+    assert result["stops"] == []
+    assert "cumplan la búsqueda" in result["error"]
+
+
 def test_parse_preferences_arg_accepts_max_useful_power_cap():
     preferences = parse_preferences_arg({"reserve_min_percent": 20, "max_useful_power_kw": 100})
 

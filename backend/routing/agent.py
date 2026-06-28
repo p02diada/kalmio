@@ -652,14 +652,52 @@ def deepseek_tool_definitions() -> list[dict[str, Any]]:
             "type": "function",
             "function": {
                 "name": "search_destination_chargers",
-                "description": "Busca puntos de carga autorizados cerca de una ubicación ya resuelta o coordenadas explícitas.",
+                "description": (
+                    "Busca puntos de carga autorizados cerca de una ubicación ya resuelta o coordenadas explícitas. "
+                    "Usa purpose para que la herramienta aplique ranking/umbrales según la decisión del agente, "
+                    "sin que Django haga parsing conversacional."
+                ),
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "location": location_schema,
+                        "purpose": {
+                            "type": "string",
+                            "enum": ["urgent", "destination", "stay", "near_route_fallback"],
+                            "description": "Propósito ya decidido por el agente para ranking: urgente, destino, estancia o respaldo cercano a ruta.",
+                        },
                         "connector": {"type": "string", "description": "Conector si el usuario lo ha indicado."},
                         "radius_km": {"type": "number", "description": "Radio entre 1 y 100 km."},
                         "limit": {"type": "integer", "description": "Número de estaciones, entre 1 y 6."},
+                        "requested_services": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Servicios pedidos explícitamente, como restaurant, bathroom, cafe, supermarket.",
+                        },
+                        "max_useful_power_kw": {
+                            "type": "number",
+                            "description": "Potencia máxima útil del coche o preferencia; cap de ranking, no dato inventado.",
+                        },
+                        "require_verified_price": {
+                            "type": "boolean",
+                            "description": "True solo si el usuario exige precio/tarifa verificada; excluye tarifas estimadas o ausentes.",
+                        },
+                        "min_total_evses": {
+                            "type": "integer",
+                            "description": "Tamaño mínimo de hub en puestos de carga registrados.",
+                        },
+                        "allow_unvalidated_safety": {
+                            "type": "boolean",
+                            "description": "False solo si el usuario exige seguridad validada; normalmente true porque Kalmio no valida seguridad del entorno.",
+                        },
+                        "max_data_age_days": {
+                            "type": "number",
+                            "description": "Freshness máxima aceptable de datos importados si el usuario lo pide.",
+                        },
+                        "require_access_notes": {
+                            "type": "boolean",
+                            "description": "True solo si el usuario exige notas de acceso verificadas por fuente.",
+                        },
                     },
                     "required": ["location"],
                     "additionalProperties": False,
@@ -1140,7 +1178,10 @@ def conversation_agent_prompt(
         '- resolve_location: resuelve una ciudad o texto conocido. Args: {"query":"ciudad o texto"}\n'
         "- search_destination_chargers: busca puntos de carga autorizados alrededor de una ubicación ya resuelta o "
         'coordenadas dadas por el usuario. Args: {"location":{"label":"...","lat":0,"lon":0},"connector":null,'
-        '"radius_km":80,"limit":3}\n'
+        '"purpose":"destination|urgent|stay|near_route_fallback","radius_km":80,"limit":3,'
+        '"requested_services":[],"max_useful_power_kw":null,"require_verified_price":false,'
+        '"min_total_evses":null,"allow_unvalidated_safety":true,"max_data_age_days":null,'
+        '"require_access_notes":false}\n'
         "- plan_route: calcula ruta y paradas con proveedor y datos autorizados. Args: "
         '{"origin":{"label":"...","lat":0,"lon":0},"destination":{"label":"...","lat":0,"lon":0},'
         '"vehicle":null,"preferences":{"reserve_min_percent":20,"max_useful_power_kw":null},"corridor_radius_km":25}\n'
@@ -1171,6 +1212,7 @@ def conversation_agent_prompt(
         "- Si el usuario menciona ida y vuelta, volver, regreso o fechas de salida/vuelta, reconoce contexto de viaje redondo. Si falta origen para planificar ida/vuelta, pregunta por el origen en un AssistantMessage antes de pedir hotel/zona y no llames plan_route ni search_destination_chargers todavia. No uses la ciudad destino como origen.\n"
         "- Si resolve_location recibe un hotel, calle o POI pero solo devuelve una ciudad/zona, no afirmes que conoces el lugar exacto; no presentes el hotel exacto como ubicación validada; di que usas esa ciudad/zona como aproximación o pide coordenadas/dirección exacta.\n"
         "- Si search_destination_chargers devuelve stops, trátalos como estaciones: usa StationPreviewCard para una estación concreta o StationList para varias, con nombres y métricas exactas trazables. No uses placeholders cuando hay estaciones. Antes de llamar una herramienta, no crees StationPreviewCard genéricos como 'Cargador en Granada', potencia 0, distancia 0 o coordenadas iguales a la ciudad: pide herramienta o pregunta el dato mínimo.\n"
+        "- Al llamar search_destination_chargers, decide purpose por contexto útil y pásalo explícitamente: urgent para carga inmediata/batería baja/cerca de mí, destination para cargar cerca de destino/hotel/POI, stay para estancias de varios días o cargar durante la estancia, near_route_fallback para plan B cerca de corredor cuando no procede calcular ruta completa. Purpose solo ajusta ranking/umbrales de la herramienta; no es intent parsing de Django. Pasa requested_services solo si el usuario pidió servicios concretos; max_useful_power_kw solo si el usuario/coche dio ese límite; require_verified_price solo si exige precio verificado; min_total_evses para hubs grandes; allow_unvalidated_safety=false solo si el usuario exige seguridad validada, sabiendo que normalmente no habrá resultados porque Kalmio no valida seguridad del entorno; max_data_age_days y require_access_notes solo si pide freshness o notas de acceso verificadas.\n"
         "- En móvil, no satures la primera respuesta con todas las alternativas si hay una estación primaria clara. Por defecto, no muestres StationList en esa primera respuesta: prefiere StationPreviewCard para la recomendación y ActionButtons inmediatamente después para navegar, pedir más opciones o ajustar la búsqueda. Para pedir más opciones, usa ActionButtons con event.name='show_more_options' y un context trazable de la búsqueda o estación cuando exista; para navegación usa functionCall.openUrl si hay lat/lon trazables. Usa StationList cuando el usuario pida comparar/más opciones, cuando haya empate real, baja confianza o alternativas materialmente útiles que cambien la decisión. Si muestras StationPreviewCard y StationList juntos, no repitas la estación primaria dentro de StationList.\n"
         "- No uses superlativos globales como 'el más rápido en la ciudad' o 'el mejor de Córdoba' salvo que la herramienta lo demuestre. Acota a 'entre estas opciones' o 'según los datos disponibles' cuando compares potencia/distancia.\n"
         "- Si ya hay stops con potencia/distancia/disponibilidad y el usuario pide comparar potencia, alternativas o más opciones, responde con esos resultados previos; no repitas la misma búsqueda sin cambiar ubicación, radio, conector o criterio material.\n"
