@@ -148,6 +148,8 @@ def plan_route_tool(args: dict[str, Any]) -> dict[str, Any]:
         return {"ok": False, "tool": "plan_route", "error": str(exc)}
 
     recommendation = station_score_payload(plan.recommendation)
+    alternatives = [station_score_payload(item) for item in plan.alternatives]
+    geometry = route_geometry_payload(plan.route)
     return {
         "ok": True,
         "tool": "plan_route",
@@ -158,11 +160,46 @@ def plan_route_tool(args: dict[str, Any]) -> dict[str, Any]:
         "durationMin": plan.route.duration_min,
         "energyKwh": round(plan.energy_kwh, 1) if plan.energy_kwh is not None else None,
         "arrivalBattery": round(plan.arrival_battery_percent, 1) if plan.arrival_battery_percent is not None else None,
-        "routeGeometry": route_geometry_payload(plan.route),
+        "routeGeometry": geometry,
         "corridorRadiusKm": corridor_radius_km,
         "recommendation": recommendation,
-        "alternatives": [station_score_payload(item) for item in plan.alternatives],
+        "alternatives": alternatives,
         "warnings": plan.warnings,
+        "routeProvider": {
+            "provider": "configured_route_provider",
+            "origin": origin,
+            "destination": destination,
+            "distanceKm": round(plan.route.distance_km, 1),
+            "durationMin": plan.route.duration_min,
+            "routeGeometry": geometry,
+            "geometryPrecision": "provider",
+        },
+        "corridorStations": {
+            "corridorRadiusKm": corridor_radius_km,
+            "stations": [recommendation, *alternatives],
+            "stationCount": 1 + len(alternatives),
+            "source": "authorized_charger_imports",
+        },
+        "energyValidation": {
+            "status": "validated" if plan.planning_level == "ev_plan" else "not_validated",
+            "planningLevel": plan.planning_level,
+            "energyKwh": round(plan.energy_kwh, 1) if plan.energy_kwh is not None else None,
+            "arrivalBattery": round(plan.arrival_battery_percent, 1) if plan.arrival_battery_percent is not None else None,
+            "reserveMinPercent": preferences.reserve_min_percent,
+            "warnings": plan.warnings,
+        },
+        "ranking": {
+            "primaryStationName": recommendation.get("stationName"),
+            "candidates": [
+                {
+                    "stationName": station.get("stationName"),
+                    "score": station.get("score"),
+                    "reasons": station.get("scoreReasons", []),
+                }
+                for station in [recommendation, *alternatives]
+            ],
+        },
+        "unsatisfiedConstraints": plan.unsatisfied_constraints,
     }
 
 
@@ -189,6 +226,7 @@ def station_score_payload(score) -> dict[str, Any]:
         "lat": score.station["lat"],
         "lon": score.station["lon"],
         "priceIsEstimated": score.station.get("price_is_estimated"),
+        "score": score.score,
     }
     if score.station.get("price_eur_kwh") is not None and score.station.get("price_is_estimated") is not True:
         payload["pricePerKwhEur"] = score.station.get("price_eur_kwh")

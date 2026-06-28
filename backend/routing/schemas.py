@@ -97,6 +97,11 @@ class RoutePlanResponse(Schema):
     recommendation: RoutePlanStation
     alternatives: list[RoutePlanStation]
     warnings: list[str]
+    route_provider: dict
+    corridor_stations: dict
+    energy_validation: dict
+    ranking: dict
+    unsatisfied_constraints: list[dict]
 
 
 class RoutePlanError(Schema):

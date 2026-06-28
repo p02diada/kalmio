@@ -5279,6 +5279,19 @@ def test_anonymous_conversation_without_vehicle_returns_chargers_only(client, mo
     assert body["arrival_battery_percent"] is None
     assert body["recommendation"]["external_id"] == real_station.external_id
     assert body["recommendation"]["connector"] == "CCS2"
+    assert body["route_provider"] == {
+        "provider": "configured_route_provider",
+        "origin": {"label": "Córdoba", "lat": 37.8882, "lon": -4.7794},
+        "destination": {"label": "Valencia", "lat": 39.4699, "lon": -0.3763},
+        "distance_km": 520.0,
+        "duration_min": 355,
+        "geometry_precision": "provider",
+    }
+    assert body["corridor_stations"]["source"] == "authorized_charger_imports"
+    assert body["corridor_stations"]["station_count"] == 1
+    assert body["energy_validation"]["status"] == "not_validated"
+    assert body["ranking"]["primary_station_id"] == body["recommendation"]["id"]
+    assert body["unsatisfied_constraints"][0]["code"] == "missing_vehicle_profile"
     assert "Sin datos de autonomía" in body["warnings"][0]
     assert RoutePlan.objects.count() == 0
 
@@ -5312,6 +5325,22 @@ def test_plan_route_tool_treats_partial_vehicle_profile_as_chargers_only(monkeyp
     assert result["energyKwh"] is None
     assert result["arrivalBattery"] is None
     assert result["recommendation"]["stationName"] == real_station.name
+    assert result["routeProvider"]["distanceKm"] == 520
+    assert result["routeProvider"]["geometryPrecision"] == "provider"
+    assert result["corridorStations"]["stationCount"] == 1
+    assert result["corridorStations"]["stations"][0]["stationName"] == real_station.name
+    assert result["energyValidation"] == {
+        "status": "not_validated",
+        "planningLevel": "chargers_only",
+        "energyKwh": None,
+        "arrivalBattery": None,
+        "reserveMinPercent": 20.0,
+        "warnings": [
+            "Sin datos de autonomía, solo mostramos paradas de carga en ruta. No calculamos llegada estimada ni paradas óptimas."
+        ],
+    }
+    assert result["ranking"]["candidates"][0]["stationName"] == real_station.name
+    assert result["unsatisfiedConstraints"][0]["code"] == "missing_vehicle_profile"
     assert result["routeGeometry"] == {
         "type": "LineString",
         "coordinates": [

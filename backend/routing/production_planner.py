@@ -23,6 +23,7 @@ class ProductionPlanResult:
     energy_kwh: float | None
     arrival_battery_percent: float | None
     warnings: list[str]
+    unsatisfied_constraints: list[dict]
 
 
 class PlanningDataError(RuntimeError):
@@ -61,6 +62,13 @@ def plan_route_with_persisted_stations(
             warnings=[
                 "Sin datos de autonomía, solo mostramos paradas de carga en ruta. No calculamos llegada estimada ni paradas óptimas.",
             ],
+            unsatisfied_constraints=[
+                {
+                    "code": "missing_vehicle_profile",
+                    "label": "Falta perfil completo de vehículo para validar energía y llegada.",
+                    "severity": "blocking",
+                },
+            ],
         )
 
     energy_kwh = estimate_energy(route.distance_km, vehicle)
@@ -68,9 +76,17 @@ def plan_route_with_persisted_stations(
     reserve_kwh = vehicle.usable_battery_kwh * preferences.reserve_min_percent / 100
     arrival_battery = round(max(0, (available_kwh - energy_kwh) / vehicle.usable_battery_kwh * 100), 1)
     warnings: list[str] = []
+    unsatisfied_constraints: list[dict] = []
 
     if available_kwh - energy_kwh < reserve_kwh:
         warnings.append("La ruta completa necesita carga para respetar la reserva mínima.")
+        unsatisfied_constraints.append(
+            {
+                "code": "reserve_margin_not_met_without_charging",
+                "label": "La ruta completa queda por debajo de la reserva mínima sin una parada de carga.",
+                "severity": "warning",
+            }
+        )
 
     candidates = score_persisted_stations(
         route=route,
@@ -91,6 +107,7 @@ def plan_route_with_persisted_stations(
         energy_kwh=energy_kwh,
         arrival_battery_percent=arrival_battery,
         warnings=warnings,
+        unsatisfied_constraints=unsatisfied_constraints,
     )
 
 

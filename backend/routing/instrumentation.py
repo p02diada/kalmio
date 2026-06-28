@@ -320,4 +320,8 @@ def tool_result_summary(result: dict[str, Any]) -> dict[str, Any]:
         summary["alternativeCount"] = len(alternatives)
     if result.get("planningLevel"):
         summary["planningLevel"] = result.get("planningLevel")
+    if isinstance(result.get("corridorStations"), dict):
+        summary["corridorStationCount"] = result["corridorStations"].get("stationCount")
+    if isinstance(result.get("unsatisfiedConstraints"), list):
+        summary["unsatisfiedConstraintCount"] = len(result["unsatisfiedConstraints"])
     return {key: value for key, value in summary.items() if value is not None}

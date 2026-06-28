@@ -670,7 +670,11 @@ def deepseek_tool_definitions() -> list[dict[str, Any]]:
             "type": "function",
             "function": {
                 "name": "plan_route",
-                "description": "Calcula ruta EV con proveedor de rutas y puntos de carga autorizados cuando hay origen y destino.",
+                "description": (
+                    "Calcula ruta factual con proveedor, estaciones autorizadas del corredor y, solo si hay perfil completo, "
+                    "validación energética. Devuelve sub-resultados routeProvider, corridorStations, energyValidation, "
+                    "ranking y unsatisfiedConstraints."
+                ),
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -970,9 +974,24 @@ def compact_tool_result_for_prompt(result: dict[str, Any], tool_name: str = "") 
             "arrivalBattery",
             "corridorRadiusKm",
             "warnings",
+            "routeProvider",
+            "energyValidation",
+            "ranking",
+            "unsatisfiedConstraints",
         ):
             if key in result:
                 compact[key] = compact_prompt_value(result[key])
+        if isinstance(result.get("corridorStations"), dict):
+            corridor = {
+                key: compact_prompt_value(value)
+                for key, value in result["corridorStations"].items()
+                if key != "stations"
+            }
+            stations = result["corridorStations"].get("stations")
+            if isinstance(stations, list):
+                corridor["stations"] = compact_station_list_for_prompt(stations, limit=3)
+                corridor["stationCount"] = len(stations)
+            compact["corridorStations"] = corridor
         if isinstance(result.get("routeGeometry"), dict):
             compact["routeGeometrySummary"] = route_geometry_summary_for_prompt(result["routeGeometry"])
         if isinstance(result.get("recommendation"), dict):

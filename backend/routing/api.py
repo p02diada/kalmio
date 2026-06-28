@@ -498,6 +498,8 @@ def serialize_plan(plan: ProductionPlanResult, payload: RoutePlanRequest, route_
     if plan.planning_level == "chargers_only":
         warnings.append("No uses esta respuesta como garantía de llegada: no hay datos de autonomía ni compatibilidad.")
 
+    recommendation = serialize_station(plan.recommendation)
+    alternatives = [serialize_station(station) for station in plan.alternatives]
     return {
         "id": str(route_plan.public_id) if route_plan else None,
         "created_at": route_plan.created_at if route_plan else None,
@@ -508,13 +510,20 @@ def serialize_plan(plan: ProductionPlanResult, payload: RoutePlanRequest, route_
         "duration_min": plan.route.duration_min,
         "energy_kwh": plan.energy_kwh,
         "arrival_battery_percent": plan.arrival_battery_percent,
-        "recommendation": serialize_station(plan.recommendation),
-        "alternatives": [serialize_station(station) for station in plan.alternatives],
+        "recommendation": recommendation,
+        "alternatives": alternatives,
         "warnings": warnings,
+        "route_provider": route_provider_result(plan, payload),
+        "corridor_stations": corridor_stations_result(payload.corridor_radius_km, recommendation, alternatives),
+        "energy_validation": energy_validation_result(plan, payload),
+        "ranking": ranking_result(recommendation, alternatives),
+        "unsatisfied_constraints": plan.unsatisfied_constraints,
     }
 
 
 def serialize_saved_plan(route_plan: RoutePlan) -> dict:
+    recommendation = route_plan.recommendation_snapshot
+    alternatives = route_plan.alternatives_snapshot
     return {
         "id": str(route_plan.public_id),
         "created_at": route_plan.created_at,
@@ -525,9 +534,36 @@ def serialize_saved_plan(route_plan: RoutePlan) -> dict:
         "duration_min": route_plan.duration_min,
         "energy_kwh": float(route_plan.energy_kwh),
         "arrival_battery_percent": float(route_plan.arrival_battery_percent),
-        "recommendation": route_plan.recommendation_snapshot,
-        "alternatives": route_plan.alternatives_snapshot,
+        "recommendation": recommendation,
+        "alternatives": alternatives,
         "warnings": route_plan.warnings,
+        "route_provider": {
+            "provider": "stored",
+            "origin": {
+                "label": route_plan.origin_label,
+                "lat": float(route_plan.origin_latitude),
+                "lon": float(route_plan.origin_longitude),
+            },
+            "destination": {
+                "label": route_plan.destination_label,
+                "lat": float(route_plan.destination_latitude),
+                "lon": float(route_plan.destination_longitude),
+            },
+            "distance_km": float(route_plan.distance_km),
+            "duration_min": route_plan.duration_min,
+            "geometry_precision": "not_stored",
+        },
+        "corridor_stations": corridor_stations_result(None, recommendation, alternatives),
+        "energy_validation": {
+            "status": "validated",
+            "planning_level": "ev_plan",
+            "energy_kwh": float(route_plan.energy_kwh),
+            "arrival_battery_percent": float(route_plan.arrival_battery_percent),
+            "reserve_min_percent": None,
+            "warnings": route_plan.warnings,
+        },
+        "ranking": ranking_result(recommendation, alternatives),
+        "unsatisfied_constraints": [],
     }
 
 
@@ -548,4 +584,62 @@ def serialize_station(station_score) -> dict:
         "longitude": station["lon"],
         "score": station_score.score,
         "reasons": station_score.reasons,
+    }
+
+
+def route_provider_result(plan: ProductionPlanResult, payload: RoutePlanRequest) -> dict:
+    return {
+        "provider": "configured_route_provider",
+        "origin": {
+            "label": payload.origin_label,
+            "lat": payload.origin.lat,
+            "lon": payload.origin.lon,
+        },
+        "destination": {
+            "label": payload.destination_label,
+            "lat": payload.destination.lat,
+            "lon": payload.destination.lon,
+        },
+        "distance_km": plan.route.distance_km,
+        "duration_min": plan.route.duration_min,
+        "geometry_precision": "provider",
+    }
+
+
+def corridor_stations_result(corridor_radius_km: float | None, recommendation: dict, alternatives: list[dict]) -> dict:
+    stations = [recommendation, *alternatives]
+    return {
+        "corridor_radius_km": corridor_radius_km,
+        "stations": stations,
+        "station_count": len(stations),
+        "source": "authorized_charger_imports",
+    }
+
+
+def energy_validation_result(plan: ProductionPlanResult, payload: RoutePlanRequest) -> dict:
+    reserve_min_percent = getattr(getattr(payload, "preferences", None), "reserve_min_percent", None)
+    return {
+        "status": "validated" if plan.planning_level == "ev_plan" else "not_validated",
+        "planning_level": plan.planning_level,
+        "energy_kwh": plan.energy_kwh,
+        "arrival_battery_percent": plan.arrival_battery_percent,
+        "reserve_min_percent": reserve_min_percent,
+        "warnings": plan.warnings,
+    }
+
+
+def ranking_result(recommendation: dict, alternatives: list[dict]) -> dict:
+    ranked = [recommendation, *alternatives]
+    return {
+        "primary_station_id": recommendation.get("id"),
+        "candidates": [
+            {
+                "station_id": station.get("id"),
+                "external_id": station.get("external_id"),
+                "name": station.get("name"),
+                "score": station.get("score"),
+                "reasons": station.get("reasons", []),
+            }
+            for station in ranked
+        ],
     }
